@@ -14,7 +14,7 @@ h2 {
 #query fieldset, #query fieldset input, #query fieldset select { font-size: 11px }
 #query fieldset { margin-top: 1em }
 #query .option, #query .option input, #query .option select { font-size: 11px }
-#query .option { float: left; margin: 1em 2.5em 0 .5em; padding: 0 0 .1em }
+#query .option { float: left; line-height: 2em; margin: .9em 2.5em 0 .5em; padding: 0 0 .1em }
 #query .buttons { float: right; margin-top: .5em }
 #query .buttons input { margin: .5em }
 #query hr { clear: both; margin: 0; visibility: hidden }
@@ -66,13 +66,14 @@ h2 {
 .tickets .fullrow :link, .tickets .fullrow :visited { display: inline }
 .tickets .fullrow hr { display: none }
 
-.tickets tr.odd.highest { background: #fdc; border-color: #e88; color: #a22 }
-.tickets tr.even.highest { background: #fed; border-color: #e99; color: #a22 }
-.tickets tr.odd.high { background: #ffb; border-color: #eea; color: #880 }
-.tickets tr.even.high { background: #ffd; border-color: #dd8; color: #880 }
-.tickets tr.odd.normal  { background: #fbfbfb; border-color: #ddd; color: #444 }
-.tickets tr.even.normal { background: #f6f6f6; border-color: #ccc; color: #333 }
-.tickets tr.odd.low { background: #e7ffff; border-color: #cee; color: #099 }
-.tickets tr.even.low { background: #dff; border-color: #bee; color: #099 }
-.tickets tr.odd.lowest { background: #e7eeff; border-color: #cde; color: #469 }
-.tickets tr.even.lowest { background: #dde7ff; border-color: #cde; color: #469 }
+/* Query results table */
+table.tickets tbody tr.highest { background: #fdc; border-color: #e88; color: #a22 }
+table.tickets tbody tr.even.highest { background: #fed; border-color: #e99 }
+table.tickets tbody tr.high { background: #ffb; border-color: #eea; color: #880 }
+table.tickets tbody tr.even.high { background: #ffd; border-color: #dd8 }
+table.tickets tbody tr.normal  { background: #fbfbfb; border-color: #ddd; color: #444 }
+table.tickets tbody tr.even.normal { background: #f6f6f6; border-color: #ccc }
+table.tickets tbody tr.low { background: #e7ffff; border-color: #cee; color: #099 }
+table.tickets tbody tr.even.low { background: #dff; border-color: #bee }
+table.tickets tbody tr.lowest { background: #e7eeff; border-color: #cde; color: #469 }
+table.tickets tbody tr.even.lowest { background: #dde7ff; border-color: #cde }

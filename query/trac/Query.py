@@ -360,8 +360,8 @@ class QueryModule(Module):
             if self.req.authname and self.req.authname != 'anonymous':
                 constraints['owner'] = [ self.req.authname ]
             else:
-                email = self.req.session['email']
-                name = self.req.session['name']
+                email = self.req.session.get('email')
+                name = self.req.session.get('name')
                 if email or name:
                     constraints['cc'] = [ '~%s' % email or name ]
         else:
