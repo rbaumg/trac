@@ -30,31 +30,29 @@ class Href:
     def __init__(self, base):
         self.base = base
 
-    def log(self, path, rev=None):
+    def log(self, path, rev=None, format=None):
         path = urllib.quote(path)
+        href = href_join(self.base, 'log', path)
+        params = []
         if rev:
-            return href_join(self.base, 'log', path) + '?rev=' + str(rev)
-        else:
-            return href_join(self.base, 'log', path)
-        
-    def file(self, path, rev=None, format=None):
-        path = urllib.quote(path)
-        if rev and format:
-            return href_join(self.base, 'file', path) + \
-                   '?rev=%s&format=%s' % (str(rev), format)
-        elif rev:
-            return href_join(self.base, 'file', path) + '?rev=' + str(rev)
-        elif format:
-            return href_join(self.base, 'file', path) + '?format=' + format
-        else:
-            return href_join(self.base, 'file', path)
+            params.append(('rev', rev))
+        if format:
+            params.append(('format', format))
+        if params:
+            href += '?' + urllib.urlencode(params)
+        return href
 
-    def browser(self, path, rev=None):
+    def browser(self, path, rev=None, format=None):
         path = urllib.quote(path)
+        href = href_join(self.base, 'browser', path)
+        params = []
         if rev:
-            return href_join(self.base, 'browser', path) + '?rev=' + str(rev)
-        else:
-            return href_join(self.base, 'browser', path)
+            params.append(('rev', rev))
+        if format:
+            params.append(('format', format))
+        if params:
+            href += '?' + urllib.urlencode(params)
+        return href
 
     def login(self):
         return href_join(self.base, 'login')

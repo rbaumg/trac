@@ -92,7 +92,7 @@ class AuthzPermission:
 
     def has_permission_for_changeset(self, rev):
         cursor = self.db.cursor()
-        cursor.execute("SELECT name FROM node_change WHERE rev=%s", (rev,))
+        cursor.execute("SELECT path FROM node_change WHERE rev=%s", (rev,))
         for row in cursor:
             if self.has_permission(row[0]):
                 return 1
