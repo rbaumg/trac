@@ -58,15 +58,44 @@ class QueryModule(Module):
                     vals = map(lambda x: mode + x, vals)
                 constraints[field] = vals
 
-        from pprint import pprint
-        from StringIO import StringIO
-        buf = StringIO()
-        pprint(constraints, buf)
-        self.log.debug("Query constraints:\n%s" % buf.getvalue())
-
         return constraints
 
-    def _get_results(self, sql):
+    def _get_columns(self, constraints):
+        # FIXME: the user should be able to configure which columns should
+        # be displayed
+        cols = [ 'id', 'summary', 'status', 'resolution', 'priority',
+                 'owner', 'milestone', 'component', 'version', 'severity',
+                 'reporter' ]
+
+        # Semi-intelligently remove columns that are restricted to a single
+        # value by a query constraint.
+        for col in [k for k in constraints.keys() if k in cols]:
+            constraint = constraints[col]
+            if len(constraint) == 1 and not constraint[0][0] in '!~^$':
+                cols.remove(col)
+            if col == 'status' and not 'closed' in constraint \
+                    and 'resolution' in cols:
+                cols.remove('resolution')
+
+        def sort_columns(col1, col2):
+            # Ticket ID is always the first column
+            if col1 == 'id':
+                return -1
+            # Ticket summary is always the second column
+            elif col1 == 'summary' and not col2 == 'id':
+                return -1
+            # Constrained columns appear before other columns
+            elif col1 in constraints.keys() and not (
+                 col2 in ['id', 'summary'] or col2 in constraints.keys()):
+                return -1
+            return 0
+        cols.sort(sort_columns)
+
+        # Only display the first seven columns by default
+        # FIXME: Make this configurable on a per-user and/or per-query basis
+        return cols[:7]
+
+    def _get_results(self, cols, sql):
         cursor = self.db.cursor()
         cursor.execute(sql)
         results = []
@@ -75,15 +104,9 @@ class QueryModule(Module):
             if not row:
                 break
             id = int(row['id'])
-            result = {
-                'id': id,
-                'href': self.env.href.ticket(id),
-                'summary': escape(row['summary'] or '(no summary)'),
-                'status': row['status'] or '',
-                'component': row['component'] or '',
-                'owner': row['owner'] or '',
-                'priority': row['priority'] or ''
-            }
+            result = { 'id': id, 'href': self.env.href.ticket(id) }
+            for col in cols:
+                result[col] = escape(row[col] or '--')
             results.append(result)
         cursor.close()
         return results
@@ -135,81 +158,46 @@ class QueryModule(Module):
     def _get_constraint_modes(self):
         modes = {}
         modes['text'] = [
-            {'name': "contains", 'value': "~",'novalue': 1},
-            {'name': "doesn't cointain", 'value': "!~",'novalue': 1},
-            {'name': "begins with", 'value': "^",'novalue': 1},
-            {'name': "ends with", 'value': "$",'novalue': 1},
-            {'name': "is", 'value': "",'novalue': 1},
-            {'name': "is not", 'value': "!",'novalue': 1}
+            {'name': "contains", 'value': "~"},
+            {'name': "doesn't cointain", 'value': "!~"},
+            {'name': "begins with", 'value': "^"},
+            {'name': "ends with", 'value': "$"},
+            {'name': "is", 'value': ""},
+            {'name': "is not", 'value': "!"}
         ]
         modes['select'] = [
-            {'name': "is", 'value': "",'novalue': 1},
-            {'name': "is not", 'value': "!",'novalue': 1}
+            {'name': "is", 'value': ""},
+            {'name': "is not", 'value': "!"}
         ]
         return modes
 
-    def render(self):
-        self.perm.assert_permission(perm.TICKET_VIEW)
-
-        constraints = self._get_constraints()
-        order = self.args.get('order', 'priority')
-        desc = self.args.has_key('desc')
-
-        if self.args.has_key('update'):
-            self.req.redirect(self.env.href.query(constraints, order, desc))
-        props = self._get_ticket_properties()
-        add_to_hdf(props, self.req.hdf, 'ticket.properties')
-        modes = self._get_constraint_modes()
-        add_to_hdf(modes, self.req.hdf, 'query.modes')
-
-        self._render_results(constraints, order, desc)
-
-        # For clients without JavaScript, we add a new constraint here if
-        # requested
-        if self.args.has_key('add'):
-            field = self.args.get('add_filter')
-            if field:
-                self.req.hdf.setValue('query.constraints.%s.0' % field, '')
-
-    def _render_results(self, constraints, order, desc):
-        self.req.hdf.setValue('title', 'Custom Query')
-
-        # FIXME: the user should be able to configure which columns should
-        # be displayed
-        headers = [ 'id', 'summary', 'status', 'component', 'owner' ]
-        cols = headers
+    def _generate_sql(self, cols, constraints, order, desc):
+        if not order in cols:
+            cols.append(order)
         if not 'priority' in cols:
+            # Always add the priority column for coloring the resolt rows
             cols.append('priority')
 
-        if order != 'id' and not order in Ticket.std_fields:
-            # order by priority by default
-            order = 'priority'
-        for i in range(len(headers)):
-            self.req.hdf.setValue('query.headers.%d.name' % i, headers[i])
-            if headers[i] == order:
-                self.req.hdf.setValue('query.headers.%d.href' % i,
-                    self.env.href.query(constraints, order, not desc))
-                self.req.hdf.setValue('query.headers.%d.order' % i,
-                    desc and 'desc' or 'asc')
-            else:
-                self.req.hdf.setValue('query.headers.%d.href' % i,
-                    self.env.href.query(constraints, headers[i]))
-
         sql = []
-        sql.append("SELECT " + ", ".join(headers))
+        sql.append("SELECT " + ", ".join(cols))
         custom_fields = [f['name'] for f in get_custom_fields(self.env)]
         for k in [k for k in constraints.keys() if k in custom_fields]:
             sql.append(", %s.value AS %s" % (k, k))
-        sql.append(" FROM ticket")
+        sql.append("\nFROM ticket")
         for k in [k for k in constraints.keys() if k in custom_fields]:
-           sql.append(" LEFT OUTER JOIN ticket_custom AS %s ON " \
+           sql.append("\n  LEFT OUTER JOIN ticket_custom AS %s ON " \
                       "(id=%s.ticket AND %s.name='%s')"
                       % (k, k, k, k))
 
         for col in [c for c in ['status', 'resolution', 'priority', 'severity']
-                    if c in cols]:
-            sql.append(" INNER JOIN (SELECT name AS %s_name, value AS %s_value " \
-                                   "FROM enum WHERE type='%s')" \
+                    if c == order]:
+            sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
+                                         "value AS %s_value " \
+                                         "FROM enum WHERE type='%s')" \
+                       " ON %s_name=%s" % (col, col, col, col, col))
+        for col in [c for c in ['milestone', 'version'] if c == order]:
+            sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
+                                         "time AS %s_time FROM %s)" \
                        " ON %s_name=%s" % (col, col, col, col, col))
 
         clauses = []
@@ -217,7 +205,6 @@ class QueryModule(Module):
             if len(v) > 1:
                 inlist = ["'" + sql_escape(val) + "'" for val in v]
                 clauses.append("%s IN (%s)" % (k, ",".join(inlist)))
-                add_to_hdf(v, self.req.hdf, 'query.constraints.%s' % k)
             elif len(v) == 1:
                 val = v[0]
 
@@ -225,10 +212,8 @@ class QueryModule(Module):
                 if neg:
                     val = val[1:]
                 mode = ''
-                if val[:1] in "~^$*|-":
+                if val[:1] in "~^$":
                     mode, val = val[:1], val[1:]
-                self.req.hdf.setValue('query.constraints.%s.mode' % k, (neg and '!' or '') + mode)
-                add_to_hdf([val], self.req.hdf, 'query.constraints.%s' % k)
 
                 val = sql_escape(val)
                 if mode == '~' and val:
@@ -247,18 +232,87 @@ class QueryModule(Module):
                         clauses.append("IFNULL(%s,'')='%s'" % (k, val))
 
         if clauses:
-            sql.append(" WHERE " + " AND ".join(clauses))
+            sql.append("\nWHERE " + " AND ".join(clauses))
 
+        sql.append("\nORDER BY IFNULL(%s,'')=''%s,"
+                   % (order, desc and ' DESC' or ''))
         if order in ['status', 'resolution', 'priority', 'severity']:
-            sql.append(" ORDER BY %s_value" % order)
+            sql.append("%s_value%s" % (order, desc and ' DESC' or ''))
+        elif order in ['milestone', 'version']:
+            sql.append("IFNULL(%s_time,0)=0%s,%s_time%s,%s_name%s"
+                       % (order, desc and ' DESC' or '',
+                          order, desc and ' DESC' or '',
+                          order, desc and ' DESC' or ''))
         else:
-            sql.append(" ORDER BY " + order)
-        self.req.hdf.setValue('query.order', order)
-        if desc:
-            sql.append(" DESC")
-            self.req.hdf.setValue('query.desc', '1')
+            sql.append("%s%s" % (order, desc and ' DESC' or ''))
+        sql.append(",id")
 
         sql = "".join(sql)
         self.log.debug("SQL Query: %s" % sql)
-        results = self._get_results(sql)
+        return sql
+
+    def render(self):
+        self.perm.assert_permission(perm.TICKET_VIEW)
+
+        constraints = self._get_constraints()
+        order = self.args.get('order')
+        if order != 'id' and not order in Ticket.std_fields:
+            # order by priority by default
+            order = 'priority'
+        desc = self.args.has_key('desc')
+
+        if self.args.has_key('update'):
+            self.req.redirect(self.env.href.query(constraints, order, desc))
+
+        props = self._get_ticket_properties()
+        add_to_hdf(props, self.req.hdf, 'ticket.properties')
+        modes = self._get_constraint_modes()
+        add_to_hdf(modes, self.req.hdf, 'query.modes')
+
+        self._render_results(constraints, order, desc)
+
+        # For clients without JavaScript, we add a new constraint here if
+        # requested
+        if self.args.has_key('add'):
+            field = self.args.get('add_filter')
+            if field:
+                self.req.hdf.setValue('query.constraints.%s.0' % field, '')
+
+    def _render_results(self, constraints, order, desc):
+        self.req.hdf.setValue('title', 'Custom Query')
+
+        cols = self._get_columns(constraints)
+
+        for i in range(len(cols)):
+            self.req.hdf.setValue('query.headers.%d.name' % i, cols[i])
+            if cols[i] == order:
+                self.req.hdf.setValue('query.headers.%d.href' % i,
+                    self.env.href.query(constraints, order, not desc))
+                self.req.hdf.setValue('query.headers.%d.order' % i,
+                    desc and 'desc' or 'asc')
+            else:
+                self.req.hdf.setValue('query.headers.%d.href' % i,
+                    self.env.href.query(constraints, cols[i]))
+
+        for k, v in constraints.items():
+            if len(v) > 1:
+                add_to_hdf(v, self.req.hdf, 'query.constraints.%s' % k)
+            elif len(v) == 1:
+                val = v[0]
+                neg = val[:1] == '!'
+                if neg:
+                    val = val[1:]
+                mode = ''
+                if val[:1] in "~^$":
+                    mode, val = val[:1], val[1:]
+                self.req.hdf.setValue('query.constraints.%s.mode' % k,
+                                      (neg and '!' or '') + mode)
+                add_to_hdf([val], self.req.hdf, 'query.constraints.%s' % k)
+
+        self.req.hdf.setValue('query.order', order)
+        if desc:
+            self.req.hdf.setValue('query.desc', '1')
+
+        sql = self._generate_sql(cols, constraints, order, desc)
+        results = self._get_results(cols, sql)
         add_to_hdf(results, self.req.hdf, 'query.results')
