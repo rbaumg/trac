@@ -19,6 +19,8 @@
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
+from __future__ import generators
+
 from protocols import *
 
 
@@ -146,7 +148,7 @@ class ExtensionsProxy(object):
         if constrain:
             pluginIds = filter(constrain, self.pluginIds)
         else:
-            pluginIds = self.pluginIds[:]        
+            pluginIds = self.pluginIds[:]
         if order:
             pluginIds.sort(order)
         if reverse:
@@ -162,15 +164,9 @@ class ExtensionsProxy(object):
         return adapt(plugin, self.extensionPoint.protocol)
 
     def __iter__(self):
-        self.pos = 0
-        return self
-
-    def next(self):
-        if self.pos == len(self.pluginIds):
-            raise StopIteration
-        plugin = self.pluginManager.plugin(self.pluginIds[self.pos])
-        self.pos += 1
-        return adapt(plugin, self.extensionPoint.protocol)
+        for pluginId in self.pluginIds:
+            plugin = self.pluginManager.plugin(pluginIn)
+            yield adapt(plugin, self.extensionPoint.protocol)
 
 
 class IPluginActivationListener(Interface):
