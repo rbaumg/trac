@@ -165,7 +165,7 @@ class Timeline (Module):
                 item['shortmsg'] = util.escape(util.shorten_line(msg))
                 item['message'] = wiki_to_oneliner(
                     util.shorten_line(item['message']),
-                    self.req.hdf, self.db, self.env,absurls=1)
+                    self.req.hdf, self.env, self.db, absurls=1)
                 item['msg_escwiki'] = util.escape(wiki_to_html(msg,
                                                                self.req.hdf,
                                                                self.env,
