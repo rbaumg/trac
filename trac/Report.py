@@ -164,7 +164,7 @@ class Report (Module):
                 elif cols[col_idx][0] in ['time', 'date', 'created', 'modified']:
                     self.cgi.hdf.setValue(prefix + '.type', 'time')
                     self.cgi.hdf.setValue(prefix + '.value',
-                                          time.strftime('%F',
+                                          time.strftime('%x',
                                           time.localtime(int(cell))))
                 elif cols[col_idx][0] in ['summary', 'owner',
                                           'severity', 'status', 'priority']:
