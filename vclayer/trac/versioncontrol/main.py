@@ -22,7 +22,8 @@
 
 class Repository(object):
 
-    def __init__(self, log):
+    def __init__(self, authz, log):
+        self.authz = authz or Authorizer()
         self.log = log
 
     def close(self):
@@ -103,3 +104,19 @@ class Changeset(object):
         ADD, COPY, DELETE, EDIT or MOVE.
         """
         raise NotImplementedError
+
+
+class PermissionDenied(Exception):
+    pass
+
+
+class Authorizer(object):
+
+    def assert_permission(self, path):
+        if not self.has_permission(path):
+            raise PermissionDenied, \
+                  'Insufficient permissions to access %s' % path
+
+    def has_permission(self, path):
+        return 1
+

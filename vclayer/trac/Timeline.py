@@ -22,7 +22,7 @@
 from trac import perm
 from trac.util import enum, escape, shorten_line
 from trac.Module import Module
-from trac.versioncontrol.svn_authz import AuthzPermission
+from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.WikiFormatter import wiki_to_oneliner, wiki_to_html
 
 import time
@@ -108,7 +108,7 @@ class Timeline(Module):
 
     def render(self, req):
         self.perm.assert_permission(perm.TIMELINE_VIEW)
-        self.authzperm = AuthzPermission(self.env, req.authname)
+        self.authzperm = SubversionAuthorizer(self.env, req.authname) # Kludge
 
         _from = req.args.get('from', '')
         _daysback = req.args.get('daysback', '')

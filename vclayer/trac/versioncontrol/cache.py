@@ -37,8 +37,8 @@ _actionmap = {'A': Changeset.ADD, 'C': Changeset.COPY,
 
 class CachedRepository(Repository):
 
-    def __init__(self, db, repos, log):
-        Repository.__init__(self, log)
+    def __init__(self, db, repos, authz, log):
+        Repository.__init__(self, authz, log)
         self.db = db
         self.repos = repos
         self.synced = 0
@@ -46,14 +46,11 @@ class CachedRepository(Repository):
     def __getattr__(self, name):
         return getattr(self.repos, name)
 
-    def close(self):
-        self.repos.close()
-
     def get_changeset(self, rev):
         if not self.synced:
             self.sync()
             self.synced = 1
-        return CachedChangeset(rev, self.db)
+        return CachedChangeset(rev, self.db, self.authz)
 
     def sync(self):
         self.log.debug("Checking whether sync with repository is needed")
@@ -87,8 +84,9 @@ class CachedRepository(Repository):
 
 class CachedChangeset(Changeset):
 
-    def __init__(self, rev, db):
+    def __init__(self, rev, db, authz):
         self.db = db
+        self.authz = authz
         cursor = self.db.cursor()
         cursor.execute("SELECT time,author,message FROM revision "
                        "WHERE rev=%s", (rev,))
@@ -103,6 +101,9 @@ class CachedChangeset(Changeset):
         cursor.execute("SELECT path,kind,change,base_path,base_rev "
                        "FROM node_change WHERE rev=%s", (self.rev,))
         for path, kind, change, base_path, base_rev in cursor:
+            if not self.authz.has_permission(path):
+                # FIXME: what about the base_path?
+                continue
             kind = _kindmap[kind]
             change = _actionmap[change]
             yield path, kind, change, base_path, base_rev

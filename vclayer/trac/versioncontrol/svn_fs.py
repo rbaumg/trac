@@ -38,8 +38,8 @@ class SubversionRepository(Repository):
     TODO: authz support
     """
 
-    def __init__(self, path, log):
-        Repository.__init__(self, log)
+    def __init__(self, path, authz, log):
+        Repository.__init__(self, authz, log)
 
         if core.SVN_VER_MAJOR < 1:
             raise TracError, \
@@ -58,12 +58,6 @@ class SubversionRepository(Repository):
         self.repos = None
         self.fs_ptr = None
 
-    def __del__(self):
-        self.close()
-
-    def __lazyinit(self):
-        assert not self.apr_initialized, "Already initialized"
-
         self.log.debug("Opening subversion file-system at %s" % self.path)
 
         core.apr_initialize()
@@ -73,6 +67,9 @@ class SubversionRepository(Repository):
         self.repos = repos.svn_repos_open(self.path, self.pool)
         self.fs_ptr = repos.svn_repos_fs(self.repos)
         self.rev = fs.youngest_rev(self.fs_ptr, self.pool)
+
+    def __del__(self):
+        self.close()
 
     def close(self):
         if self.pool:
@@ -87,15 +84,10 @@ class SubversionRepository(Repository):
             self.apr_initialized = 0
 
     def get_changeset(self, rev):
-        if not self.apr_initialized:
-            self.__lazyinit()
-
-        return SubversionChangeset(int(rev), self.fs_ptr, self.pool)
+        return SubversionChangeset(int(rev), self.authz, self.fs_ptr, self.pool)
 
     def get_node(self, path, rev=None):
-        if not self.apr_initialized:
-            self.__lazyinit()
-
+        self.authz.assert_permission(path)
         if path and path[-1] == '/':
             path = path[:-1]
 
@@ -107,18 +99,15 @@ class SubversionRepository(Repository):
         if not rev:
             rev = self.rev
 
-        return SubversionNode(path, rev, self.fs_ptr, self.pool)
+        return SubversionNode(path, rev, self.authz, self.fs_ptr, self.pool)
 
-    def __getattr__(self, name):
-        if not self.apr_initialized:
-            self.__lazyinit()
-        return getattr(self, name)
 
 class SubversionNode(Node):
 
-    def __init__(self, path, rev, fs_ptr, pool):
+    def __init__(self, path, rev, authz, fs_ptr, pool):
         self.root = fs.revision_root(fs_ptr, rev, pool)
         self.rev = fs.node_created_rev(self.root, path, pool)
+        self.authz = authz
         self.fs_ptr = fs_ptr
         self.pool = pool
         Node.__init__(self, path, self.rev,
@@ -135,14 +124,28 @@ class SubversionNode(Node):
         entries = fs.dir_entries(self.root, self.path, self.pool)
         for item in entries.keys():
             path = '/'.join((self.path, item))
-            yield SubversionNode(path, self.rev, self.fs_ptr, self.pool)
+            if not self.authz.has_permission(path):
+                continue
+            yield SubversionNode(path, self.rev, self.authz, self.fs_ptr,
+                                 self.pool)
 
     def get_history(self):
         history = []
-        def history_cb(path, rev, pool):
-            history.append((path, rev))
-        repos.svn_repos_history(self.fs_ptr, self.path, history_cb,
-                                self.rev, 0, 1, self.pool)
+        if hasattr(repos, 'svn_repos_history2'):
+            # For Subversion >= 1.1
+            def authz_cb(root, path, pool):
+                return self.authz.has_permission(path) and 1 or 0
+            def history_cb(path, rev, pool):
+                history.append((path, rev))
+            repos.svn_repos_history2(self.fs_ptr, self.path, history_cb,
+                                     authz_cb, self.rev, 0, 1, self.pool)
+        else:
+            # For Subversion 1.0.x
+            def history_cb(path, rev, pool):
+                if self.authz.has_permission(path):
+                    history.append((path, rev))
+            repos.svn_repos_history(self.fs_ptr, self.path, history_cb,
+                                    self.rev, 0, 1, self.pool)
         for item in history:
             yield item
 
@@ -167,8 +170,9 @@ class SubversionNode(Node):
 
 class SubversionChangeset(Changeset):
 
-    def __init__(self, rev, fs_ptr, pool):
+    def __init__(self, rev, authz, fs_ptr, pool):
         self.rev = rev
+        self.authz = authz
         self.fs_ptr = fs_ptr
         self.pool = pool
         message = self._get_prop(core.SVN_PROP_REVISION_LOG)
@@ -184,6 +188,9 @@ class SubversionChangeset(Changeset):
         repos.svn_repos_replay(root, e_ptr, e_baton, self.pool)
 
         for path, change in editor.changes.items():
+            if not self.authz.has_permission(path):
+                # FIXME: what about base_path?
+                continue
             base_path, base_rev = change.base_path, change.base_rev
             if base_path and base_path[0] == '/':
                 base_path = base_path[1:]

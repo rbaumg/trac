@@ -23,7 +23,7 @@ import time
 import util
 import re
 
-from trac import authzperm, perm
+from trac import perm
 from trac.Module import Module
 from trac.WikiFormatter import wiki_to_html
 from trac.versioncontrol import Changeset, Node
@@ -42,7 +42,7 @@ class Changeset(Module):
                       'application/zip', 'zip')
 
         rev = req.args.get('rev')
-        repos = self.env.get_repository()
+        repos = self.env.get_repository(req.authname)
 
         diff_options = get_diff_options(req)
         if req.args.has_key('update'):
