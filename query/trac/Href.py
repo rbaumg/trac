@@ -72,11 +72,9 @@ class Href:
     def newticket(self):
         return href_join(self.base, 'newticket')
 
-    def query(self, constraints={}, order=None, desc=0, action=None):
+    def query(self, constraints={}, order=None, desc=0, verbose=0):
         href = href_join(self.base, 'query')
         params = []
-        if action:
-            params.append('action=' + urllib.quote(action))
         for field in constraints.keys():
             values = constraints[field]
             if type(values) is not ListType:
@@ -87,6 +85,8 @@ class Href:
             params.append('order=' + urllib.quote(order))
         if desc:
             params.append('desc=1')
+        if verbose:
+            params.append('verbose=1')
         if params:
             href += '?' + ('&').join(params)
         return href

@@ -25,17 +25,23 @@ from types import ListType
 import perm
 from Module import Module
 from Ticket import get_custom_fields, insert_custom_fields, Ticket
+from Wiki import wiki_to_html
 from util import add_to_hdf, escape, sql_escape
 
 
 class Query:
 
-    def __init__(self, env, constraints=None, order='priority', desc=0):
+    def __init__(self, env, constraints=None, order=None, desc=0, verbose=0):
         self.env = env
         self.constraints = constraints or {}
         self.order = order
         self.desc = desc
+        self.verbose = verbose
         self.cols = [] # lazily initialized
+
+        if self.order != 'id' and not self.order in Ticket.std_fields:
+            # order by priority by default
+            self.order = 'priority'
 
     def get_columns(self):
         if self.cols:
@@ -95,6 +101,9 @@ class Query:
             result = { 'id': id, 'href': self.env.href.ticket(id) }
             for col in self.cols:
                 result[col] = escape(row[col] or '--')
+            if self.verbose:
+                result['description'] = wiki_to_html(row['description'] or '',
+                                                     None, self.env, db)
             results.append(result)
         cursor.close()
         return results
@@ -109,6 +118,8 @@ class Query:
         if not 'priority' in cols:
             # Always add the priority column for coloring the resolt rows
             cols.append('priority')
+        if self.verbose:
+            cols.append('description')
 
         sql = []
         sql.append("SELECT " + ",".join(cols))
@@ -292,22 +303,20 @@ class QueryModule(Module):
     def render(self):
         self.perm.assert_permission(perm.TICKET_VIEW)
 
-        constraints = self._get_constraints()
-        order = self.args.get('order')
-        if order != 'id' and not order in Ticket.std_fields:
-            # order by priority by default
-            order = 'priority'
-        desc = self.args.has_key('desc')
+        query = Query(self.env, self._get_constraints(),
+                      self.args.get('order'), self.args.has_key('desc'),
+                      self.args.has_key('verbose'))
 
         if self.args.has_key('update'):
-            self.req.redirect(self.env.href.query(constraints, order, desc))
+            self.req.redirect(self.env.href.query(query.constraints,
+                                                  query.order, query.desc,
+                                                  query.verbose))
 
         props = self._get_ticket_properties()
         add_to_hdf(props, self.req.hdf, 'ticket.properties')
         modes = self._get_constraint_modes()
         add_to_hdf(modes, self.req.hdf, 'query.modes')
 
-        query = Query(self.env, constraints, order, desc)
         self._render_results(query)
 
         # For clients without JavaScript, we add a new constraint here if
@@ -326,12 +335,13 @@ class QueryModule(Module):
             if cols[i] == query.order:
                 self.req.hdf.setValue('query.headers.%d.href' % i,
                     self.env.href.query(query.constraints, query.order,
-                                        not query.desc))
+                                        not query.desc, query.verbose))
                 self.req.hdf.setValue('query.headers.%d.order' % i,
                     query.desc and 'desc' or 'asc')
             else:
                 self.req.hdf.setValue('query.headers.%d.href' % i,
-                    self.env.href.query(query.constraints, cols[i]))
+                    self.env.href.query(query.constraints, cols[i],
+                                        query.verbose))
 
         for k, v in query.constraints.items():
             if len(v) > 1:
@@ -351,6 +361,8 @@ class QueryModule(Module):
         self.req.hdf.setValue('query.order', query.order)
         if query.desc:
             self.req.hdf.setValue('query.desc', '1')
+        if query.verbose:
+            self.req.hdf.setValue('query.verbose', '1')
 
         results = query.execute(self.db)
         add_to_hdf(results, self.req.hdf, 'query.results')

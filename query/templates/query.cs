@@ -85,6 +85,14 @@
    </tr>
   </table>
  </fieldset>
+ <fieldset id="options">
+  <legend>Options</legend>
+  <p>
+   <input type="checkbox" name="verbose" id="verbose"<?cs
+     if:query.verbose ?> checked="checked"<?cs /if ?> />
+   <label for="verbose">Show full description under each result</label>
+  </p>
+ </fieldset>
  <div class="buttons">
   <input type="hidden" name="mode" value="query" />
   <input type="hidden" name="order" value="<?cs var:query.order ?>" />
@@ -96,6 +104,7 @@
   var:htdocs_location ?>query.js" defer="defer"></script>
 <script type="text/javascript" defer="defer">
   initializeFilters();
+  stackFieldsets("filters", "options");
 </script>
 
 <p id="nummatches"><?cs alt:len(query.results) ?>No<?cs /alt ?> ticket<?cs if:len(query.results) != 1 ?>s<?cs
@@ -136,6 +145,11 @@
       </td><?cs
      /if ?>
     <?cs /each ?>
+    <?cs if:result.description ?>
+     </tr><tr><td class="fullrow" colspan="<?cs var:len(query.headers) ?>">
+      <?cs var:result.description ?>
+     </td>
+    <?cs /if ?>
    </tr><?cs /each ?>
   </tbody>
  </table>

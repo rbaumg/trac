@@ -21,6 +21,14 @@ ORDER BY IFNULL(id,'')='',id""")
 FROM ticket
 ORDER BY IFNULL(id,'')='' DESC,id DESC""")
 
+    def test_all_ordered_by_id_verbose(self):
+        query = Query(self.env, order='id', verbose=1)
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,status,owner,priority,milestone,component,description
+FROM ticket
+ORDER BY IFNULL(id,'')='',id""")
+
     def test_all_ordered_by_priority(self):
         query = Query(self.env) # priority is default order
         sql = query.to_sql()

@@ -153,17 +153,6 @@ function addFilter(select) {
 // Removes an existing row from the filters table
 function removeFilter(button, propertyName) {
 
-  // Ugly hack: Safari removes the DOM nodes, but not the form elements for
-  // some buggy reason, so they'll get submitted twice. Setting the name of
-  // the original elements to an empty string before removing them seems to
-  // solve the problem
-  function removeControlNames(container) {
-    var inputs = container.getElementsByTagName("input");
-    for (var j = 0; j < inputs.length; j++) inputs[j].name = "";
-    var selects = container.getElementsByTagName("select");
-    for (var j = 0; j < selects.length; j++) selects[j].name = "";
-  }
-
   var tr = getAncestorByTagName(button, "tr");
   var table = getAncestorByTagName(tr, "table");
   removeControlNames(tr);
@@ -174,4 +163,57 @@ function removeFilter(button, propertyName) {
     var option = select.options[i];
     if (option.value == propertyName) option.disabled = false;
   }
+}
+
+// Takes are variable length list of IDs of fieldsets as arguments, and stacks
+// all those fieldsets under a single fieldset, enabling the user to switch
+// between them by selecting the legend of the original fieldsets from a
+// dropdown list displayed as legend of the new fieldset.
+function stackFieldsets() {
+  var stack = document.createElement("fieldset");
+  var legend = document.createElement("legend");
+  stack.appendChild(legend);
+  var menu = document.createElement("select");
+  menu.name = "active_card";
+  legend.appendChild(menu);
+  var cardIds = arguments;
+  menu.onchange = function() {
+    var activateId = menu.options[menu.selectedIndex].value
+    for (var i = 0; i < cardIds.length; i++) {
+      var card = document.getElementById(cardIds[i]);
+      card.style.display = (card.id == activateId) ? "block" : "none";
+    }
+  }
+  for (var i = 0; i < cardIds.length; i++) {
+    var fieldset = document.getElementById(cardIds[i]);
+    legend = fieldset.getElementsByTagName("legend")[0];
+    fieldset.removeChild(legend);
+    var card = document.createElement("div");
+    card.id = fieldset.id;
+    for (var j = 0; j < fieldset.childNodes.length; j++) {
+      card.appendChild(fieldset.childNodes[j]);
+    }
+    removeControlNames(fieldset);
+
+    if (i > 0) card.style.display = "none";
+    stack.appendChild(card);
+    menu.options[i] = new Option(legend.firstChild.nodeValue, fieldset.id);
+  }
+  for (var i = cardIds.length - 1; i > 0; i--) {
+    fieldset = document.getElementById(cardIds[i]);
+    fieldset.parentNode.removeChild(fieldset);
+  }
+  fieldset = document.getElementById(cardIds[0]);
+  fieldset.parentNode.replaceChild(stack, fieldset);
+}
+
+// Ugly hack: Safari removes the DOM nodes, but not the form elements for
+// some buggy reason, so they'll get submitted twice. Setting the name of
+// the original elements to an empty string before removing them seems to
+// solve the problem
+function removeControlNames(container) {
+  var inputs = container.getElementsByTagName("input");
+  for (var j = 0; j < inputs.length; j++) inputs[j].name = "";
+  var selects = container.getElementsByTagName("select");
+  for (var j = 0; j < selects.length; j++) selects[j].name = "";
 }

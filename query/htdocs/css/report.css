@@ -1,3 +1,5 @@
+@import url(code.css);
+
 h1 .numrows { font-size: 65%; color: #999; font-weight: normal }
 h2 {
  background: #f7f7f7;
@@ -20,6 +22,8 @@ h2 {
 #filters td label { font-size: 11px }
 #filters td.filter { width: 100% }
 #filters td.filter label { padding-right: 1em }
+
+#options p { margin: .5em }
 
 #nummatches { font-style: italic }
 
@@ -52,11 +56,11 @@ h2 {
 #tktlist tbody td.fullrow {
  border: none;
  color: #333;
- background: #fff;
- padding-bottom: 2.5em !important;
+ background: transparent;
+ padding: 0 1em 2em !important;
  font-size: 90%;
 }
-#tktlist td.fullrow p { margin: 0; padding: .25em 1em }
+#tktlist td.fullrow :link, #tktlist td.fullrow :visited { display: inline }
 #tktlist td.fullrow hr { display: none }
 
 #tktlist tr.odd.highest { background: #fdc; border-color: #e88; color: #a22 }
