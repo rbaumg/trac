@@ -62,9 +62,12 @@ how_much_context = 40
 
 class TracObj:
     """
-    A TracObj encapsulate the identity of a Trac Object (changeset,
-    wiki page, ticket, ...) and can be used to manage the relationships
-    to other Trac Objects.
+    A TracObj encapsulate the identity of a Trac Object
+    (changeset, wiki page, ticket, ...) and can be used to perform
+    generic tasks on those objects:
+     * manage the relationships to other Trac Objects
+     * handle custom fields
+     * handle facets editing and anchoring
 
     The cross-reference information is stored in the XREF table
     (see trac/db_default.py).

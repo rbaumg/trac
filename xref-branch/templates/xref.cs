@@ -47,13 +47,9 @@
     <dt class="<?cs var:item.icon ?>">
      <a href="<?cs var:item.href ?>"><?cs 
       if:xref.direction.back ?>
-       <em><?cs var:item.name ?></em>
-       <strong><?cs var:item.relation ?></strong>
-       <?cs var:xref.base.name ?><?cs
+       <em><?cs var:item.name ?></em> <i>&laquo;<?cs var:item.relation ?>&raquo;</i> <?cs var:xref.base.name ?><?cs
       else ?>
-       <?cs var:xref.base.name ?>
-       <strong><?cs var:item.relation ?></strong>
-       <em><?cs var:item.name ?></em><?cs
+       <?cs var:xref.base.name ?> <i>&laquo;<?cs var:item.relation ?>&raquo;</i> <em><?cs var:item.name ?></em><?cs
       /if ?>
      </a>
     </dt>
