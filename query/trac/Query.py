@@ -50,7 +50,8 @@ class Query:
         # value by a query constraint.
         for col in [k for k in self.constraints.keys() if k in cols]:
             constraint = self.constraints[col]
-            if len(constraint) == 1 and not constraint[0][0] in '!~^$':
+            if len(constraint) == 1 and constraint[0] \
+                    and not constraint[0][0] in '!~^$':
                 cols.remove(col)
             if col == 'status' and not 'closed' in constraint \
                     and 'resolution' in cols:
@@ -67,15 +68,15 @@ class Query:
             # Constrained columns appear before other columns
             elif col1 in constrained_fields or col2 in constrained_fields:
                 return col1 in constrained_fields and -1 or 1
-            # Ordered columns should be visible
-            elif col1 == self.order:
-                return -1
             return 0
         cols.sort(sort_columns)
 
         # Only display the first seven columns by default
         # FIXME: Make this configurable on a per-user and/or per-query basis
         self.cols = cols[:7]
+        if not self.order in self.cols:
+            # Make sure the column we order by is visible
+            self.cols[-1] = self.order
 
         return self.cols
 
@@ -207,6 +208,11 @@ class QueryModule(Module):
                 (real_k, real_v) = checkbox[2:].split(':', 2)
                 self.args.list.append(cgi.MiniFieldStorage(real_k, real_v))
 
+        # For clients without JavaScript, we add a new constraint here if
+        # requested
+        removed_fields = [k[10:] for k in self.args.keys()
+                          if k.startswith('rm_filter_')]
+
         constrained_fields = [k for k in self.args.keys()
                               if k in Ticket.std_fields or k in custom_fields]
         for field in constrained_fields:
@@ -218,7 +224,8 @@ class QueryModule(Module):
                 mode = self.args.get(field + '_mode')
                 if mode:
                     vals = map(lambda x: mode + x, vals)
-                constraints[field] = vals
+                if not field in removed_fields:
+                    constraints[field] = vals
 
         return constraints
 

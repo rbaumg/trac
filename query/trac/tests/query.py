@@ -25,7 +25,7 @@ ORDER BY IFNULL(id,'')='' DESC,id DESC""")
         query = Query(self.env) # priority is default order
         sql = query.to_sql()
         self.assertEqual(sql,
-"""SELECT id,summary,priority,status,owner,milestone,component
+"""SELECT id,summary,status,owner,priority,milestone,component
 FROM ticket
   LEFT OUTER JOIN (SELECT name AS priority_name, value AS priority_value FROM enum WHERE type='priority') ON priority_name=priority
 ORDER BY IFNULL(priority,'')='',priority_value,id""")
@@ -34,7 +34,7 @@ ORDER BY IFNULL(priority,'')='',priority_value,id""")
         query = Query(self.env, desc=1) # priority is default order
         sql = query.to_sql()
         self.assertEqual(sql,
-"""SELECT id,summary,priority,status,owner,milestone,component
+"""SELECT id,summary,status,owner,priority,milestone,component
 FROM ticket
   LEFT OUTER JOIN (SELECT name AS priority_name, value AS priority_value FROM enum WHERE type='priority') ON priority_name=priority
 ORDER BY IFNULL(priority,'')='' DESC,priority_value DESC,id""")
@@ -43,7 +43,7 @@ ORDER BY IFNULL(priority,'')='' DESC,priority_value DESC,id""")
         query = Query(self.env, order='version')
         sql = query.to_sql()
         self.assertEqual(sql,
-"""SELECT id,summary,version,status,owner,priority,milestone
+"""SELECT id,summary,status,owner,priority,milestone,version
 FROM ticket
   LEFT OUTER JOIN (SELECT name AS version_name, time AS version_time FROM version) ON version_name=version
 ORDER BY IFNULL(version,'')='',IFNULL(version_time,0)=0,version_time,version,id""")
@@ -52,7 +52,7 @@ ORDER BY IFNULL(version,'')='',IFNULL(version_time,0)=0,version_time,version,id"
         query = Query(self.env, order='version', desc=1)
         sql = query.to_sql()
         self.assertEqual(sql,
-"""SELECT id,summary,version,status,owner,priority,milestone
+"""SELECT id,summary,status,owner,priority,milestone,version
 FROM ticket
   LEFT OUTER JOIN (SELECT name AS version_name, time AS version_time FROM version) ON version_name=version
 ORDER BY IFNULL(version,'')='' DESC,IFNULL(version_time,0)=0 DESC,version_time DESC,version DESC,id""")

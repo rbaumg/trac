@@ -12,8 +12,6 @@
 <div id="content" class="query">
  <h1><?cs var:title ?></h1>
 
-<script type="text/javascript" src="<?cs
-  var:htdocs_location ?>query.js" defer="defer"></script>
 <form id="query" method="post" action="<?cs var:cgi_location ?>">
  <fieldset id="filters">
   <legend>Filters</legend>
@@ -65,9 +63,8 @@
        /if ?>
       </td>
       <td class="actions">
-       <input type="button" name="rm_filter_<?cs
-         var:property.name ?>" value="-" onclick="removeFilter(this, '<?cs
-         var:property.name ?>'); return false" />
+       <input type="submit" name="rm_filter_<?cs
+         var:property.name ?>" value="-" />
       </td>
      </tr><?cs /if ?><?cs
     /each ?><?cs
@@ -75,7 +72,7 @@
    <tr>
     <td class="actions" colspan="4" style="text-align: right">
      <label for="add_filter">Add filter</label>
-     <select name="add_filter" id="add_filter" onchange="addFilter(this)">
+     <select name="add_filter" id="add_filter">
       <option></option><?cs
       each:property = ticket.properties ?>
        <option value="<?cs var:property.name ?>"<?cs
@@ -95,6 +92,11 @@
   <input type="submit" name="update" value="Update" />
  </div>
 </form>
+<script type="text/javascript" src="<?cs
+  var:htdocs_location ?>query.js" defer="defer"></script>
+<script type="text/javascript" defer="defer">
+  initializeFilters();
+</script>
 
 <p id="nummatches"><?cs alt:len(query.results) ?>No<?cs /alt ?> ticket<?cs if:len(query.results) != 1 ?>s<?cs
 /if ?> matched this query.</p>

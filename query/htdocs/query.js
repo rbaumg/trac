@@ -1,3 +1,23 @@
+function initializeFilters() {
+  // Make the submit buttons for removing filters client-side triggers
+  var filters = document.getElementById("filters");
+  var inputs = filters.getElementsByTagName("input");
+  for (var i = 0; i < inputs.length; i++) {
+    var input = inputs[i];
+    if (input.type == "submit" && input.name
+     && input.name.match(/^rm_filter_/)) {
+      input.type = "button";
+      input.onclick = function() {
+        removeFilter(input, input.name.substr(10));
+        return false;
+      }
+    }
+  }
+  // Make the drop-down menu for adding a filter a client-side trigger
+  var select = document.getElementById("add_filter");
+  select.onchange = function() { addFilter(select) };
+}
+
 // Adds a new row to the filters table
 function addFilter(select) {
   if (select.selectedIndex < 1) return;
@@ -131,7 +151,7 @@ function addFilter(select) {
 }
 
 // Removes an existing row from the filters table
-function removeFilter(button, propertyName, select) {
+function removeFilter(button, propertyName) {
 
   // Ugly hack: Safari removes the DOM nodes, but not the form elements for
   // some buggy reason, so they'll get submitted twice. Setting the name of
@@ -149,7 +169,7 @@ function removeFilter(button, propertyName, select) {
   removeControlNames(tr);
   table.deleteRow(tr.rowIndex);
 
-  var select = document.getElementById("query").elements["add_filter"];
+  var select = document.forms["query"].elements["add_filter"];
   for (var i = 0; i < select.options.length; i++) {
     var option = select.options[i];
     if (option.value == propertyName) option.disabled = false;
