@@ -1,0 +1,241 @@
+#!/usr/bin/env python
+# -*- coding: iso8859-1 -*-
+#
+# Copyright (C) 2003, 2004 Edgewall Software
+# Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
+#
+# Trac is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of the
+# License, or (at your option) any later version.
+#
+# Trac is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+#
+# Author: Jonas Borgström <jonas@edgewall.com>
+
+#
+# Major issues:
+# * No authentication support yet
+# * Too much code duplication between trac.py and tracd.py
+# * No error (exception) handling.
+
+import os
+import re
+import time
+import shutil
+import getopt
+import Cookie
+import urllib
+import mimetypes
+import SocketServer
+import BaseHTTPServer
+
+import neo_cgi
+import neo_cs
+import neo_util
+import svn.core
+
+import trac
+from trac import db
+from trac import auth
+from trac import perm
+from trac.Href import Href
+from trac import sync
+from trac.util import *
+from trac.trac import parse_args, modules, Request, open_svn_repos
+from trac import siteconfig
+
+def parse_qs(args, query):
+    """Parse a HTTP query string, can be used for both GET and POST"""
+    for arg in query.split('&'):
+        val = arg.split('=', 1)
+        if len(val) == 2:
+            args[val[0]] = urllib.unquote(val[1].replace('+', ' '))
+
+class TracHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+    pass
+
+class TracHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler,
+                             Request):
+    url_re = re.compile('/(?P<project>[^/]+)'
+                        '(?P<path_info>/[^\?]*)?'
+                        '(?:\?(?P<query_string>.*))?')
+    server_version = 'tracd/' + trac.__version__
+
+    def read(self, len):
+        return self.rfile.read(len)
+
+    def write(self, data):
+        self.wfile.write(data)
+
+    def parse_path(self, path):
+        m = self.url_re.findall(self.path)
+        if not m:
+            raise self.send_error(500, 'Invalid URL')
+        self.project, self.path_info, self.query_string = m[0]
+
+    def do_project_index(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+        self.end_headers()
+        self.write('<html><head><title>Available Projects</title></head>')
+        self.write('<body><h1>Available Projects</h1><ul>')
+        for project in self.server.projects.keys():
+            self.write('<li><a href="%s">%s</a></li>' % (project, project))
+        self.write('</ul></body><html>')
+
+    def do_htdocs_req(self, path):
+        path = urllib.unquote(path)
+        # Make sure the path doesn't contain any dangerous ".."-parts.
+        path = '/'.join(filter(lambda x: x not in ['..', ''],
+                               path.split('/')))
+        filename = os.path.join(siteconfig.__default_htdocs_dir__,
+                                os.path.normcase(path))
+        try:
+            f = open(filename, 'rb')
+        except IOError:
+            self.send_error(404, path)
+            return
+        self.send_response(200)
+        mtype, enc = mimetypes.guess_type(filename)
+        stat = os.fstat(f.fileno())
+        content_length = stat[6]
+        last_modified = time.strftime("%a, %d %b %Y %H:%M:%S GMT",
+                                      time.gmtime(stat[8]))
+        self.send_header('Content-Type', mtype)
+        self.send_header('Conten-Length', str(content_length))
+        self.send_header('Last-Modified', last_modified)
+        self.end_headers()
+        shutil.copyfileobj(f, self.wfile)
+
+    def do_POST(self):
+        if not self.headers.has_key('Content-Type') or \
+           not self.headers.has_key('Content-Length') or \
+           self.headers['Content-Type'] != 'application/x-www-form-urlencoded':
+            self.send_error(500, 'Weird POST request')
+            return
+        self.post_query_string = self.read(int(self.headers['Content-Length']))
+        self.do_trac_req()
+
+    def do_GET(self):
+        if self.path[0:13] == '/':
+            self.do_project_index()
+        elif self.path[0:13] == '/trac_common/':
+            self.do_htdocs_req(self.path[13:])
+        else:
+            self.post_query_string = None
+            self.do_trac_req()
+        
+    def do_trac_req(self):
+        start = time.time()
+        self.init_request()
+        self.parse_path(self.path)
+        try:
+            db_path = self.server.projects[self.project]
+        except KeyError:
+            self.send_error(500, 'Unknown project: "%s"' % self.project)
+            return
+        database = db.Database(db_path)
+        # FIXME: we only need to load this once per project
+        config = database.load_config()
+        config['general']['htdocs_location'] = '/trac_common/'
+
+        remote_addr = '' #FIXME
+        auth_cookie = '' #FIXME
+        authenticator = auth.Authenticator(database, auth_cookie, remote_addr)
+
+        # Parse arguments
+        args = parse_args(self.path_info)
+        if self.post_query_string:
+            parse_qs(args, self.post_query_string)
+        if self.query_string:
+            parse_qs(args, self.query_string)
+
+        # Load the selected module
+        mode = args.get('mode', 'wiki')
+        module_name, constructor_name, need_svn = modules[mode]
+        module = __import__('trac.' + module_name,
+                            globals(),  locals(), ['trac'])
+        constructor = getattr(module, constructor_name)
+        module = constructor(config, args)
+
+        module.req = self
+        module._name = mode
+        module.db = database
+        module.href = Href('/' + self.project)
+        module.authname = authenticator.authname
+        module.remote_addr = remote_addr
+        cgi_location = '/' + self.project + '/'
+        module.cgi_location = cgi_location
+        module.perm = perm.PermissionCache(database, authenticator.authname)
+        module.perm.add_to_hdf(self.hdf)
+
+        # Only open the subversion repository for the modules that really
+        # need it. This saves us some precious time.
+        if need_svn:
+            repos_dir = config['general']['repository_dir']
+            pool, rep, fs_ptr = open_svn_repos(repos_dir)
+            module.repos = rep
+            module.fs_ptr = fs_ptr
+            sync.sync(database, rep, fs_ptr, pool)
+        else:
+            pool = None
+
+        # FIXME: do this only once per project
+        from trac import Wiki
+        Wiki.populate_page_dict(database)
+        
+        module.pool = pool
+        module.run()
+        if pool:
+            svn.core.svn_pool_destroy(pool)
+            
+        print 'Total request time:', time.time() - start, 'seconds'
+
+
+def usage():
+    print 'usage: %s [options] <database> [database] ...' % sys.argv[0]
+    print '\nOptions:\n'
+    print '-p --port [port]\t\tPort number to use (default: 80)'
+    print '-b --hostname [hostname]\tIP to bind to (default: \'\')'
+    print
+    sys.exit(1)
+        
+def main():
+    port = 80
+    hostname = ''
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "p:b:",
+                                   ["port=", "hostname="])
+    except getopt.GetoptError:
+        usage()
+    for o, a in opts:
+        if o in ("-p", "--port"):
+            port = int(a)
+        elif o in ("-b", "--hostname"):
+            hostname = a
+
+    if not args:
+        usage()
+    projects = {}
+    for database in args:
+        base = os.path.basename(database)
+        # We assume the database filenames follow the following
+        # naming convention: /some/path/project.whatever
+        project = re.search('[a-zA-Z0-9-]+', base).group(0)
+        projects[project] = database
+        
+    server_address = (hostname, port)
+    httpd = TracHTTPServer(server_address, TracHTTPRequestHandler)
+    httpd.projects = projects
+    httpd.serve_forever()
+
+if __name__ == '__main__':
+    main()
