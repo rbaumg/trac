@@ -331,9 +331,24 @@ class QueryModule(Module):
     def render(self):
         self.perm.assert_permission(perm.TICKET_VIEW)
 
-        query = Query(self.env, self._get_constraints(),
-                      self.args.get('order'), self.args.has_key('desc'),
-                      self.args.get('group'), self.args.has_key('groupdesc'),
+        if not self.args.has_key('order'):
+            # avoid displaying all tickets when the query module is invoked
+            # with no parameters. Instead show only open tickets, possibly
+            # associated with the user
+            constraints = { 'status': [ 'new', 'assigned', 'reopened' ] }
+            if self.req.authname and self.req.authname != 'anonymous':
+                constraints['owner'] = [ self.req.authname ]
+            else:
+                email = self.req.session['email']
+                name = self.req.session['name']
+                if email or name:
+                    constraints['cc'] = [ '~%s' % email or name ]
+        else:
+            constraints = self._get_constraints()
+
+        query = Query(self.env, constraints, self.args.get('order'),
+                      self.args.has_key('desc'), self.args.get('group'),
+                      self.args.has_key('groupdesc'),
                       self.args.has_key('verbose'))
 
         if self.args.has_key('update'):
