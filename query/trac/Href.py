@@ -73,7 +73,7 @@ class Href:
         return href_join(self.base, 'newticket')
 
     def query(self, constraints={}, order=None, desc=0, group=None, groupdesc=0,
-              verbose=0):
+              verbose=0, format=None):
         href = href_join(self.base, 'query')
         params = []
         for field in constraints.keys():
@@ -92,6 +92,8 @@ class Href:
             params.append('groupdesc=1')
         if verbose:
             params.append('verbose=1')
+        if format:
+            params.append('format=' + urllib.quote(format))
         if params:
             href += '?' + ('&').join(params)
         return href

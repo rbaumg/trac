@@ -119,6 +119,11 @@ class Query:
         cursor.close()
         return results
 
+    def to_href(self, format=None):
+        return self.env.href.query(self.constraints, self.order, self.desc,
+                                   self.group, self.groupdesc, self.verbose,
+                                   format)
+
     def to_sql(self):
         if not self.cols:
             self.get_columns()
@@ -332,17 +337,19 @@ class QueryModule(Module):
                       self.args.has_key('verbose'))
 
         if self.args.has_key('update'):
-            self.req.redirect(self.env.href.query(query.constraints,
-                                                  query.order, query.desc,
-                                                  query.group, query.groupdesc,
-                                                  query.verbose))
+            self.req.redirect(query.to_href())
 
         props = self._get_ticket_properties()
         add_to_hdf(props, self.req.hdf, 'ticket.properties')
         modes = self._get_constraint_modes()
         add_to_hdf(modes, self.req.hdf, 'query.modes')
 
-        self._render_results(query)
+        self.add_link('alternate', query.to_href('csv'), 'Comma-delimited Text',
+            'text/plain')
+        self.add_link('alternate', query.to_href('tab'), 'Tab-delimited Text',
+            'text/plain')
+
+        self.query = query
 
         # For clients without JavaScript, we add a new constraint here if
         # requested
@@ -351,8 +358,9 @@ class QueryModule(Module):
             if field:
                 self.req.hdf.setValue('query.constraints.%s.0' % field, '')
 
-    def _render_results(self, query):
+    def display(self):
         self.req.hdf.setValue('title', 'Custom Query')
+        query = self.query
 
         cols = query.get_columns()
         for i in range(len(cols)):
@@ -397,3 +405,24 @@ class QueryModule(Module):
 
         results = query.execute(self.db)
         add_to_hdf(results, self.req.hdf, 'query.results')
+        self.req.display(self.template_name, 'text/html')
+
+    def display_csv(self,sep=','):
+        self.req.send_response(200)
+        self.req.send_header('Content-Type', 'text/plain;charset=utf-8')
+        self.req.end_headers()
+        query = self.query
+
+        cols = query.get_columns()
+        self.req.write(sep.join([col for col in cols]) + '\r\n')
+
+        results = query.execute(self.db)
+        for result in results:
+            self.req.write(sep.join([str(result[col]).replace(sep, '_')
+                                                     .replace('\n', ' ')
+                                                     .replace('\r', ' ')
+                                     for col in cols]) + '\r\n')
+
+    def display_tab(self):
+        self.display_csv('\t')
+
