@@ -58,6 +58,9 @@ class CommonFormatter:
         self.env = env
         self.db = db
         self._href = absurls and env.abs_href or env.href
+        if not hasattr(env, '_wiki_pages'):
+            from trac import Wiki
+            Wiki.populate_page_dict(db, env)
 
     def replace(self, fullmatch):
         for itype, match in fullmatch.groupdict().items():

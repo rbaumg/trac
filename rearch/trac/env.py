@@ -22,6 +22,10 @@
 # Todo: Move backup and upgrade from db.py
 #
 
+from trac.plugin import *
+
+from protocols import *
+
 import os
 import sys
 import time
@@ -39,7 +43,7 @@ import sqlite
 
 db_version = db_default.db_version
 
-class Environment:
+class Environment(Plugin, PluginManager):
     """
     Trac stores project information in a Trac environment.
 
@@ -50,7 +54,15 @@ class Environment:
      * Project specific templates and wiki macros.
      * wiki and ticket attachments.
     """
+
+    _id = 'environment'
+    _extends = ['plugin.activationListeners']
+    advise(instancesProvide=[IPluginActivationListener])
+
     def __init__(self, path, create=0):
+        PluginManager.__init__(self)
+        Plugin.__init__(self)
+
         self.path = path
         if create:
             self.create()
@@ -71,7 +83,7 @@ class Environment:
         assert fd.read(26) == 'Trac Environment Version 1'
         fd.close()
 
-    def get_db_cnx(self):
+    def getDBConnection(self):
         db_str = self.get_config('trac', 'database', 'sqlite:db/trac.db')
         assert db_str[:7] == 'sqlite:'
         db_name = os.path.join(self.path, db_str[7:])
@@ -86,6 +98,7 @@ class Environment:
                   'to the database %s and the directory this file is located in.' % db_name
         return sqlite.connect(os.path.join(self.path, db_str[7:]),
                               timeout=10000)
+    get_db_cnx = getDBConnection # deprecated
 
     def create(self):
         def _create_file(fname, data=None):
@@ -327,3 +340,9 @@ class Environment:
                           dbver, db_default.db_version)
             cnx.commit()
             return 1
+
+    # plugin.IPluginActivationListener methods
+
+    def pluginActivated(self, plugin):
+        plugin.env = self
+        plugin.log = self.log

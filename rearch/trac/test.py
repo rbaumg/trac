@@ -9,6 +9,7 @@ import tests.environment
 import tests.diff
 import tests.tracadmin
 import tests.query
+import tests.plugin
 
 def suite():
     suite = unittest.TestSuite()
@@ -20,6 +21,7 @@ def suite():
     suite.addTest(tests.diff.suite())
     suite.addTest(tests.tracadmin.suite())
     suite.addTest(tests.query.suite())
+    suite.addTest(tests.plugin.suite())
     return suite
 
 if __name__ == '__main__':

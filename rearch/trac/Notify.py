@@ -31,7 +31,7 @@ import neo_util
 
 from __init__ import __version__
 from util import add_dict_to_hdf, CRLF, TRUE, FALSE, TracError
-import Environment
+import env
 import core
 import Ticket
 
@@ -355,7 +355,7 @@ class TicketNotifyEmail(NotifyEmail):
 # A simple test 
 if __name__ == '__main__':
     import db
-    env = Environment.Environment('/home/daniel/trac/db/tracenv')
+    env = env.Environment('/home/daniel/trac/db/tracenv')
     try:
         tktid = int(sys.argv[1])
     except IndexError:

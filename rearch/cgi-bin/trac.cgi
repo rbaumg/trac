@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004 Edgewall Software
-# Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003, 2004, 2005 Edgewall Software
+# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
 #
 # Trac is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -20,19 +20,39 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
+import os
+
 try:
-    import trac.core
-    trac.core.cgi_start()
+    # Open the environment
+    env_path = os.environ['TRAC_ENV']
+    if not env_path:
+        raise RuntimeError, "Missing TRAC_ENV environment variable."
+    from trac.env import Environment
+    env = Environment(env_path)
+
+    # Load the plugins
+    # TODO: the list of plugins to load shouldn't be hard-coded like this
+    from trac.web import chrome, clearsilver, ext_auth
+    from trac.plugins import compat
+
+    # Run the application
+    from trac.web import cgiserver, Application
+    cgiserver.run(Application(env))
+
 except Exception, e:
-    print 'Content-Type: text/plain\r\n\r\n',
-    print 'Oops...'
+    print 'Status: 500 Internal Server Error'
+    print 'Content-Type: text/html'
     print
-    print 'Trac detected an internal error:'
-    print
-    print e
-    print
+
     import traceback
     import StringIO
-    tb = StringIO.StringIO()
-    traceback.print_exc(file=tb)
-    print tb.getvalue()
+    buf = StringIO.StringIO()
+    traceback.print_exc(file=buf)
+
+    print """<html>
+<head><title>Internal error</title></head>
+<body>
+<h1>Internal error</h1>
+<p>%s</p>
+<pre>%s</pre>
+</body></html>""" % (e, buf.getvalue())

@@ -33,7 +33,7 @@ import Href
 import perm
 import auth
 import authzperm
-import Environment
+import env 
 import Session
 from util import escape, TracError
 
@@ -185,12 +185,12 @@ def open_environment():
               'Missing environment variable "TRAC_ENV". Trac ' \
               'requires this variable to point to a valid Trac Environment.'
 
-    env = Environment.Environment(env_path)
+    env = env.Environment(env_path)
     version = env.get_version()
-    if version < Environment.db_version:
+    if version < env.db_version:
         raise TracError('The Trac Environment needs to be upgraded. '
                         'Run "trac-admin %s upgrade"' % env_path)
-    elif version > Environment.db_version:
+    elif version > env.db_version:
         raise TracError('Unknown Trac Environment version (%d).' % version)
     return env
 
