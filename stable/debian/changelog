@@ -1,3 +1,12 @@
+trac (0.8-2) UNRELEASED; urgency=low
+
+  * debian/control:
+    - Add suggestion of enscript and python-docutils (Closes: #284094)
+    - Change debhelper build-dependencie to build-depends-indep and set it
+      to be (>= 4.0.0)
+
+ -- Otavio Salvador <otavio@debian.org>  Fri, 24 Dec 2004 16:22:57 -0200
+
 trac (0.8-1) unstable; urgency=low
 
   * New upstream release (Closes: #282010)
