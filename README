@@ -1,19 +1,9 @@
 This is the local branch for Rocky Burt <rocky@carterscove.com>, r0ky on #trac.
 
-Current feature branches are:
+Items worked on and/or completed so far:
 
-  features/ticket_attachment_support-based_on_trunk
-    Based on:            Trunk
-    Ticket(s) Affected:  #27
-    Description:         Provides attachment support for tickets
-
-  features/diff_support
-    Based on:            Trunk
-    Ticket(s) Affected:  #87
-    Description:         Work for downloadable diffs
-
-  features/dbapi_support
-    Based on:            Trunk
-    Ticket(s) Affected:  
-    Description:         This is theoretical work for making Trac python
-                         db-api compliant
+  - (#27) ticket attachment support: pending merge
+  - (#87) downloadable diffs from changeset view: pending merge
+  - (#126) database independence: pending merge
+  - (#19) ticket listing sorting capability: merged, pending second merge due
+          to bug in original patch
