@@ -1,6 +1,7 @@
 # -*- coding: iso8859-1 -*-
 #
 # Copyright (C) 2004 Rocky Burt <rocky@carterscove.com>
+# Copyright (C) 2004 Edgewall Software
 #
 # Trac is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
