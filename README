@@ -12,3 +12,8 @@ Current feature branches are:
     Ticket(s) Affected:  #87
     Description:         Work for downloadable diffs
 
+  features/dbapi_support
+    Based on:            Trunk
+    Ticket(s) Affected:  
+    Description:         This is theoretical work for making Trac python
+                         db-api compliant
