@@ -21,7 +21,7 @@
 
 
 # Database version identifier. Used for automatic upgrades.
-db_version = 10
+db_version = 11
 
 def __mkreports(reports):
     """Utility function used to create report data in same syntax as the
@@ -73,6 +73,7 @@ CREATE TABLE system (
 );
 CREATE TABLE ticket (
         id              integer PRIMARY KEY,
+        category        text,           -- the nature of the ticket
         time            integer,        -- the time it was created
         changetime      integer,
         component       text,
@@ -372,7 +373,9 @@ data = (('component',
                 ('severity', 'normal', 4),
                 ('severity', 'minor', 5),
                 ('severity', 'trivial', 6),
-                ('severity', 'enhancement', 7),
+                ('category', 'Bug', 1),
+                ('category', 'Feature', 2),
+                ('category', 'Task', 3),
                 ('priority', 'highest', 1),
                 ('priority', 'high', 2),
                 ('priority', 'normal', 3),
@@ -422,6 +425,7 @@ default_config = \
    '<a href="http://trac.edgewall.com/">http://trac.edgewall.com/</a>'),
   ('ticket', 'default_version', ''),
   ('ticket', 'default_severity', 'normal'),
+  ('ticket', 'default_category', 'Bug'),
   ('ticket', 'default_priority', 'normal'),
   ('ticket', 'default_milestone', ''),
   ('ticket', 'default_component', 'component1'),

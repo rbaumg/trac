@@ -44,21 +44,27 @@ class Timeline(Module):
             return []
 
         sql, params = [], []
+        # Column   0:    1:       2:   3:             4:       5:     6:
+        #          time  (int id) id   render method  message  author extra
         if 'changeset' in filters:
-            sql.append("SELECT time,rev,'','changeset',message,author"
+            sql.append("SELECT time,rev,'','changeset',message,author,''"
                        " FROM revision WHERE time>=%s AND time<=%s")
             params += (start, stop)
         if 'ticket' in filters:
-            sql.append("SELECT time,id,'','newticket',summary,reporter"
+            sql.append("SELECT time,id,'','newticket',summary,reporter,category"
                        " FROM ticket WHERE time>=%s AND time<=%s")
             params += (start, stop)
-            sql.append("SELECT time,ticket,'','reopenedticket','',author "
-                       "FROM ticket_change WHERE field='status' "
-                       "AND newvalue='reopened' AND time>=%s AND time<=%s")
+            # FIXME join with ticket table for retrieving category...
+            sql.append("SELECT t1.time,t1.ticket,'','reopenedticket','',t1.author,t.category"
+                       " FROM ticket_change t1"
+                       "   INNER JOIN ticket t ON t1.ticket = t.id"
+                       " WHERE t1.field='status'"
+                       "   AND t1.newvalue='reopened' AND t1.time>=%s AND t1.time<=%s")
             params += (start, stop)
             sql.append("SELECT t1.time,t1.ticket,t2.newvalue,'closedticket',"
-                       "t3.newvalue,t1.author"
+                       "t3.newvalue,t1.author,t.category"
                        " FROM ticket_change t1"
+                       "   INNER JOIN ticket t ON t1.ticket = t.id"
                        "   INNER JOIN ticket_change t2 ON t1.ticket = t2.ticket"
                        "     AND t1.time = t2.time"
                        "   LEFT OUTER JOIN ticket_change t3 ON t1.time = t3.time"
@@ -68,11 +74,11 @@ class Timeline(Module):
                        "   AND t1.time >= %s AND t1.time <= %s")
             params += (start,stop)
         if 'wiki' in filters:
-            sql.append("SELECT time,-1,name,'wiki',comment,author"
+            sql.append("SELECT time,-1,name,'wiki',comment,author,''"
                        " FROM wiki WHERE time>=%s AND time<=%s")
             params += (start, stop)
         if 'milestone' in filters:
-            sql.append("SELECT completed AS time,-1,name,'milestone','',''" 
+            sql.append("SELECT completed AS time,-1,name,'milestone','','',''" 
                        " FROM milestone WHERE completed>=%s AND completed<=%s")
             params += (start, stop)
 
@@ -99,7 +105,8 @@ class Timeline(Module):
                 'tdata': escape(row[2]),
                 'type': row[3],
                 'message': row[4] or '',
-                'author': escape(row[5] or 'anonymous')
+                'author': escape(row[5] or 'anonymous'),
+                'extra' : row[6] or '',
             }
             info.append(item)
         return info
@@ -234,6 +241,8 @@ class Timeline(Module):
             href = self.env.abs_href
 
         item['href'] = escape(href.ticket(item['idata']))
+        item['category'] = item['extra']
+        del item['extra']
         if req.args.get('format') == 'rss':
             item['message'] = escape(wiki_to_html(item['message'],
                                                   req.hdf, self.env,
