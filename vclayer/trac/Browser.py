@@ -24,8 +24,6 @@ from trac.Module import Module
 from trac.WikiFormatter import wiki_to_oneliner
 
 import time
-import posixpath
-
 
 CHUNK_SIZE = 4096
 DISP_MAX_FILE_SIZE = 256 * 1024
