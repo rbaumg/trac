@@ -11,23 +11,21 @@ class HrefTestCase(unittest.TestCase):
     def test_log(self):
         """Testing Href.log"""
         self.assertEqual('/log/foo/bar', self.href.log('/foo/bar'))
-        self.assertEqual('/log/foo/bar?rev=42', self.href.log('/foo/bar', 42))
-
-    def test_file(self):
-        """Testing Href.file"""
-        self.assertEqual('/file/foo/bar', self.href.file('/foo/bar'))
-        self.assertEqual('/file/foo/bar?rev=42', self.href.file('/foo/bar',42))
-        self.assertEqual('/file/foo/bar?format=foo',
-                         self.href.file('/foo/bar',format='foo'))
-        self.assertEqual('/file/foo/bar?rev=42&format=foo',
-                         self.href.file('/foo/bar',42, 'foo'))
+        self.assertEqual('/log/foo/bar?rev=42',
+                         self.href.log('/foo/bar', rev=42))
+        self.assertEqual('/log/foo/bar?rev=42&format=rss',
+                         self.href.log('/foo/bar', rev=42, format='rss'))
 
     def test_browser(self):
         """Testing Href.browser"""
         self.assertEqual('/browser/foo/bar', self.href.browser('/foo/bar'))
         self.assertEqual('/browser/foo/bar?rev=42',
-                         self.href.browser('/foo/bar', 42))
-        
+                         self.href.browser('/foo/bar', rev=42))
+        self.assertEqual('/browser/foo/bar?format=foo',
+                         self.href.browser('/foo/bar',format='foo'))
+        self.assertEqual('/browser/foo/bar?rev=42&format=foo',
+                         self.href.browser('/foo/bar',rev=42, format='foo'))
+
     def test_login(self):
         """Testing Href.login"""
         self.assertEqual('/login', self.href.login())

@@ -51,7 +51,7 @@ CREATE TABLE node_change (
         change          char(1),
         base_path       text,
         base_rev        text,
-        UNIQUE(rev, name, change)
+        UNIQUE(rev, path, change)
 );
 CREATE TABLE auth_cookie (
         cookie          text,
