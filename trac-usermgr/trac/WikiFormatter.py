@@ -44,7 +44,7 @@ class CommonFormatter:
               r"""(?P<tickethref>!?#\d+)""",
               r"""(?P<changesethref>!?\[\d+\])""",
               r"""(?P<reporthref>!?\{\d+\})""",
-              r"""(?P<modulehref>!?((?P<modulename>bug|ticket|browser|source|repos|report|changeset|wiki|milestone|search):(?P<moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^\., \)]))))""",
+              r"""(?P<modulehref>!?((?P<modulename>bug|ticket|browser|source|repos|report|changeset|wiki|milestone|search|user):(?P<moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^\., \)]))))""",
               r"""(?P<wikilink>!?(^|(?<=[^A-Za-z]))[A-Z][a-z0-9/.]+(?:[A-Z][a-z0-9/.]*[a-z0-9/])+(?=\Z|\s|,|\.|:|\)))""",
               r"""(?P<fancylink>!?\[(?P<fancyurl>([a-z]+:[^ ]+)) (?P<linkname>.*?)\])"""]
 
@@ -173,6 +173,8 @@ class CommonFormatter:
                        '%s:%s#%s' % (module, args, rev), 0
             else:
                 return self._href.browser(args), '%s:%s' % (module, args), 0
+        elif module in ['user']:
+            return self._href.user(args), '%s:%s' % (module, args), 0	
         else:
             return None, None, 0
 

@@ -59,7 +59,9 @@ modules = {
     'attachment'  : ('File', 'Attachment', 0),
     'roadmap'     : ('Roadmap', 'Roadmap', 0),
     'settings'    : ('Settings', 'Settings', 0),
-    'milestone'   : ('Milestone', 'Milestone', 0)
+    'milestone'   : ('Milestone', 'Milestone', 0),
+    'user'        : ('User', 'User', 0),
+    'userlist'    : ('User', 'UserList', 0)
     }
 
 class TracFieldStorage(cgi.FieldStorage):
@@ -127,6 +129,15 @@ def parse_path_info(args, path_info):
         if match.group(1):
             set_if_missing(args, 'id', urllib.unquote_plus(match.group(1)))
         return args
+    match = re.search('^/user/([a-zA-Z0-9_]+)',path_info)
+    if match:
+	set_if_missing(args, 'mode', 'user')
+	set_if_missing(args, 'user', match.group(1))
+	return args
+    match = re.search('^/user/?',path_info)
+    if match:
+	set_if_missing(args, 'mode', 'userlist')	
+	return args
     return args
 
 def parse_args(command, path_info, query_string,
@@ -165,7 +176,7 @@ def module_factory(args, env, db, req):
     module.perm = perm.PermissionCache(module.db, req.authname)
     module.perm.add_to_hdf(req.hdf)
     module.authzperm = None
-
+    
     # Only open the subversion repository for the modules that really
     # need it. This saves us some precious time.
     if need_svn:
@@ -225,6 +236,7 @@ def populate_hdf(hdf, env, db, req):
     hdf.setValue('trac.href.newticket', env.href.newticket())
     hdf.setValue('trac.href.search', env.href.search())
     hdf.setValue('trac.href.about', env.href.about())
+    hdf.setValue('trac.href.userlist', env.href.userlist())
     hdf.setValue('trac.href.about_config', env.href.about('config'))
     hdf.setValue('trac.href.login', env.href.login())
     hdf.setValue('trac.href.logout', env.href.logout())

@@ -61,8 +61,11 @@ class Href:
         return href_join(self.base, 'logout')
 
     def timeline(self):
-        return href_join(self.base, 'timeline')
-
+	return href_join(self.base, 'timeline')
+    
+    def userlist(self):
+	return href_join(self.base, 'user')
+    
     def changeset(self, rev):
         return href_join(self.base, 'changeset', str(rev))
 
@@ -132,6 +135,11 @@ class Href:
         else:
             return href_join(self.base, 'wiki')
 
+    def user(self, username=None):
+	if username:
+	    href= href_join(self.base, 'user', username)
+	return href
+    
     def report(self, report=None, action=None):
         if report:
             href = href_join(self.base, 'report', str(report))

@@ -111,6 +111,8 @@
                     $trac.acl.REPORT_VIEW, "") ?>
   <?cs call:navlink("New Ticket", $trac.href.newticket, "newticket",
                     $trac.acl.TICKET_CREATE, "9") ?>
+  <?cs call:navlink("Users", $trac.href.userlist, "userlist",
+                    $trac.acl.USER_VIEW, "") ?>  
   <?cs call:navlink("Search", $trac.href.search, "search",
                     $trac.acl.SEARCH_VIEW, "4") ?>
  </ul>

@@ -21,7 +21,7 @@
 
 
 # Database version identifier. Used for automatic upgrades.
-db_version = 7
+db_version = 8
 
 def __mkreports(reps):
     """Utility function used to create report data in same syntax as the
@@ -168,6 +168,17 @@ CREATE TABLE session (
          var_value       text,
          UNIQUE(sid,var_name)
 );
+
+CREATE TABLE user (
+         username        text,
+	 name            text,
+	 email           text,
+	 role            text,
+	 desc            text,
+	 team            text,
+	 UNIQUE(username)
+);
+							       
 
 CREATE INDEX node_change_idx ON node_change(rev);
 CREATE INDEX ticket_change_idx  ON ticket_change(ticket, time);
