@@ -277,7 +277,11 @@ class Formatter(CommonFormatter):
                         'linkname', 'macroname', 'macroargs', 'inline',
                         'modulename', 'moduleargs')
 
-    _htmlproc_disallow_rule = re.compile('(?i)<(script|noscript|embed|object|iframe|frame|frameset|link|style|meta|param|doctype)')
+    # Forbid "dangerous" HTML tags and attributes
+    _htmlproc_disallow_rule = re.compile('(?i)<(script|noscript|embed|object|'
+                                         'iframe|frame|frameset|link|style|'
+                                         'meta|param|doctype)')
+    _htmlproc_disallow_attribute = re.compile('(?i)<[^>]*\s+(on\w+)=')
 
     def default_processor(hdf, text, env):
         return '<pre class="wiki">' + util.escape(text) + '</pre>'
@@ -311,7 +315,15 @@ class Formatter(CommonFormatter):
 <div class="system-message">
  <strong>Error: HTML block contains disallowed tags.</strong>
  <pre>%s</pre>
-</div>""" % util.escape(text)
+</div>\n""" % util.escape(text)
+            env.log.error(err)
+            return err
+        if Formatter._htmlproc_disallow_attribute.search(text):
+            err = """\
+<div class="system-message">
+ <strong>Error: HTML block contains disallowed attributes.</strong>
+ <pre>%s</pre>
+</div>\n""" % util.escape(text)
             env.log.error(err)
             return err
         return text
@@ -378,7 +390,7 @@ class Formatter(CommonFormatter):
         depth = int((len(fullmatch.group('idepth')) + 1) / 2)
         list_depth = len(self._list_stack)
         if list_depth > 0 and depth == list_depth + 1:
-            self.in_list_item = True
+            self.in_list_item = 1
         else:
             self.open_indentation(depth)
         return ''

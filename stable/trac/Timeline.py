@@ -110,14 +110,14 @@ class Timeline (Module):
                     'date': time.strftime('%x', t),
                     'datetime': time.strftime('%a, %d %b %Y %H:%M:%S GMT', gmt),
                     'idata': int(row['idata']),
-                    'tdata': row['tdata'],
+                    'tdata': util.escape(row['tdata']),
                     'type': int(row['type']),
                     'message': row['message'] or '',
                     'author': util.escape(row['author'] or 'anonymous')
                     }
 
             if item['type'] == CHANGESET:
-                item['href'] = self.env.href.changeset(item['idata'])
+                item['href'] = util.escape(self.env.href.changeset(item['idata']))
                 msg = item['message']
                 item['shortmsg'] = util.escape(util.shorten_line(msg))
                 item['msg_nowiki'] = util.escape(msg)
@@ -162,14 +162,14 @@ class Timeline (Module):
                     item['node_list'] = node_list + ': '
 
             elif item['type'] == WIKI:
-                item['href'] = self.env.href.wiki(row['tdata'])
+                item['href'] = util.escape(self.env.href.wiki(row['tdata']))
                 item['message'] = wiki_to_oneliner(util.shorten_line(item['message']),
                                                    self.req.hdf, self.env, self.db, absurls=1)
             elif item['type'] == MILESTONE:
-                item['href'] = self.env.href.milestone(item['message'])
+                item['href'] = util.escape(self.env.href.milestone(item['message']))
                 item['message'] = util.escape(item['message'])
             else:               # TICKET
-                item['href'] = self.env.href.ticket(item['idata'])
+                item['href'] = util.escape(self.env.href.ticket(item['idata']))
                 msg = item['message']
                 item['shortmsg'] = util.escape(util.shorten_line(msg))
                 item['message'] = wiki_to_oneliner(
@@ -192,9 +192,6 @@ class Timeline (Module):
     def render (self):
         self.perm.assert_permission(perm.TIMELINE_VIEW)
 
-        self.add_link('alternate', '?daysback=90&max=50&format=rss',
-            'RSS Feed', 'application/rss+xml', 'rss')
-
         _from = self.args.get('from', '')
         _daysback = self.args.get('daysback', '')
 
@@ -216,7 +213,7 @@ class Timeline (Module):
         self.req.hdf.setValue('timeline.daysback', str(daysback))
 
         stop  = _from
-        start = stop - daysback * 86400
+        start = stop - (daysback + 1) * 86400
         maxrows = int(self.args.get('max', 0))
 
         wiki = self.args.has_key('wiki') 
@@ -234,6 +231,21 @@ class Timeline (Module):
             self.req.hdf.setValue('timeline.changeset', 'checked')
         if milestone:
             self.req.hdf.setValue('timeline.milestone', 'checked')
+
+        rssargs = []
+        if wiki:
+            rssargs.append('wiki=on')
+        if ticket:
+            rssargs.append('ticket=on')
+        if changeset:
+            rssargs.append('changeset=on')
+        if milestone:
+            rssargs.append('milestone=on')
+        if rssargs:
+            rssargs = '&' + '&'.join(rssargs)
+        self.add_link('alternate',
+            '?daysback=90&max=50%s&format=rss' % rssargs,
+            'RSS Feed', 'application/rss+xml', 'rss')
 
         info = self.get_info (start, stop, maxrows, ticket,
                               changeset, wiki, milestone)

@@ -136,12 +136,15 @@ class Ticket(UserDict):
                not self._old.has_key('owner'):
             cursor.execute('SELECT owner FROM component '
                            'WHERE name=%s', self._old['component'])
-            old_owner = cursor.fetchone()[0]
-            if self['owner'] == old_owner:
-                cursor.execute('SELECT owner FROM component '
-                               'WHERE name=%s', self['component'])
-                self['owner'] = cursor.fetchone()[0]
-           
+            row = cursor.fetchone()
+            # If the old component has been removed from the database
+            # then we just leave the owner as is.
+            if row:
+                old_owner = row[0]
+                if self['owner'] == old_owner:
+                    cursor.execute('SELECT owner FROM component '
+                                   'WHERE name=%s', self['component'])
+                    self['owner'] = cursor.fetchone()[0]
 
         for name in self._old.keys():
             if name[:7] == 'custom_':
@@ -398,7 +401,7 @@ class TicketModule (Module):
         util.hdf_add_if_missing(self.req.hdf, 'enums.resolution', 'fixed')
 
         self.req.hdf.setValue('ticket.reporter_id', util.escape(reporter_id))
-        self.req.hdf.setValue('title', '#%d (%s)' % (id,ticket['summary']))
+        self.req.hdf.setValue('title', '#%d (%s)' % (id, util.escape(ticket['summary'])))
         self.req.hdf.setValue('ticket.description.formatted',
                               wiki_to_html(ticket['description'], self.req.hdf,
                                            self.env, self.db))
@@ -455,7 +458,7 @@ class TicketModule (Module):
             reporter_id = self.args.get('author')
             comment = self.args.get('comment')
             if comment:
-                self.req.hdf.setValue('ticket.comment', comment)
+                self.req.hdf.setValue('ticket.comment', util.escape(comment))
                 # Wiki format a preview of comment
                 self.req.hdf.setValue('ticket.comment_preview',
                                   wiki_to_html(comment,

@@ -26,7 +26,6 @@ import os
 import sys
 import time
 import urllib
-from xml.sax import saxutils
 
 import svn
 
@@ -77,9 +76,6 @@ class FileCommon(Module.Module):
         self.req.send_header('Last-Modified', self.last_modified)
         self.req.send_header('Pragma', 'no-cache')
         self.req.send_header('Expires', 'Mon, 26 Jul 1997 05:00:00 GMT')
-        self.req.send_header('Cache-Control',
-                             'no-store, no-cache, must-revalidate, max-age=0')
-        self.req.send_header('Cache-Control', 'post-check=0, pre-check=0')
         self.req.end_headers()
         i = 0
         while 1:
@@ -220,7 +216,8 @@ class File(FileCommon):
     def generate_path_links(self, rev, rev_specified):
         # FIXME: Browser, Log and File should share implementation of this
         # function.
-        list = self.path.split('/')
+        list = filter(None, self.path.split('/'))
+        self.log.debug("Path links: %s" % list)
         self.filename = list[-1]
         path = '/'
         self.req.hdf.setValue('file.filename', list[-1])
@@ -233,8 +230,6 @@ class File(FileCommon):
         i = 0
         for part in list[:-1]:
             i = i + 1
-            if part == '':
-                continue
             path = path + part + '/'
             self.req.hdf.setValue('file.path.%d' % i, part)
             url = ''
@@ -308,7 +303,7 @@ class File(FileCommon):
         self.req.hdf.setValue('file.rev_msg', msg_html)
         self.req.hdf.setValue('file.path', self.path)
         self.req.hdf.setValue('file.logurl',
-            saxutils.escape(self.env.href.log(self.path, self.rev)))
+            util.escape(self.env.href.log(self.path, self.rev)))
 
         # Try to do an educated guess about the mime-type
         self.mime_type = svn.fs.node_prop (root, self.path,

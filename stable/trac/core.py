@@ -125,7 +125,7 @@ def parse_path_info(args, path_info):
     if match:
         set_if_missing(args, 'mode', 'milestone')
         if match.group(1):
-            set_if_missing(args, 'id', urllib.unquote_plus(match.group(1)))
+            set_if_missing(args, 'id', urllib.unquote(match.group(1)))
         return args
     return args
 
@@ -239,7 +239,7 @@ def populate_hdf(hdf, env, db, req):
     hdf.setValue('header_logo.link', env.get_config('header_logo', 'link'))
     hdf.setValue('header_logo.alt', env.get_config('header_logo', 'alt'))
     src = env.get_config('header_logo', 'src')
-    src_abs = src[:7] == 'http://' and 1 or 0
+    src_abs = re.match(r'https?://', src) != None
     if not src[0] == '/' and not src_abs:
         src = htdocs_location + src
     hdf.setValue('header_logo.src', src)
@@ -339,6 +339,7 @@ class Request:
 class CGIRequest(Request):
     def init_request(self):
         Request.init_request(self)
+
         self.cgi_location = os.getenv('SCRIPT_NAME')
         self.remote_addr = os.getenv('REMOTE_ADDR')
         self.remote_user = os.getenv('REMOTE_USER')
@@ -346,8 +347,14 @@ class CGIRequest(Request):
         host = os.getenv('SERVER_NAME')
         proto_port = ''
         port = int(os.environ.get('SERVER_PORT', 80))
-        if port == 443:
-           proto = 'https'
+
+        if os.getenv('HTTPS') in ('on', '1'):
+            # when you support Apache's way, you get it 60% right
+            proto  = 'https'
+            if port != 443:
+               proto_port = ':%d' % port
+        elif port == 443:
+            proto = 'https'
         else:
            proto = 'http'
            if port != 80:
@@ -385,7 +392,6 @@ class CGIRequest(Request):
 
     def send_header(self, name, value):
         self.write('%s: %s\r\n' % (name, value))
-        pass
 
     def end_headers(self):
         self.write('\r\n')

@@ -19,8 +19,8 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
+from __future__ import nested_scopes
 import time
-
 import os
 import sys
 import util
@@ -55,10 +55,6 @@ class HtmlDiffEditor (svn.delta.Editor):
         new_rev = svn.fs.node_created_rev(self.new_root, new_path, pool)
 
         options = Diff.get_options(self.env, self.req, self.args, 1)
-
-        # Make sure we have permission to view this diff
-        if not self.authzperm.has_permission(new_path):
-            return
 
         # Try to figure out the charset used. We assume that both the old
         # and the new version uses the same charset, not always the case
@@ -202,9 +198,9 @@ class Changeset (Module.Module):
                               time.asctime(time.localtime(int(changeset_info['time']))))
         author = changeset_info['author'] or 'anonymous'
         self.req.hdf.setValue('changeset.author', util.escape(author))
+        message = changeset_info['message'] or '--'
         self.req.hdf.setValue('changeset.message',
-                              wiki_to_html(util.wiki_escape_newline(
-                                           changeset_info['message']),
+                              wiki_to_html(util.wiki_escape_newline(message),
                                            self.req.hdf, self.env, self.db))
         self.req.hdf.setValue('changeset.revision', str(self.rev))
         util.add_dictlist_to_hdf(change_info, self.req.hdf, 'changeset.changes')
@@ -236,7 +232,8 @@ class Changeset (Module.Module):
                               self.args, self.env, self.authzperm)
         e_ptr, e_baton = svn.delta.make_editor(editor, self.pool)
 
-        def authz_cb(root, path, pool): return 1
+        def authz_cb(root, path, pool):
+            return self.authzperm.has_permission(path) and 1 or 0
         svn.repos.svn_repos_dir_delta(old_root, '', '',
                                       new_root, '', e_ptr, e_baton, authz_cb,
                                       0, 1, 0, 1, self.pool)
