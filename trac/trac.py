@@ -179,37 +179,37 @@ def real_main():
     module.perm = perm.PermissionCache(database, authenticator.authname)
     module.perm.add_to_hdf(module.cgi.hdf)
 
-    # Only open the subversion repository for the modules that really
-    # need it. This saves us some precious time.
-    if need_svn:
-        from svn import util, repos, core
+    pool = None
+    try:
+        # Only open the subversion repository for the modules that really
+        # need it. This saves us some precious time.
+        if need_svn:
+            from svn import util, repos, core
 
-        core.apr_initialize()
-        pool = core.svn_pool_create(None)
+            core.apr_initialize()
+            pool = core.svn_pool_create(None)
 
-        repos_dir = config['general']['repository_dir']
+            repos_dir = config['general']['repository_dir']
 
-        # Remove any trailing slash or else subversion might abort
-        if not os.path.split(repos_dir)[1]:
-            repos_dir = os.path.split(repos_dir)[0]
+            # Remove any trailing slash or else subversion might abort
+            if not os.path.split(repos_dir)[1]:
+                repos_dir = os.path.split(repos_dir)[0]
             
-        rep = repos.svn_repos_open(repos_dir, pool)
-        fs_ptr = repos.svn_repos_fs(rep)
-        module.repos = rep
-        module.fs_ptr = fs_ptr
-        sync.sync(database, rep, fs_ptr, pool)
-    else:
-        pool = None
+            rep = repos.svn_repos_open(repos_dir, pool)
+            fs_ptr = repos.svn_repos_fs(rep)
+            module.repos = rep
+            module.fs_ptr = fs_ptr
+            sync.sync(database, rep, fs_ptr, pool)
         
-    # Let the wiki module build a dictionary of all page names
-    import Wiki
-    Wiki.populate_page_dict(database)
-    module.pool = pool
-    module.run()
-    
-    if pool:
-        core.svn_pool_destroy(pool)
-        core.apr_terminate()
+        # Let the wiki module build a dictionary of all page names
+        import Wiki
+        Wiki.populate_page_dict(database)
+        module.pool = pool
+        module.run()
+    finally:
+        if pool:
+            core.svn_pool_destroy(pool)
+            core.apr_terminate()
 
 def create_error_cgi():
     import neo_cgi
