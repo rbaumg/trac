@@ -1,14 +1,3 @@
-function getContent(node) {
-  if (node.nodeType == 3) {
-    return node.nodeValue;
-  } else if (node.nodeType == 1) {
-    var buf = "";
-    for (var i = 0; i < node.childNodes.length; i++) {
-      buf += getContent(node.childeNodes[i]);
-    }
-  }
-}
-
 function initializeFilters() {
 
   // Removes an existing row from the filters table
@@ -20,9 +9,25 @@ function initializeFilters() {
       // Check whether there are more 'or' rows for this filter
       var next = tr.nextSibling;
       if (next && (next.className == propertyName)) {
-        next.cells[0].colSpan = 1;
-        next.insertBefore(tr.cells[0], next.cells[0]);
-        next.replaceChild(tr.cells[0], next.cells[1]);
+        function getChildElementAt(e, idx) {
+          e = e.firstChild;
+          var cur = 0;
+          while (cur <= idx) {
+            while (e && e.nodeType != 1) e = e.nextSibling;
+            if (cur++ == idx) break;
+            e = e.nextSibling;
+          }
+          return e;
+        }
+
+        var thisTh = getChildElementAt(tr, 0);
+        var nextTh = getChildElementAt(next, 0);
+        next.insertBefore(thisTh, nextTh);
+        nextTh.colSpan = 1;
+
+        thisTd = getChildElementAt(tr, 0);
+        nextTd = getChildElementAt(next, 1);
+        next.replaceChild(thisTd, nextTd);
       }
     }
 
@@ -139,7 +144,6 @@ function initializeFilters() {
         break;
       }
     }
-    alert(alreadyPresent);
 
     // Add the row header
     var th = document.createElement("th");
