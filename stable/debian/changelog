@@ -2,6 +2,7 @@ trac (0.8.1-2) UNRELEASED; urgency=low
 
   * debian/rules:
     - Add support for patching in build process;
+    - Include contrib/ on doc directory. (Closes: #298969)
 
  -- Otavio Salvador <otavio@debian.org>  Tue, 29 Mar 2005 20:08:28 -0300
 
