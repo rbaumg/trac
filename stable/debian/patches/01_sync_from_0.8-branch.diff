@@ -1,7 +1,7 @@
-Index: ../../0.8-stable/trac/wikimacros/rst.py
+Index: trac/wikimacros/rst.py
 ===================================================================
---- ../../0.8-stable/trac/wikimacros/rst.py	(revisão 1307)
-+++ ../../0.8-stable/trac/wikimacros/rst.py	(revisão 1461)
+--- trac/wikimacros/rst.py	(revisão 1307)
++++ trac/wikimacros/rst.py	(revisão 1462)
 @@ -123,7 +123,9 @@
      text = arguments[int(len(arguments) == 2)]
      reference = trac_get_reference(env, block_text, text)
