@@ -28,6 +28,168 @@ from Ticket import get_custom_fields, insert_custom_fields, Ticket
 from util import add_to_hdf, escape, sql_escape
 
 
+class Query:
+
+    def __init__(self, env, constraints=None, order='priority', desc=0):
+        self.env = env
+        self.constraints = constraints or {}
+        self.order = order
+        self.desc = desc
+        self.cols = [] # lazily initialized
+
+    def get_columns(self):
+        if self.cols:
+            return self.cols
+
+        # FIXME: the user should be able to configure which columns should
+        # be displayed
+        cols = [ 'id', 'summary', 'status', 'owner', 'priority', 'milestone',
+                 'component', 'version', 'severity', 'resolution', 'reporter' ]
+
+        # Semi-intelligently remove columns that are restricted to a single
+        # value by a query constraint.
+        for col in [k for k in self.constraints.keys() if k in cols]:
+            constraint = self.constraints[col]
+            if len(constraint) == 1 and not constraint[0][0] in '!~^$':
+                cols.remove(col)
+            if col == 'status' and not 'closed' in constraint \
+                    and 'resolution' in cols:
+                cols.remove('resolution')
+
+        def sort_columns(col1, col2):
+            constrained_fields = self.constraints.keys()
+            # Ticket ID is always the first column
+            if 'id' in [col1, col2]:
+                return col1 == 'id' and -1 or 1
+            # Ticket summary is always the second column
+            elif 'summary' in [col1, col2]:
+                return col1 == 'summary' and -1 or 1
+            # Constrained columns appear before other columns
+            elif col1 in constrained_fields or col2 in constrained_fields:
+                return col1 in constrained_fields and -1 or 1
+            # Ordered columns should be visible
+            elif col1 == self.order:
+                return -1
+            return 0
+        cols.sort(sort_columns)
+
+        # Only display the first seven columns by default
+        # FIXME: Make this configurable on a per-user and/or per-query basis
+        self.cols = cols[:7]
+
+        return self.cols
+
+    def execute(self, db):
+        if not self.cols:
+            self.get_columns()
+
+        cursor = db.cursor()
+        cursor.execute(self.to_sql())
+        results = []
+        while 1:
+            row = cursor.fetchone()
+            if not row:
+                break
+            id = int(row['id'])
+            result = { 'id': id, 'href': self.env.href.ticket(id) }
+            for col in self.cols:
+                result[col] = escape(row[col] or '--')
+            results.append(result)
+        cursor.close()
+        return results
+
+    def to_sql(self):
+        if not self.cols:
+            self.get_columns()
+
+        cols = self.cols[:]
+        if not self.order in cols:
+            cols.append(self.order)
+        if not 'priority' in cols:
+            # Always add the priority column for coloring the resolt rows
+            cols.append('priority')
+
+        sql = []
+        sql.append("SELECT " + ",".join(cols))
+        custom_fields = [f['name'] for f in get_custom_fields(self.env)]
+        for k in [k for k in self.constraints.keys() if k in custom_fields]:
+            sql.append(", %s.value AS %s" % (k, k))
+        sql.append("\nFROM ticket")
+        for k in [k for k in self.constraints.keys() if k in custom_fields]:
+           sql.append("\n  LEFT OUTER JOIN ticket_custom AS %s ON " \
+                      "(id=%s.ticket AND %s.name='%s')"
+                      % (k, k, k, k))
+
+        for col in [c for c in ['status', 'resolution', 'priority', 'severity']
+                    if c == self.order]:
+            sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
+                                         "value AS %s_value " \
+                                         "FROM enum WHERE type='%s')" \
+                       " ON %s_name=%s" % (col, col, col, col, col))
+        for col in [c for c in ['milestone', 'version'] if c == self.order]:
+            sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
+                                         "time AS %s_time FROM %s)" \
+                       " ON %s_name=%s" % (col, col, col, col, col))
+
+        clauses = []
+        for k, v in self.constraints.items():
+            if len(v) > 1:
+                inlist = ["'" + sql_escape(val) + "'" for val in v]
+                clauses.append("%s IN (%s)" % (k, ",".join(inlist)))
+            elif len(v) == 1:
+                val = v[0]
+
+                neg = val[:1] == '!'
+                if neg:
+                    val = val[1:]
+                mode = ''
+                if val[:1] in "~^$":
+                    mode, val = val[:1], val[1:]
+
+                val = sql_escape(val)
+                if mode == '~' and val:
+                    if neg:
+                        clauses.append("IFNULL(%s,'') NOT LIKE '%%%s%%'" % (k, val))
+                    else:
+                        clauses.append("IFNULL(%s,'') LIKE '%%%s%%'" % (k, val))
+                elif mode == '^' and val:
+                    clauses.append("IFNULL(%s,'') LIKE '%s%%'" % (k, val))
+                elif mode == '$' and val:
+                    clauses.append("IFNULL(%s,'') LIKE '%%%s'" % (k, val))
+                elif mode == '':
+                    if neg:
+                        clauses.append("IFNULL(%s,'')!='%s'" % (k, val))
+                    else:
+                        clauses.append("IFNULL(%s,'')='%s'" % (k, val))
+
+        if clauses:
+            sql.append("\nWHERE " + " AND ".join(clauses))
+
+        sql.append("\nORDER BY IFNULL(%s,'')=''%s,"
+                   % (self.order, self.desc and ' DESC' or ''))
+        if self.order in ['status', 'resolution', 'priority', 'severity']:
+            if self.desc:
+                sql.append("%s_value DESC" % self.order)
+            else:
+                sql.append("%s_value" % self.order)
+        elif self.order in ['milestone', 'version']:
+            if self.desc:
+                sql.append("IFNULL(%s_time,0)=0 DESC,%s_time DESC,%s DESC"
+                           % (self.order, self.order, self.order))
+            else:
+                sql.append("IFNULL(%s_time,0)=0,%s_time,%s"
+                           % (self.order, self.order, self.order))
+        else:
+            if self.desc:
+                sql.append("%s DESC" % self.order)
+            else:
+                sql.append("%s" % self.order)
+        if self.order != 'id':
+            sql.append(",id")
+
+        return "".join(sql)
+
+
 class QueryModule(Module):
     template_name = 'query.cs'
 
@@ -59,57 +221,6 @@ class QueryModule(Module):
                 constraints[field] = vals
 
         return constraints
-
-    def _get_columns(self, constraints):
-        # FIXME: the user should be able to configure which columns should
-        # be displayed
-        cols = [ 'id', 'summary', 'status', 'resolution', 'priority',
-                 'owner', 'milestone', 'component', 'version', 'severity',
-                 'reporter' ]
-
-        # Semi-intelligently remove columns that are restricted to a single
-        # value by a query constraint.
-        for col in [k for k in constraints.keys() if k in cols]:
-            constraint = constraints[col]
-            if len(constraint) == 1 and not constraint[0][0] in '!~^$':
-                cols.remove(col)
-            if col == 'status' and not 'closed' in constraint \
-                    and 'resolution' in cols:
-                cols.remove('resolution')
-
-        def sort_columns(col1, col2):
-            # Ticket ID is always the first column
-            if col1 == 'id':
-                return -1
-            # Ticket summary is always the second column
-            elif col1 == 'summary' and not col2 == 'id':
-                return -1
-            # Constrained columns appear before other columns
-            elif col1 in constraints.keys() and not (
-                 col2 in ['id', 'summary'] or col2 in constraints.keys()):
-                return -1
-            return 0
-        cols.sort(sort_columns)
-
-        # Only display the first seven columns by default
-        # FIXME: Make this configurable on a per-user and/or per-query basis
-        return cols[:7]
-
-    def _get_results(self, cols, sql):
-        cursor = self.db.cursor()
-        cursor.execute(sql)
-        results = []
-        while 1:
-            row = cursor.fetchone()
-            if not row:
-                break
-            id = int(row['id'])
-            result = { 'id': id, 'href': self.env.href.ticket(id) }
-            for col in cols:
-                result[col] = escape(row[col] or '--')
-            results.append(result)
-        cursor.close()
-        return results
 
     def _get_ticket_properties(self):
         properties = []
@@ -171,86 +282,6 @@ class QueryModule(Module):
         ]
         return modes
 
-    def _generate_sql(self, cols, constraints, order, desc):
-        if not order in cols:
-            cols.append(order)
-        if not 'priority' in cols:
-            # Always add the priority column for coloring the resolt rows
-            cols.append('priority')
-
-        sql = []
-        sql.append("SELECT " + ", ".join(cols))
-        custom_fields = [f['name'] for f in get_custom_fields(self.env)]
-        for k in [k for k in constraints.keys() if k in custom_fields]:
-            sql.append(", %s.value AS %s" % (k, k))
-        sql.append("\nFROM ticket")
-        for k in [k for k in constraints.keys() if k in custom_fields]:
-           sql.append("\n  LEFT OUTER JOIN ticket_custom AS %s ON " \
-                      "(id=%s.ticket AND %s.name='%s')"
-                      % (k, k, k, k))
-
-        for col in [c for c in ['status', 'resolution', 'priority', 'severity']
-                    if c == order]:
-            sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
-                                         "value AS %s_value " \
-                                         "FROM enum WHERE type='%s')" \
-                       " ON %s_name=%s" % (col, col, col, col, col))
-        for col in [c for c in ['milestone', 'version'] if c == order]:
-            sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
-                                         "time AS %s_time FROM %s)" \
-                       " ON %s_name=%s" % (col, col, col, col, col))
-
-        clauses = []
-        for k, v in constraints.items():
-            if len(v) > 1:
-                inlist = ["'" + sql_escape(val) + "'" for val in v]
-                clauses.append("%s IN (%s)" % (k, ",".join(inlist)))
-            elif len(v) == 1:
-                val = v[0]
-
-                neg = val[:1] == '!'
-                if neg:
-                    val = val[1:]
-                mode = ''
-                if val[:1] in "~^$":
-                    mode, val = val[:1], val[1:]
-
-                val = sql_escape(val)
-                if mode == '~' and val:
-                    if neg:
-                        clauses.append("IFNULL(%s,'') NOT LIKE '%%%s%%'" % (k, val))
-                    else:
-                        clauses.append("IFNULL(%s,'') LIKE '%%%s%%'" % (k, val))
-                elif mode == '^' and val:
-                    clauses.append("IFNULL(%s,'') LIKE '%s%%'" % (k, val))
-                elif mode == '$' and val:
-                    clauses.append("IFNULL(%s,'') LIKE '%%%s'" % (k, val))
-                elif mode == '':
-                    if neg:
-                        clauses.append("IFNULL(%s,'')!='%s'" % (k, val))
-                    else:
-                        clauses.append("IFNULL(%s,'')='%s'" % (k, val))
-
-        if clauses:
-            sql.append("\nWHERE " + " AND ".join(clauses))
-
-        sql.append("\nORDER BY IFNULL(%s,'')=''%s,"
-                   % (order, desc and ' DESC' or ''))
-        if order in ['status', 'resolution', 'priority', 'severity']:
-            sql.append("%s_value%s" % (order, desc and ' DESC' or ''))
-        elif order in ['milestone', 'version']:
-            sql.append("IFNULL(%s_time,0)=0%s,%s_time%s,%s_name%s"
-                       % (order, desc and ' DESC' or '',
-                          order, desc and ' DESC' or '',
-                          order, desc and ' DESC' or ''))
-        else:
-            sql.append("%s%s" % (order, desc and ' DESC' or ''))
-        sql.append(",id")
-
-        sql = "".join(sql)
-        self.log.debug("SQL Query: %s" % sql)
-        return sql
-
     def render(self):
         self.perm.assert_permission(perm.TICKET_VIEW)
 
@@ -269,7 +300,8 @@ class QueryModule(Module):
         modes = self._get_constraint_modes()
         add_to_hdf(modes, self.req.hdf, 'query.modes')
 
-        self._render_results(constraints, order, desc)
+        query = Query(self.env, constraints, order, desc)
+        self._render_results(query)
 
         # For clients without JavaScript, we add a new constraint here if
         # requested
@@ -278,23 +310,23 @@ class QueryModule(Module):
             if field:
                 self.req.hdf.setValue('query.constraints.%s.0' % field, '')
 
-    def _render_results(self, constraints, order, desc):
+    def _render_results(self, query):
         self.req.hdf.setValue('title', 'Custom Query')
 
-        cols = self._get_columns(constraints)
-
+        cols = query.get_columns()
         for i in range(len(cols)):
             self.req.hdf.setValue('query.headers.%d.name' % i, cols[i])
-            if cols[i] == order:
+            if cols[i] == query.order:
                 self.req.hdf.setValue('query.headers.%d.href' % i,
-                    self.env.href.query(constraints, order, not desc))
+                    self.env.href.query(query.constraints, query.order,
+                                        not query.desc))
                 self.req.hdf.setValue('query.headers.%d.order' % i,
-                    desc and 'desc' or 'asc')
+                    query.desc and 'desc' or 'asc')
             else:
                 self.req.hdf.setValue('query.headers.%d.href' % i,
-                    self.env.href.query(constraints, cols[i]))
+                    self.env.href.query(query.constraints, cols[i]))
 
-        for k, v in constraints.items():
+        for k, v in query.constraints.items():
             if len(v) > 1:
                 add_to_hdf(v, self.req.hdf, 'query.constraints.%s' % k)
             elif len(v) == 1:
@@ -309,10 +341,9 @@ class QueryModule(Module):
                                       (neg and '!' or '') + mode)
                 add_to_hdf([val], self.req.hdf, 'query.constraints.%s' % k)
 
-        self.req.hdf.setValue('query.order', order)
-        if desc:
+        self.req.hdf.setValue('query.order', query.order)
+        if query.desc:
             self.req.hdf.setValue('query.desc', '1')
 
-        sql = self._generate_sql(cols, constraints, order, desc)
-        results = self._get_results(cols, sql)
+        results = query.execute(self.db)
         add_to_hdf(results, self.req.hdf, 'query.results')
