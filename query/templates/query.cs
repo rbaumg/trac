@@ -61,7 +61,7 @@
         /each ?><?cs
        elif:property.type == "text" ?>
         <input type="text" name="<?cs var:property.name ?>" value="<?cs
-          var:constraint.0 ?>" /><?cs
+          var:constraint.0 ?>" size="42" /><?cs
        /if ?>
       </td>
       <td class="actions">

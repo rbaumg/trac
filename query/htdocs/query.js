@@ -1,5 +1,6 @@
 // Adds a new row to the filters table
 function addFilter(select) {
+  if (select.selectedIndex < 1) return;
 
   if (select.options[select.selectedIndex].disabled) {
     // Neither IE nor Safari supported disabled options at the time this was
@@ -86,6 +87,7 @@ function addFilter(select) {
     } else if (property.type == "text") {
       var element = document.createElement("input");
       element.name = propertyName;
+      element.size = 42;
     }
     td.appendChild(element);
     element.focus();
@@ -122,6 +124,10 @@ function addFilter(select) {
   } else { // real XHTML
     table.insertBefore(tr, insertionPoint);
   }
+  
+  // Disable the add filter in the drop-down list
+  select.options[select.selectedIndex].disabled = true;
+  select.selectedIndex = -1;
 }
 
 // Removes an existing row from the filters table
