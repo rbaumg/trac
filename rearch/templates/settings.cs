@@ -13,7 +13,7 @@
  settings are stored on the server and identified using  a 'Session Key'
  stored in a browser cookie. The cookie lets Trac restore your settings 
  </p>
- <form method="get" action="<?cs var:cgi_location?>/settings/">
+ <form method="post" action="">
  <div>
   <h3>Personal Information</h3>
   <div>

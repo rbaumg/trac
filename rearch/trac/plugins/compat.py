@@ -32,7 +32,6 @@ class LegacyRequestWrapper(legacy.Request):
 
     req = None
     resp = None
-    session = {}
 
     def __init__(self, req, resp):
         self.req = req
@@ -73,7 +72,8 @@ class LegacyRequestWrapper(legacy.Request):
         self.resp.headers['Content-Type'] = content_type
 
     cgi_location = property(fget=lambda x: x.req.scriptName)
-    authname = property(fget=lambda x: x.req['user'])
+    authname = property(fget=lambda x: x.req['user'] or 'anonymous')
+    session = property(fget=lambda x: x.req['session'])
 
 
 class CompatPlugin(Plugin):
@@ -119,10 +119,16 @@ class CompatPlugin(Plugin):
             'homepage': 'http://trac.edgewall.com/'
         }
 
+        # Setup the permissions helper
+        from trac import perm
+        self.env.perm = perm.PermissionCache(self.env.getDBConnection(),
+                                             req['user'])
+        self.env.perm.add_to_hdf(data)
+
         # Add request parameters to HDF
         data['args'] = req.params
 
-    def afterProcessingRequest(self, req, resp):
+    def afterProcessingRequest(self, req, resp, exc_info):
         pass
 
     # dispatcher.IRequestProcessor methods
@@ -136,7 +142,7 @@ class CompatPlugin(Plugin):
             if match.group(2):
                 req.params['page'] = match.group(2)
             return 1
-        match = re.search('^/(newticket|timeline|search|roadmap|settings|query)/?', req.pathInfo)
+        match = re.search('^/(newticket|timeline|search|roadmap|query)/?', req.pathInfo)
         if match:
             req['mode'] = match.group(1)
             return 1

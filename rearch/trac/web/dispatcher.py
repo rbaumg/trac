@@ -22,6 +22,8 @@
 from protocols import *
 from trac.plugin import *
 
+import sys
+
 
 class IRequestProcessor(Interface):
     """
@@ -47,7 +49,7 @@ class IRequestFilter(Interface):
     def beforeProcessingRequest(req, resp):
         """TODO"""
 
-    def afterProcessingRequest(req, resp):
+    def afterProcessingRequest(req, resp, exc_info):
         """TODO"""
 
 
@@ -87,23 +89,30 @@ class RequestDispatcher(Plugin):
             processors = [p for p in self.requestProcessors
                           if p.matchRequest(req)]
 
-        # Make sure we have one (and only one plug-in ready to process the
-        # request, and let it do its work
-        if not processors: # 404 Not Found
-            resp.status = "404 Not Found"
-            raise Exception, "No processor matched the request to %s" \
-                             % req.pathInfo
-        if len(processors) > 1: # 500 Internal Server Error
-            resp.status = "500 Internal Server Error"
-            raise Exception, "More than one processor matched the request (%s)" \
-                             % map(str, processors)
-        processors[0].processRequest(req, resp)
+        exc_info = None
+        try:
+            # Make sure we have one (and only one plug-in ready to process the
+            # request, and let it do its work
+            if not processors: # 404 Not Found
+                resp.status = "404 Not Found"
+                raise Exception, "No processor matched the request to %s" \
+                                 % req.pathInfo
+            if len(processors) > 1: # 500 Internal Server Error
+                resp.status = "500 Internal Server Error"
+                raise Exception, "More than one processor matched the request (%s)" \
+                                 % map(str, processors)
+            processors[0].processRequest(req, resp)
+        except:
+            from trac.web import SendResponse
+            exc_info = sys.exc_info()
+            if exc_info[0] != SendResponse:
+                raise exc_info[0], exc_info[1], exc_info[2]
 
         # Give request filters a chance to post-process the request (in reverse
         # order)
         for requestFilter in self.requestFilters(constrain=filterEnabled,
                                                  order=filterOrder, reverse=1):
-            requestFilter.afterProcessingRequest(req, resp)
+            requestFilter.afterProcessingRequest(req, resp, exc_info)
 
 
 __all__ = ['IRequestFilter', 'IRequestProcessor', 'RequestDispatcher']

@@ -75,7 +75,7 @@ class ExternalAuthPlugin(Plugin):
             finally:
                 db.close()
 
-    def afterProcessingRequest(self, req, resp):
+    def afterProcessingRequest(self, req, resp, exc_info):
         pass
 
     # dispatcher.IRequestProcessor methods

@@ -109,5 +109,5 @@ class ChromePlugin(Plugin):
                 items += contributor.getNavigationLinks(req, category) or []
             data['navigation'][category] = items
 
-    def afterProcessingRequest(self, req, resp):
+    def afterProcessingRequest(self, req, resp, exc_info):
         pass

@@ -21,7 +21,7 @@
 
 from trac.plugin import *
 from trac.web import dispatcher
-import trac.web
+from trac.web import SendResponse
 
 from protocols import *
 
@@ -45,7 +45,10 @@ class ClearSilverTemplatingFilter(Plugin):
         req['template_data'] = templateData
         req['template_file'] = None
 
-    def afterProcessingRequest(self, req, resp):
+    def afterProcessingRequest(self, req, resp, exc_info):
+        if exc_info and exc_info[0] == SendResponse:
+            return
+
         templateData = req['template_data']
         assert templateData, 'No template data to process'
 

@@ -32,8 +32,8 @@ try:
 
     # Load the plugins
     # TODO: the list of plugins to load shouldn't be hard-coded like this
-    from trac.web import chrome, clearsilver, extauth
-    from trac.plugins import compat
+    from trac.web import chrome, clearsilver, extauth, session
+    from trac.plugins import compat, settings
 
     # Run the application
     from trac.web import cgiserver, Application
