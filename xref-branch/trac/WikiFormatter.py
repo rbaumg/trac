@@ -38,7 +38,7 @@ def system_message(msg, text):
  <pre>%s</pre>
 </div>
 """ % (msg, util.escape(text))
-    
+
 
 class WikiProcessor:
 
@@ -126,7 +126,7 @@ class CommonFormatter:
               r"(?P<tickethref>!?#\d+)",
               r"(?P<changesethref>!?(\[\d+\]|\br\d+\b))",
               r"(?P<reporthref>!?\{\d+\})",
-              r"(?P<modulehref>!?((?P<modulename>bug|ticket|browser|source|repos|report|changeset|wiki|milestone|search):(?P<moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)]))))",
+              r"(?P<modulehref>!?((?P<modulename>bug|ticket|browser|source|repos|report|query|changeset|wiki|milestone|search):(?P<moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)]))))",
               r"(?P<wikihref>!?(^|(?<=[^A-Za-z]))[A-Z][a-z]+(?:[A-Z][a-z]*[a-z/])+(?:#[A-Za-z0-9]+)?(?=\Z|\s|[.,;:!?\)}\]]))",
               r"(?P<fancylink>!?\[(?P<fancyurl>([a-z]+:[^ ]+)) (?P<linkname>.*?)\])"]
 
@@ -311,6 +311,19 @@ class CommonFormatter:
         return '<a class="milestone" href="%s">%s</a>' \
                % (self._href.milestone(name), text)
 
+    def _make_query_link(self, query, text):
+        if query[0] == '?':
+            return '<a class="query" href="%s">%s</a>' \
+                   % (self.env.href.query() + query, text)
+        else:
+            from trac.Query import Query, QuerySyntaxError
+            try:
+                query = Query.from_string(self.env, query)
+                return '<a class="query" href="%s">%s</a>' \
+                       % (query.get_href(), text)
+            except QuerySyntaxError, e:
+                return '<em class="error">[Error: %s]</em>' % util.escape(e)
+
     def _make_report_link(self, id, text):
         self.make_xref('report', id)
         return '<a class="report" href="%s">%s</a>' \
@@ -479,7 +492,6 @@ class Formatter(CommonFormatter):
         self.anchors.append(anchor)
         self.out.write('<h%d id="%s">%s</h%d>' % (depth, anchor.encode('utf-8'),
                                                   heading, depth))
-        return ''
 
     def _svnimg_formatter(self, match, fullmatch):
         prefix_len = match.find(':') + 1
