@@ -22,8 +22,6 @@
 from protocols import *
 from trac.plugin import *
 
-import sys
-
 
 class IRequestProcessor(Interface):
     """
@@ -49,7 +47,7 @@ class IRequestFilter(Interface):
     def beforeProcessingRequest(req, resp):
         """TODO"""
 
-    def afterProcessingRequest(req, resp, exc_info):
+    def afterProcessingRequest(req, resp):
         """TODO"""
 
 
@@ -62,7 +60,7 @@ class RequestDispatcher(Plugin):
     def dispatch(self, req, resp):
         """
         Dispatches the given HTTP request to the plugin matching it, or sends
-        a "404 Not Found" error page if no plugin matches.
+        a "404 Not Found" error if no plugin matches.
         """
 
         # Get the list of configured request filters. This determines both the
@@ -93,7 +91,8 @@ class RequestDispatcher(Plugin):
         # request, and let it do its work
         if not processors: # 404 Not Found
             resp.status = "404 Not Found"
-            raise Exception, "No processor matched the request"
+            raise Exception, "No processor matched the request to %s" \
+                             % req.pathInfo
         if len(processors) > 1: # 500 Internal Server Error
             resp.status = "500 Internal Server Error"
             raise Exception, "More than one processor matched the request (%s)" \
@@ -104,7 +103,7 @@ class RequestDispatcher(Plugin):
         # order)
         for requestFilter in self.requestFilters(constrain=filterEnabled,
                                                  order=filterOrder, reverse=1):
-            requestFilter.afterProcessingRequest(req, resp, None)
+            requestFilter.afterProcessingRequest(req, resp)
 
 
 __all__ = ['IRequestFilter', 'IRequestProcessor', 'RequestDispatcher']

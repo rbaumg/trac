@@ -19,6 +19,7 @@
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
+from trac.__init__ import __version__ as TRAC_VERSION
 from trac.plugin import *
 from trac.web import dispatcher
 from trac.util import escape
@@ -65,8 +66,6 @@ class ChromePlugin(Plugin):
         data = req['template_data']
         assert data, "Template data not available"
 
-        from trac.__init__ import __version__
-
         # TODO: The following has been adapted from trac.core.populate_hdf.
         # It should be cleaned up.
         htdocs_location = self.env.get_config('trac', 'htdocs_location')
@@ -83,24 +82,7 @@ class ChromePlugin(Plugin):
             'url': self.env.get_config('project', 'url')
         }
         data['trac'] = {
-            'href': {
-                'wiki': self.env.href.wiki(),
-                'browser': self.env.href.browser('/'),
-                'timeline': self.env.href.timeline(),
-                'roadmap': self.env.href.roadmap(),
-                'milestone': self.env.href.milestone(None),
-                'report': self.env.href.report(),
-                'query': self.env.href.query(),
-                'newticket': self.env.href.newticket(),
-                'search': self.env.href.search(),
-                'about': self.env.href.about(),
-                'about_config': self.env.href.about('config'),
-                'login': self.env.href.login(),
-                'logout': self.env.href.logout(),
-                'settings': self.env.href.settings(),
-                'homepage': 'http://trac.edgewall.com/'
-            },
-            'version': __version__,
+            'version': TRAC_VERSION,
             'time': time.strftime('%c', time.localtime())
         }
 
@@ -116,6 +98,7 @@ class ChromePlugin(Plugin):
             'width': self.env.get_config('header_logo', 'width'),
             'height': self.env.get_config('header_logo', 'height')
         }
+
         if req:
             data['cgi_location'] = req.scriptName
             data['trac.authname'] = escape(req['user'])
@@ -126,5 +109,5 @@ class ChromePlugin(Plugin):
                 items += contributor.getNavigationLinks(req, category) or []
             data['navigation'][category] = items
 
-    def afterProcessingRequest(self, req, resp, exc_info):
+    def afterProcessingRequest(self, req, resp):
         pass

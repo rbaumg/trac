@@ -45,10 +45,8 @@ class ClearSilverTemplatingFilter(Plugin):
         req['template_data'] = templateData
         req['template_file'] = None
 
-    def afterProcessingRequest(self, req, resp, exc_info):
+    def afterProcessingRequest(self, req, resp):
         templateData = req['template_data']
-        if exc_info and not templateData:
-            raise exc_info[0], exc_info[1], exc_info[2]
         assert templateData, 'No template data to process'
 
         if req.params.has_key('debug'):

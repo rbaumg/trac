@@ -31,7 +31,6 @@ from types import ListType
 
 import Href
 import perm
-import auth
 import authzperm
 import env 
 import Session
@@ -78,76 +77,6 @@ class TracFieldStorage(cgi.FieldStorage):
             raise KeyError(name)
         self.list = filter(lambda x, name=name: x.name != name, self.list)
 
-
-def parse_path_info(args, path_info):
-    def set_if_missing(fs, name, value):
-        if value and not fs.has_key(name):
-            fs.list.append(cgi.MiniFieldStorage(name, value))
-
-    if not path_info or path_info in ['/login', '/logout']:
-        return args
-    match = re.search('^/(about_trac|wiki)(?:/(.*))?', path_info)
-    if match:
-        set_if_missing(args, 'mode', match.group(1))
-        if match.group(2):
-            set_if_missing(args, 'page', match.group(2))
-        return args
-    match = re.search('^/(newticket|timeline|search|roadmap|settings|query)/?', path_info)
-    if match:
-        set_if_missing(args, 'mode', match.group(1))
-        return args
-    match = re.search('^/(ticket|report)(?:/([0-9]+)/*)?', path_info)
-    if match:
-        set_if_missing(args, 'mode', match.group(1))
-        if match.group(2):
-            set_if_missing(args, 'id', match.group(2))
-        return args
-    match = re.search('^/(browser|log|file)(?:(/.*))?', path_info)
-    if match:
-        set_if_missing(args, 'mode', match.group(1))
-        if match.group(2):
-            set_if_missing(args, 'path', match.group(2))
-        return args
-    match = re.search('^/changeset/([0-9]+)/?', path_info)
-    if match:
-        set_if_missing(args, 'mode', 'changeset')
-        set_if_missing(args, 'rev', match.group(1))
-        return args
-    match = re.search('^/attachment/([a-zA-Z_]+)/([^/]+)(?:/(.*)/?)?', path_info)
-    if match:
-        set_if_missing(args, 'mode', 'attachment')
-        set_if_missing(args, 'type', match.group(1))
-        set_if_missing(args, 'id', urllib.unquote(match.group(2)))
-        set_if_missing(args, 'filename', match.group(3))
-        return args
-    match = re.search('^/milestone(?:/([^\?]+))?(?:/(.*)/?)?', path_info)
-    if match:
-        set_if_missing(args, 'mode', 'milestone')
-        if match.group(1):
-            set_if_missing(args, 'id', urllib.unquote_plus(match.group(1)))
-        return args
-    return args
-
-def parse_args(command, path_info, query_string,
-               fp=None, env = None, _headers=None):
-    if not env:
-        env = {'REQUEST_METHOD': command, 'QUERY_STRING': query_string}
-    if command in ['GET', 'HEAD']:
-        _headers = None
-    args = TracFieldStorage(fp, environ=env, headers=_headers, keep_blank_values=1)
-    parse_path_info(args, path_info)
-    return args
-
-def add_args_to_hdf(args, hdf):
-    for key in args.keys():
-        if not key:
-            continue
-        if type(args[key]) is not ListType:
-            hdf.setValue('args.%s' % key, str(args[key].value))
-        else:
-            for i in range(len(args[key])):
-                hdf.setValue('args.%s.%d' % (key, i), str(args[key][i].value))
-
 def module_factory(args, env, db, req):
     mode = args.get('mode', 'wiki')
     module_name, constructor_name, need_svn = modules[mode]
@@ -169,7 +98,7 @@ def module_factory(args, env, db, req):
     # need it. This saves us some precious time.
     if need_svn:
         import sync
-        module.authzperm = authzperm.AuthzPermission(env,req.authname)
+        module.authzperm = authzperm.AuthzPermission(env, req.authname)
         repos_dir = env.get_config('trac', 'repository_dir')
         pool, rep, fs_ptr = open_svn_repos(repos_dir)
         module.repos = rep
@@ -193,12 +122,6 @@ def open_environment():
     elif version > env.db_version:
         raise TracError('Unknown Trac Environment version (%d).' % version)
     return env
-
-class NotModifiedException(Exception):
-    pass
-
-class RedirectException(Exception):
-    pass
 
 def populate_hdf(hdf, env, req=None):
     htdocs_location = env.get_config('trac', 'htdocs_location')
@@ -403,55 +326,6 @@ class CGIRequest(Request):
     def end_headers(self):
         self.write('\r\n')
 
-def dispatch_request(path_info, args, req, env, database=None):
-    import Wiki
-
-    if not database:
-        database = env.get_db_cnx()
-
-    # Let the wiki module build a dictionary of all page names
-    Wiki.populate_page_dict(database, env)
-
-    try:
-        authenticator = auth.Authenticator(database, req)
-        if path_info == '/logout':
-            authenticator.logout()
-            referer = req.get_header('Referer')
-            if referer and referer[0:len(req.base_url)] != req.base_url:
-                # only redirect to referer if the latter is from the same instance
-                referer = None
-            req.redirect(referer or env.href.wiki())
-        elif req.remote_user and authenticator.authname == 'anonymous':
-            authenticator.login(req)
-        if path_info == '/login':
-            referer = req.get_header('Referer')
-            if referer and referer[0:len(req.base_url)] != req.base_url:
-                # only redirect to referer if the latter is from the same instance
-                referer = None
-            req.redirect(referer or env.href.wiki())
-        req.authname = authenticator.authname
-
-        newsession = args.has_key('newsession') and args['newsession']
-        req.session = Session.Session(env, req, newsession)
-
-        add_args_to_hdf(args, req.hdf)
-        try:
-            pool = None
-            # Load the selected module
-            module = module_factory(args, env, database, req)
-            pool = module.pool
-            module.run()
-        finally:
-            # We do this even if the cgi will terminate directly after. A pool
-            # destruction might trigger important clean-up functions.
-            if pool:
-                import svn.core
-                svn.core.svn_pool_destroy(pool)
-    except NotModifiedException:
-        pass
-    except RedirectException:
-        pass
-
 def open_svn_repos(repos_dir):
     from svn import repos, core
 
@@ -509,27 +383,3 @@ def send_pretty_error(e, env, req=None):
     if env and env.log != None:
         env.log.error(str(e))
         env.log.error(tb.getvalue())
-
-def real_cgi_start():
-
-    env = open_environment()
-
-    req = CGIRequest()
-    req.init_request()
-
-    env.href = Href.Href(req.cgi_location)
-    env.abs_href = Href.Href(req.base_url)
-
-    # Parse arguments
-    path_info = os.getenv('PATH_INFO')
-    args = parse_args(req.command,
-                      path_info, os.getenv('QUERY_STRING'),
-                      sys.stdin, os.environ)
-    dispatch_request(path_info, args, req, env)
-
-def cgi_start():
-    try:
-        locale.setlocale(locale.LC_ALL, '')
-        real_cgi_start()
-    except Exception, e:
-        send_pretty_error(e, None)

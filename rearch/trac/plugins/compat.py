@@ -62,7 +62,10 @@ class LegacyRequestWrapper(legacy.Request):
         pass
 
     def redirect(self, url):
-        self.resp.redirect(url)
+        if url.startswith(self.req.scriptName):
+            # the new Response class adds the SCRIPT_NAME automatically
+            url = url[len(self.req.scriptName):]
+        self.resp.sendRedirect(url)
 
     def display(self, cs, content_type='text/html', response=200):
         self.req['template_file'] = cs
@@ -91,11 +94,35 @@ class CompatPlugin(Plugin):
     # dispatcher.IRequestFilters methods
 
     def beforeProcessingRequest(self, req, resp):
+        data = req['template_data']
+
+        # Setup the Href helper
         from trac import Href
         self.env.href = Href.Href(req.scriptName)
         self.env.abs_href = Href.Href(req.baseURL)
 
-    def afterProcessingRequest(self, req, resp, exc_info):
+        data['trac']['href'] = {
+            'wiki': self.env.href.wiki(),
+            'browser': self.env.href.browser('/'),
+            'timeline': self.env.href.timeline(),
+            'roadmap': self.env.href.roadmap(),
+            'milestone': self.env.href.milestone(None),
+            'report': self.env.href.report(),
+            'query': self.env.href.query(),
+            'newticket': self.env.href.newticket(),
+            'search': self.env.href.search(),
+            'about': self.env.href.about(),
+            'about_config': self.env.href.about('config'),
+            'login': self.env.href.login(),
+            'logout': self.env.href.logout(),
+            'settings': self.env.href.settings(),
+            'homepage': 'http://trac.edgewall.com/'
+        }
+
+        # Add request parameters to HDF
+        data['args'] = req.params
+
+    def afterProcessingRequest(self, req, resp):
         pass
 
     # dispatcher.IRequestProcessor methods
@@ -145,31 +172,25 @@ class CompatPlugin(Plugin):
             return 1
 
     def processRequest(self, req, resp):
+        data = req['template_data']
+
         if not req['mode']: # set as default processor
             req['mode'] = 'wiki'
-
-        data = req['template_data']
-        data['mode'] = req['mode']
 
         args = {'mode': req['mode']}
         args.update(req.params)
 
         try:
-            try:
-                pool = None
-                # Load the selected module
-                module = legacy.module_factory(args, self.env,
-                                               self.env.get_db_cnx(),
-                                               LegacyRequestWrapper(req, resp))
-                pool = module.pool
-                module.run()
-            finally:
-                # We do this even if the cgi will terminate directly after. A pool
-                # destruction might trigger important clean-up functions.
-                if pool:
-                    import svn.core
-                    svn.core.svn_pool_destroy(pool)
-        except legacy.NotModifiedException:
-            pass
-        except legacy.RedirectException:
-            pass
+            pool = None
+            # Load the selected module
+            module = legacy.module_factory(args, self.env,
+                                           self.env.get_db_cnx(),
+                                           LegacyRequestWrapper(req, resp))
+            pool = module.pool
+            module.run()
+        finally:
+            # We do this even if the cgi will terminate directly after. A pool
+            # destruction might trigger important clean-up functions.
+            if pool:
+                import svn.core
+                svn.core.svn_pool_destroy(pool)

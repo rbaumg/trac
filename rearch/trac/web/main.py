@@ -76,7 +76,7 @@ class Request(object):
                 if not value.filename:
                     value = str(value.value)
             else:
-                value = [str(v.value) for v in value if not value.filename]
+                value = [str(v.value) for v in value]
             params[key] = value
         if self._environ['REQUEST_METHOD'].upper() == 'POST':
             qs = cgi.parse_qs(self.queryString, keep_blank_values=True,
@@ -244,9 +244,9 @@ class Response(object):
             self._body = lambda: file.read(block_size)
         raise SendResponse
 
-    def sendRedirect(self, location):
-        if location.startswith('/'):
-            location = self._req.baseURI + location
+    def sendRedirect(self, path):
+        if path.startswith('/'):
+            path = self._req.baseURL + path
         self.status = "302 Moved Temporarily"
         self.headers['Location'] = location
         self.headers['Content-Type'] = 'text/plain'
