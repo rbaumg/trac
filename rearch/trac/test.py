@@ -10,6 +10,7 @@ import tests.diff
 import tests.tracadmin
 import tests.query
 import tests.plugin
+import tests.web.clearsilver
 
 def suite():
     suite = unittest.TestSuite()
@@ -22,6 +23,7 @@ def suite():
     suite.addTest(tests.tracadmin.suite())
     suite.addTest(tests.query.suite())
     suite.addTest(tests.plugin.suite())
+    suite.addTest(tests.web.clearsilver.suite())
     return suite
 
 if __name__ == '__main__':
