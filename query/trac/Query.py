@@ -375,7 +375,7 @@ class QueryModule(Module):
             else:
                 self.req.hdf.setValue('query.headers.%d.href' % i,
                     escape(self.env.href.query(query.constraints, cols[i],
-                                               1, query.group, query.groupdesc,
+                                               0, query.group, query.groupdesc,
                                                query.verbose)))
 
         for k, v in query.constraints.items():
