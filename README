@@ -9,7 +9,6 @@ Current feature branches are:
 
   features/diff_support
     Based on:            Trunk
-    Ticket(s) Affected:  #87 #199
-    Description:         Work for downloadable diffs and ability to diff
-                         any two revs of a file
+    Ticket(s) Affected:  #87
+    Description:         Work for downloadable diffs
 
