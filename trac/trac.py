@@ -250,6 +250,9 @@ def main():
     # message using the error.cs template. If that failes fall
     # back to a plain/text version.
     try:
+        if sys.platform == "win32":
+            import msvcrt
+            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
         try:
             real_main()
         except util.TracError, e:
