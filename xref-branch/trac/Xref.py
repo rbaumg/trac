@@ -26,16 +26,16 @@
 
   Currently, cross-references between the following Trac objects are supported:
    * Wiki page +
-   * Ticket
+   * Ticket +
    * Changeset
    * Report
    * Milestone
-   * Source (only as targets for now)
+   * Source (only as targets for now) +
 
   Basically, two kinds of references are supported:
    * ''implicit references between objects''
      Implicit references are created for every TracLinks that can be found
-     in (any of) the wiki text of a Trac object.
+     in (any of) the wiki text(s) of a Trac object.
      Indeed, some objects may have separately editable wiki texts,
      each of them being a ''facet'' of this object.
      (TODO: generic fine grained anchoring: <object href>#<facet> should go to the facet)
@@ -54,10 +54,33 @@ from trac.Module import Module
 from trac.util import escape, TracError
 from trac.WikiFormatter import XRefFormatter
 
-__all__ = ['TracObj', 'rebuild_cross_references', 'get_dag']
+__all__ = ['object_factory', 'TracObj', 'rebuild_cross_references', 'get_dag']
 
 
 how_much_context = 40
+
+
+objects = {
+#    type           (module_name,   class_name)
+    'wiki'        : ('Wiki',        'WikiPage'),
+    'ticket'      : ('Xref',        'TracObj'),
+#   'ticket'      : ('Ticket',      'Ticket'),
+    'changeset'   : ('Xref',        'TracObj'),
+#   'changeset'   : ('Changeset',   'Changeset'),
+    'report'      : ('Xref',        'TracObj'),
+#   'report'      : ('Report',      'Report'),
+    'milestone'   : ('Xref',        'TracObj'),
+#   'milestone'   : ('Milestone',   'Milestone'),
+    'source'      : ('Browser',     'Source'),
+}
+
+def object_factory(env, type, id):
+    module_name, constructor_name = objects[type]
+    module = __import__(module_name, globals(),  locals())
+    constructor = getattr(module, constructor_name)
+    obj = constructor(env, id)
+    obj.type = type  # FIXME: should be done by the subclasses
+    return obj
 
 
 class TracObj:
@@ -79,12 +102,12 @@ class TracObj:
      * relation: the explicit nature of the relationship.
     """
 
-    def __init__(self, type, id): # TODO: consider adding self.env (esp. for href/href2)
-        self.type = type
+    def __init__(self, env, id):
+        self.env  = env
         self.id   = id
-        self.force_relation = ''
-        if type == 'source':            # TODO: oo-ify
-            self.id = id.strip('/')
+        self.force_relation = '' # FIXME: this should belongs to the XrefFormatter
+# FIXME        if type == 'source':            # TODO: oo-ify
+#                  self.id = id.strip('/')
 
     def name(self):
         if self.type == 'ticket':          # TODO: oo-ify
@@ -107,17 +130,10 @@ class TracObj:
             return self.type + ':' + escape(self.id)
 
     def icon(self):
-        if self.type == 'ticket':       # TODO: oo-ify
-            return 'newticket'
-        else:
-            return self.type
+        return self.type
 
-    def href(self, env):
-        m = getattr(env.href, self.type)
-        if m:
-            return m(self.id)
-        else:
-            return env.href.wiki()
+    def href(self, *args, **kw):
+        return self.env.href(self.type, self.id, *args, **kw)
 
     # -- used by other Modules, for cross-referencing 
 
@@ -139,20 +155,20 @@ class TracObj:
                        (self.id, self.type, relation))
         self.insert_xref(db, relation, dest, facet, context)
 
-    def replace_xrefs_from_wiki(self, env, db, facet, wikitext):
+    def replace_xrefs_from_wiki(self, db, facet, wikitext):
         """
         Remove then re-create the cross-references for the given facet.
         """
         self.delete_xrefs(db, facet)
-        XRefFormatter(env, db, False).format(wikitext, self, facet)
+        XRefFormatter(self.env, db, False).format(wikitext, self, facet)
 
-    def replace_xrefs_from_list(self, env, db, facet, relation, wikitext):
+    def replace_xrefs_from_list(self, db, facet, relation, wikitext):
         """
         Remove then re-create the cross-references for the given 'facet',
         forcing 'relation'.
         """
         self.delete_xrefs(db, facet)
-        xreffmt = XRefFormatter(env, db, False)
+        xreffmt = XRefFormatter(self.env, db, False)
         self.force_relation = relation
         xreffmt.format(wikitext.replace('\n', ' '), self, facet)
         self.force_relation = ''
@@ -303,7 +319,7 @@ def rebuild_cross_references(env, db, do_changesets=True):
     for name, text, comment, version in cursor:
         if name != previous_page:
             previous_page = name
-            src = TracObj('wiki', name)
+            src = object_factory(env, 'wiki', name)
             src.delete_xrefs(db)
             add_xrefs(src, 'content', text)
         add_xrefs(src, 'comment:%d' % version, comment)
@@ -312,7 +328,7 @@ def rebuild_cross_references(env, db, do_changesets=True):
     # -- -- description
     cursor.execute("SELECT id, description FROM ticket")
     for id, description in cursor:
-        src = TracObj('ticket', id)
+        src = object_factory(env, 'ticket', id)
         src.delete_xrefs(db)
         add_xrefs(src, 'description', description)
         # -- -- comments
@@ -330,28 +346,28 @@ def rebuild_cross_references(env, db, do_changesets=True):
     if do_changesets:
         cursor.execute("SELECT rev, message FROM revision")
         for rev, message in cursor:
-            src = TracObj('changeset', rev)
+            src = object_factory(env, 'changeset', rev)
             src.delete_xrefs(db)
             add_xrefs(src, 'content', message)
 
     # -- report objects
     cursor.execute("SELECT id, description FROM report")
     for id, description in cursor:
-        src = TracObj('report', id)
+        src = object_factory(env, 'report', id)
         src.delete_xrefs(db)
         add_xrefs(src, 'description', description)
 
     # -- milestone objects
     cursor.execute("SELECT name, description FROM milestone")
     for name, description in cursor:
-        src = TracObj('milestone', name)
+        src = object_factory(env, 'milestone', name)
         src.delete_xrefs(db)
         add_xrefs(src, 'description', description)
 
     # -- attachment object
     cursor.execute("SELECT type, id, description, filename FROM attachment")
     for type, id, description, filename in cursor:
-        add_xrefs(TracObj(type, id), 'attachment:%s' % filename, description)
+        add_xrefs(object_factory(env, type, id), 'attachment:%s' % filename, description)
 
     db.commit()
 
@@ -402,15 +418,15 @@ class XrefModule(Module):
     def render(self, req):
         type = req.args.get('type', 'wiki')
         id = req.args.get('id', 'WikiStart')
-        base = TracObj(type, id)
+        base = object_factory(self.env, type, id)
 
         def dict_of_related(type, id, relation, facet, context):
-            ref = TracObj(type, id)
+            ref = object_factory(self.env, type, id)
             return {'type' : type,
                     'id' : escape(id),
                     'name' : ref.name(),
                     'icon' : ref.icon(),
-                    'href' : ref.href(self.env),
+                    'href' : ref.href(),
                     'relation' : relation,
                     'facet' : facet,
                     'context' : context}

@@ -24,7 +24,7 @@
 
  <?cs if:$n_links > #0 ?>
   <h2 id='backlinks'><?cs 
-   call:anchor(xref.base) ?> is referenced <?cs 
+   call:anchor(xref.base) ?> is implicitly referenced <?cs 
     call:plural($n_links,
      "in the Wiki of another Trac Object:",
      $n_links + " times in the wiki of other Trac Objects:") ?>
@@ -43,10 +43,9 @@
 
  <?cs if:$n_in_relations > #0 ?>
   <h2 id='incoming-relations'><?cs 
-   call:plural($n_in_relations,
-    "Another Trac Object has a relation", 
-    "Other Trac Objects are involved in " + $n_in_relations + " relations" ) ?> 
-    with <?cs call:anchor(xref.base) ?>:
+   call:plural($n_in_relations, 
+    "Incoming relation",
+    "Incoming relations (" + $n_in_relations + ")") ?>
   </h2>
   <dl><?cs
    each:item = xref.in_relations ?>
@@ -62,10 +61,9 @@
 
  <?cs if:$n_out_relations > #0 ?>
   <h2 id='outgoing-relations'><?cs 
-   call:anchor(xref.base) ?> <?cs 
     call:plural($n_out_relations,
-     "has one relation with another Trac Object:",
-     "has " + $n_out_relations + " relations with other Trac Objects:" ) ?>
+     "Outgoing relation",
+     "Outgoing relations (" + $n_out_relations + ")") ?>
   </h2>
   <dl><?cs
    each:item = xref.out_relations ?>

@@ -5,7 +5,7 @@ Lists Wiki pages that are not referenced by another Trac object.
 
 from StringIO import StringIO
 
-from trac.Xref import TracObj
+from trac.Wiki import WikiPage
 
 
 def execute(hdf, args, env):
@@ -13,12 +13,12 @@ def execute(hdf, args, env):
     db = env.get_db_cnx()
 
     cursor = db.cursor()
-    cursor.execute("SELECT DISTINCT(name), 'wiki' FROM wiki "
+    cursor.execute("SELECT DISTINCT(name) FROM wiki "
                    "WHERE name NOT IN (SELECT DISTINCT(dest_id) FROM xref WHERE dest_type = 'wiki' "
                    "                   AND ( src_type = 'wiki' AND dest_id != src_id OR src_type != 'wiki' ) )")
     orphans = []
-    for id, type in cursor:
-        orphans.append(TracObj(type, id))
+    for id, in cursor:
+        orphans.append(WikiPage(env, id))
         
     first = 1
     for obj in orphans:
@@ -26,6 +26,6 @@ def execute(hdf, args, env):
             buf.write(', ')
         else:
             first = 0
-        buf.write('<a class="%s" href="%s">%s</a>' % (obj.icon(), obj.href(env), obj.name()))
+        buf.write('<a class="%s" href="%s">%s</a>' % (obj.icon(), obj.href(), obj.name()))
 
     return buf.getvalue()

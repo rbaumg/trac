@@ -22,7 +22,7 @@
 from __future__ import generators
 
 from trac import db, db_default, Logging, Mimeview, util
-from trac.Xref import TracObj
+from trac.Xref import object_factory
 
 
 import ConfigParser
@@ -268,7 +268,8 @@ class Environment:
         cursor.execute('INSERT INTO attachment VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
                        (type, id, filename, length, int(time.time()),
                        description, author, ipnr))
-        TracObj(type, id).replace_xrefs_from_wiki(self, cnx, 'attachment:%s' % filename, description)
+        object_factory(self, type, id).replace_xrefs_from_wiki(cnx, 'attachment:%s' % filename,
+                                                               description)
         shutil.copyfileobj(attachment.file, fd)
         self.log.info('New attachment: %s/%s/%s by %s', type, id, filename, author)
         cnx.commit()
@@ -281,7 +282,7 @@ class Environment:
 
         qfilename = urllib.quote(filename)
         
-        TracObj(type, id).delete_xrefs(cnx, 'attachment:%s' % qfilename)
+        object_factory(env, type, id).delete_xrefs(cnx, 'attachment:%s' % qfilename)
 
         path = os.path.join(self.get_attachments_dir(), type,
                             urllib.quote(id), qfilename)

@@ -23,7 +23,7 @@ from trac import perm, util
 from trac.Module import Module
 from trac.web.main import add_link
 from trac.WikiFormatter import wiki_to_html
-from trac.Xref import TracObj
+from trac.Xref import object_factory
 
 import re
 import time
@@ -112,7 +112,7 @@ class Report (Module):
         cursor.execute("INSERT INTO report (title,sql,description) "
                        "VALUES (%s,%s,%s)", (title, sql, description))
         id = self.db.get_last_id()
-        TracObj('report', id).replace_xrefs_from_wiki(self.env, self.db, 'description', description)
+        object_factory(self.env, 'report', id).replace_xrefs_from_wiki(self.env, self.db, 'description', description)
         self.db.commit()
         req.redirect(self.env.href.report(id))
 
@@ -122,7 +122,7 @@ class Report (Module):
         if not req.args.has_key('cancel'):
             cursor = self.db.cursor ()
             cursor.execute("DELETE FROM report WHERE id=%s", (id,))
-            TracObj('report', id).delete_xrefs(self.db, 'description')
+            object_factory(self.env, 'report', id).delete_xrefs(self.db, 'description')
             self.db.commit()
             req.redirect(self.env.href.report())
         else:
@@ -402,7 +402,7 @@ class Report (Module):
                                    req.args.get('description', ''),
                                    req.args.get('sql', ''))
 
-        TracObj('report', id).add_cross_refs(self.db, req)
+        object_factory(self.env, 'report', id).add_cross_refs(self.db, req)
 
         if id != -1 or action == 'new':
             add_link(req, 'up', self.env.href.report(), 'Available Reports')

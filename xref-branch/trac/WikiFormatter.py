@@ -261,8 +261,9 @@ class CommonFormatter:
         is already known at this point.
         """
         if self.xref:
-            from trac.Xref import TracObj
-            self.xref.insert_xref(self.db, self.relname, TracObj(type, id), self.facet, self.context)
+            from trac.Xref import object_factory
+            self.xref.insert_xref(self.db, self.relname, object_factory(self.env, type, id),
+                                  self.facet, self.context)
             self.relname = ''
 
     def _make_wiki_link(self, page, text):

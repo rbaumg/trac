@@ -30,6 +30,18 @@ import time
 CHUNK_SIZE = 4096
 DISP_MAX_FILE_SIZE = 256 * 1024
 
+
+class Source(TracObj):
+    """
+    Represents a source object (either a file or a directory from the repository)
+    """
+    
+    type = 'source'
+
+    def __init__(self, env, id):
+        TracObj.__init__(self, env, id.strip('/'))
+
+
 def _get_changes(env, db, repos, revs):
     changes = {}
     for rev in filter(lambda x: x in revs, revs):
@@ -68,7 +80,7 @@ class BrowserModule(Module):
         req.hdf['title'] = path
         req.hdf['browser'] = {'path': path, 'log_href': self.env.href.log(path)}
 
-        TracObj('source', path).add_cross_refs(self.db, req)
+        Source(self.env, path).add_cross_refs(self.db, req)
 
         path_links = _get_path_links(self.env.href, path, rev)
         req.hdf['browser.path'] = path_links
@@ -216,7 +228,7 @@ class LogModule(Module):
         req.hdf['log.path'] = path
         req.hdf['log.browser_href'] = self.env.href.browser(path)
 
-        TracObj('source', path).add_cross_refs(self.db, req)
+        Source(self.env, path).add_cross_refs(self.db, req)
 
         path_links = _get_path_links(self.env.href, path, rev)
         req.hdf['log.path'] = path_links

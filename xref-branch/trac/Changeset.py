@@ -25,7 +25,7 @@ from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
 from trac.web.main import add_link
 from trac.WikiFormatter import wiki_to_html
-from trac.Xref import TracObj
+from trac.Xref import object_factory
 
 import time
 import util
@@ -72,7 +72,7 @@ class ChangesetModule(Module):
                                     req.hdf, self.env, self.db)
         }
 
-        TracObj('changeset', chgset.rev).add_cross_refs(self.db, req)
+        object_factory(self.env, 'changeset', chgset.rev).add_cross_refs(self.db, req)
 
         oldest_rev = repos.oldest_rev
         if chgset.rev != oldest_rev:

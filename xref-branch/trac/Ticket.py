@@ -24,7 +24,7 @@ from trac.Module import Module
 from trac.Notify import TicketNotifyEmail
 from trac.web.main import add_link
 from trac.WikiFormatter import wiki_to_html
-from trac.Xref import TracObj, get_dag
+from trac.Xref import object_factory, TracObj, get_dag
 
 import time
 import string
@@ -34,7 +34,13 @@ from UserDict import UserDict
 __all__ = ['Ticket', 'NewticketModule', 'TicketModule']
 
 
-class Ticket(UserDict): # TODO: inehrit from TracObj
+class Ticket(TracObj, UserDict):
+    """
+    Represents a Ticket (new or existing)
+    """
+    
+    type = 'ticket'
+    
     # TODO: O-O: use std_fields() etc.
     std_fields = ['time', 'component', 'severity', 'priority', 'milestone',
                   'reporter', 'owner', 'cc', 'url', 'version', 'status',
@@ -49,12 +55,15 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
         'depends_on'  : ('1 to n', 'ticket'),
         }
     
-    def __init__(self, *args):
+    def __init__(self, env, *args):
+        TracObj.__init__(self, env, -1)
         UserDict.__init__(self)
         self._old = {}
-        self.ref = TracObj('ticket', -1)
         if len(args) == 2:
             self._fetch_ticket(*args)
+
+    def icon(self):
+        return 'newticket' # FIXME: should depend on the status
 
     def __setitem__(self, name, value):
         """Log ticket modifications so the table ticket_change can be updated"""
@@ -77,19 +86,19 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
             raise util.TracError('Ticket %d does not exist.' % id,
                                  'Invalid Ticket Number')
 
-        self['id'] = self.ref.id = id
+        self['id'] = self.id = id
         for i in range(len(Ticket.std_fields)):
             self[Ticket.std_fields[i]] = row[i] or ''
 
         # Fetch xref fields
-        obj = TracObj('ticket', id)
         for relation in Ticket.xref_fields:
             related = []
-            for dep_type, dep_id, r, f, c in obj.find_destinations(db, relation.replace('_','-'), 'field:'+relation):
-                related.append((TracObj(dep_type, dep_id), f)) # TODO: O-O: use env.object()
+            for dep_type, dep_id, r, f, c in self.find_destinations(db, relation.replace('_','-'),
+                                                                    'field:'+relation):
+                related.append((object_factory(self.env, dep_type, dep_id), f))
             xref_kind = Ticket.field_xrefs[relation]                
             if xref_kind[0] == '1 to 1' and len(related) > 1:
-                print 'Warning: more than one related object for %s#%s' % (obj, f)
+                print 'Warning: more than one related object for ticket:%s#%s' % (self.id, f)
             self[relation] = ' '.join(map(lambda rel: util.escape(rel[0].shortname()),
                                                                             related))
             
@@ -115,10 +124,10 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
             if not dict.has_key(name):
                 self[name] = '0'
 
-    def insert(self, env, db):
+    def insert(self, db):
         """Add ticket to database"""
         assert not self.has_key('id')
-        assert self.ref.id == -1
+        assert self.id == -1
 
         # Add a timestamp
         now = int(time.time())
@@ -132,23 +141,23 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
                        % (','.join(std_fields),
                           ','.join(['%s'] * len(std_fields))),
                        map(lambda n, self=self: self[n], std_fields))
-        self['id'] = self.ref.id = db.get_last_id()
+        self['id'] = self.id = db.get_last_id()
 
         for name in Ticket.field_xrefs.keys():
             if self.has_key(name): # hrm, unit test support...
-                self.xref_field(env, db, name, self[name],
+                self.xref_field(self.env, db, name, self[name],
                                 time.strftime('%c', time.localtime(now)))
         
         custom_fields = filter(lambda n: n[:7] == 'custom_', self.keys())
         for name in custom_fields:
             cursor.execute("INSERT INTO ticket_custom(ticket,name,value) "
-                           "VALUES(%s,%s,%s)", (self.ref.id, name[7:], self[name]))
+                           "VALUES(%s,%s,%s)", (self.id, name[7:], self[name]))
             # TODO: support xrefs in custom fields too...
         db.commit()
         self._forget_changes()
-        return self.ref.id
+        return self.id
 
-    def save_changes(self, env, db, author, comment, when = 0):
+    def save_changes(self, db, author, comment, when = 0):
         """Store ticket changes in the database.
         The ticket must already exist in the database."""
         assert self.has_key('id')
@@ -193,7 +202,7 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
                 if name in Ticket.std_fields:
                     cursor.execute("UPDATE ticket SET %s=%s WHERE id=%s",
                                    (fname, self[name], id))
-            self.xref_field(env, db, fname, self[name],
+            self.xref_field(self.env, db, fname, self[name],
                             time.strftime('%c', time.localtime(when)))
             cursor.execute("INSERT INTO ticket_change "
                            "(ticket,time,author,field,oldvalue,newvalue) "
@@ -201,7 +210,7 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
                            (id, when, author, fname, self._old[name],
                             self[name]))
             
-        get_dag(db, (self.ref.type, str(self.ref.id)), 'depends-on')
+        get_dag(db, (self.type, str(self.id)), 'depends-on')
         
         if comment:
             cursor.execute("SELECT count(*) FROM ticket_change "
@@ -212,7 +221,7 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
                            "(ticket,time,author,field,oldvalue,newvalue) "
                            "VALUES (%s,%s,%s,'comment',%s,%s)",
                            (id, when, author, n, comment))
-            self.ref.replace_xrefs_from_wiki(env, db, 'comment:%d' % n, comment)
+            self.replace_xrefs_from_wiki(self.env, db, 'comment:%d' % n, comment)
 
         cursor.execute("UPDATE ticket SET changetime=%s WHERE id=%s",
                        (when, id))
@@ -250,24 +259,25 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
             log.append((int(row[0]), row[1], row[2], row[3] or '', row[4] or ''))
         return log
 
-    def xref_field(self, env, db, name, value, context=''):
+    def xref_field(self, db, name, value, context=''):
         """
         Create cross-references and relationships for this ticket.
         """
-        assert self.ref.id != -1
+        assert self.id != -1
         if Ticket.field_xrefs.has_key(name):
             xref_kind = Ticket.field_xrefs[name]
             if xref_kind[0] == 'implicit':
-                self.ref.replace_xrefs_from_wiki(env, db, 'field:'+name, self[name])
+                self.replace_xrefs_from_wiki(self.env, db, 'field:'+name, self[name])
             elif xref_kind[0] == '1 to 1':
                 if name in Ticket.std_fields:
                     relation = 'has-'+name
                 else:
                     relation = name
-                self.ref.replace_relation(db, relation, TracObj(xref_kind[1], value), 
-                                          'field:'+name, context)
+                self.replace_relation(db, relation, object_factory(self.env, xref_kind[1], value), 
+                                      'field:'+name, context)
             elif xref_kind[0] == '1 to n':
-                self.ref.replace_xrefs_from_list(env, db, 'field:'+name, name.replace('_','-'), self[name])
+                self.replace_xrefs_from_list(self.env, db, 'field:'+name,
+                                             name.replace('_','-'), self[name])
 
     def can_be_closed(self, db):
         cursor = db.cursor()
@@ -276,7 +286,7 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
                                 INNER JOIN xref x ON x.dest_id = t.id
                                 AND x.src_type = 'ticket' AND x.src_id = %s
                                 AND t.status != 'closed')
-          """, (self.ref.id,))
+          """, (self.id,))
         return cursor.fetchone()[0] == 0
 
 
@@ -355,7 +365,7 @@ class NewticketModule(Module):
         if not req.args.get('summary'):
             raise util.TracError('Tickets must contain a summary.')
 
-        ticket = Ticket()
+        ticket = Ticket(self.env)
         ticket.populate(req.args)
         ticket.setdefault('reporter', req.authname)
 
@@ -367,7 +377,7 @@ class NewticketModule(Module):
             owner = cursor.fetchone()[0]
             ticket['owner'] = owner
 
-        tktid = ticket.insert(self.env, self.db)
+        tktid = ticket.insert(self.db)
 
         # Notify
         try:
@@ -377,7 +387,7 @@ class NewticketModule(Module):
             self.log.exception("Failure sending notification on creation of "
                                "ticket #%d: %s" % (tktid, e))
 
-        req.redirect(self.env.href.ticket(tktid))
+        req.redirect(ticket.href())
 
     def render(self, req):
         self.perm.assert_permission(perm.TICKET_CREATE)
@@ -385,7 +395,7 @@ class NewticketModule(Module):
         if req.args.has_key('create'):
             self.create_ticket(req)
 
-        ticket = Ticket()
+        ticket = Ticket(self.env)
         ticket.populate(req.args)
         ticket.setdefault('component',
                           self.env.get_config('ticket', 'default_component'))
@@ -443,7 +453,7 @@ class TicketModule (Module):
 
     def save_changes(self, req, id):
         self.perm.assert_permission (perm.TICKET_MODIFY)
-        ticket = Ticket(self.db, id)
+        ticket = Ticket(self.env, self.db, id)
 
         if not req.args.get('summary'):
             raise util.TracError('Tickets must contain Summary.')
@@ -472,7 +482,7 @@ class TicketModule (Module):
         ticket.populate(req.args)
 
         now = int(time.time())
-        ticket.save_changes(self.env, self.db,
+        ticket.save_changes(self.db,
                             req.args.get('author', req.authname),
                             req.args.get('comment'), when=now)
 
@@ -483,15 +493,15 @@ class TicketModule (Module):
             self.log.exception("Failure sending notification on change to "
                                "ticket #%d: %s" % (id, e))
 
-        req.redirect(self.env.href.ticket(id))
+        req.redirect(ticket.href())
 
     def insert_ticket_data(self, req, id, ticket, reporter_id):
         """Insert ticket data into the hdf"""
         evals = dict(zip(ticket.keys(),
                          map(lambda x: util.escape(x), ticket.values())))
         req.hdf['ticket'] = evals
-        req.hdf['ticket.depends_on.me'] = ticket.ref.count_sources(self.db, 'depends-on')
-        req.hdf['ticket.depends_on.others'] = ticket.ref.count_destinations(self.db, 'depends-on')
+        req.hdf['ticket.depends_on.me'] = ticket.count_sources(self.db, 'depends-on')
+        req.hdf['ticket.depends_on.others'] = ticket.count_destinations(self.db, 'depends-on')
         req.hdf['ticket.can_be_closed'] = ticket.can_be_closed(self.db) or ''
 
         util.sql_to_hdf(self.db, "SELECT name FROM component ORDER BY name",
@@ -584,10 +594,10 @@ class TicketModule (Module):
            and action in ('leave', 'accept', 'reopen', 'resolve', 'reassign'):
             self.save_changes(req, id)
 
-        ticket = Ticket(self.db, id)
+        ticket = Ticket(self.env, self.db, id)
         reporter_id = util.get_reporter_id(req)
 
-        TracObj('ticket', id).add_cross_refs(self.db, req)
+        ticket.add_cross_refs(self.db, req)
 
         if preview:
             # Use user supplied values
