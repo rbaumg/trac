@@ -25,7 +25,7 @@
   as suggested in #1242.
 
   Currently, cross-references between the following Trac objects are supported:
-   * Wiki page
+   * Wiki page +
    * Ticket
    * Changeset
    * Report
@@ -79,17 +79,14 @@ class TracObj:
      * relation: the explicit nature of the relationship.
     """
 
-    def __init__(self, type, id):
+    def __init__(self, type, id): # TODO: consider adding self.env (esp. for href/href2)
         self.type = type
         self.id   = id
         if type == 'source':            # TODO: oo-ify
             self.id = id.strip('/')
 
     def name(self):
-        if self.type == 'wiki':         # TODO: oo-ify
-            # TODO: use canonical name if it doesn't follow the WikiPageNames conventions
-            return escape(self.id)
-        elif self.type == 'ticket':
+        if self.type == 'ticket':          # TODO: oo-ify
             return 'Ticket #%s' % self.id
         elif self.type == 'changeset':
             return 'Changeset [%s]' % self.id
@@ -111,7 +108,7 @@ class TracObj:
         else:
             return env.href.wiki()
 
-    # -- used by other Modules
+    # -- used by other Modules, for cross-referencing 
 
     def add_backlinks(self, db, req):
         req.hdf['xref_count'] = self.count_sources(db)
@@ -177,6 +174,19 @@ class TracObj:
                        (self.id, self.type))
         return cursor.fetchone()[0]
 
+    def relation_exist(self, db, relation, other=None):
+        if other:
+            other_clause = "AND dest_id = %s AND dest_type = %s "
+            tuple = (self.id, self.type, relation, other.id, other.type)
+        else:
+            other_clause = ""
+            tuple = (self.id, self.type, relation)
+        cursor = db.cursor()
+        cursor.execute("SELECT count(*) "
+                       "FROM xref WHERE src_id = %s AND src_type = %s "
+                       "AND relation = %s " + other_clause,
+                       tuple)
+        return cursor.fetchone()[0]
 
     def find_sources(self, db, relation=None):
         """

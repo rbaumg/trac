@@ -47,15 +47,15 @@ def populate_page_dict(db, env):
     env._wiki_pages = page_dict
 
 
-class WikiPage:
+class WikiPage(TracObj):
     """
     Represents a wiki page (new or existing).
     """
 
     def __init__(self, name, version, perm_, env, db):
+        TracObj.__init__(self, 'wiki', name)
         self.env = env
         self.db  = db
-        self.name = name
         self.perm = perm_
         cursor = self.db.cursor ()
         if version:
@@ -84,6 +84,13 @@ class WikiPage:
         self.old_readonly = self.readonly
         self.modified = 0
 
+    def name(self):
+        # TODO: use canonical name if it doesn't follow the WikiPageNames conventions
+        return escape(self.id)
+    
+    def href2(self, **args): # TODO: unify Xref.href, WikiPage.href2 and Href.wiki
+        return self.env.href.wiki(self.id, **args)
+
     def set_content(self, text):
         self.modified = self.text != text
         self.text = text
@@ -100,17 +107,17 @@ class WikiPage:
             cursor = self.db.cursor()
             cursor.execute("UPDATE wiki SET readonly=%s WHERE name=%s"
                            "AND version=%s",
-                           (self.readonly, self.name, self.version))
+                           (self.readonly, self.id, self.version))
             self.db.commit()
             self.old_readonly = self.readonly
         elif self.modified:
             cursor = self.db.cursor()
             cursor.execute ("INSERT INTO WIKI (name,version,time,author,ipnr,"
                             "text,comment,readonly) VALUES (%s,%s,%s,%s,%s,%s,"
-                            "%s,%s)", (self.name, self.version + 1,
+                            "%s,%s)", (self.id, self.version + 1,
                             int(time.time()), author, remote_addr, self.text,
                             comment, self.readonly))
-            TracObj('wiki', self.name).replace_xrefs_from_wiki(self.env, self.db, 'content', self.text)
+            self.replace_xrefs_from_wiki(self.env, self.db, 'content', self.text)
             self.db.commit()
             self.version += 1
             self.old_readonly = self.readonly
@@ -127,10 +134,11 @@ class WikiModule(Module):
         pagename = req.args.get('page', 'WikiStart')
         req.hdf['wiki.action'] = action
         req.hdf['wiki.page_name'] = escape(pagename)
-        req.hdf['wiki.current_href'] = escape(self.env.href.wiki(pagename))
 
-        self.ref = TracObj('wiki', pagename)
-        self.ref.add_backlinks(self.db, req)
+        self.obj = WikiPage(pagename, None, self.perm, self.env, self.db)
+        self.obj.add_backlinks(self.db, req)
+
+        req.hdf['wiki.current_href'] = escape(self.obj.href2())
 
         if action == 'diff':
             version = int(req.args.get('version', 0))
@@ -146,7 +154,7 @@ class WikiModule(Module):
             self._delete_page(req, pagename, version)
         elif action == 'save':
             if req.args.has_key('cancel'):
-                req.redirect(self.env.href.wiki(pagename))
+                req.redirect(self.obj.href2())
             elif req.args.has_key('preview'):
                 req.hdf['wiki.action'] = 'preview'
                 self._render_editor(req, pagename, 1)
@@ -170,7 +178,7 @@ class WikiModule(Module):
             cursor = self.db.cursor()
             cursor.execute("DELETE FROM wiki WHERE name=%s and version=%s",
                            (pagename, version))
-            self.ref.delete_xrefs(self.db, 'comment:%s' % version)
+            self.obj.delete_xrefs(self.db, 'comment:%s' % version)
             self.log.info('Deleted version %d of page %s' % (version, pagename))
             cursor.execute("SELECT COUNT(*) FROM wiki WHERE name=%s", (pagename,))
             last_version = cursor.fetchone()[0]
@@ -180,7 +188,7 @@ class WikiModule(Module):
                 cursor.execute("SELECT text FROM wiki WHERE name=%s ORDER BY version DESC",
                                (pagename))
                 text = cursor.fetchone()[0]
-                self.ref.replace_xrefs_from_wiki(self.env, self.db, 'content', text)
+                self.obj.replace_xrefs_from_wiki(self.env, self.db, 'content', text)
         else: # Delete a wiki page completely
             cursor.execute("DELETE FROM wiki WHERE name=%s", (pagename,))
             page_deleted = 1
@@ -188,14 +196,14 @@ class WikiModule(Module):
         self.db.commit()
 
         if page_deleted:
-            self.ref.delete_xrefs(self.db)
+            self.obj.delete_xrefs(self.db)
             # Delete orphaned attachments
             for attachment in self.env.get_attachments(self.db, 'wiki', pagename):
                 self.env.delete_attachment(self.db, 'wiki', pagename,
                                            attachment[0])
             req.redirect(self.env.href.wiki())
         else:
-            req.redirect(self.env.href.wiki(pagename))
+            req.redirect(self.obj.href2())
 
     def _render_diff(self, req, pagename, version):
         # Stores the diff-style in the session if it has been changed, and adds
@@ -204,7 +212,7 @@ class WikiModule(Module):
 
         diff_style, diff_options = get_diff_options(req)
         if req.args.has_key('update'):
-           req.redirect(self.env.href.wiki(pagename, version, action='diff'))
+           req.redirect(self.obj.href2(version, action='diff'))
 
         # Ask web spiders to not index old versions
         req.hdf['html.norobots'] = 1
@@ -223,7 +231,7 @@ class WikiModule(Module):
             'time': time.strftime('%c', time.localtime(int(rows[-1][3]))),
             'author': escape(rows[-1][1] or ''),
             'comment': escape(rows[-1][2] or ''),
-            'history_href': escape(self.env.href.wiki(pagename, action='history'))
+            'history_href': escape(self.obj.href2(action='history'))
         }
         req.hdf['wiki'] = info
 
@@ -247,11 +255,10 @@ class WikiModule(Module):
     def _render_editor(self, req, pagename, preview=0):
         self.perm.assert_permission(perm.WIKI_MODIFY)
 
-        page = WikiPage(pagename, None, self.perm, self.env, self.db)
         if req.args.has_key('text'):
-            page.set_content(req.args.get('text'))
+            self.obj.set_content(req.args.get('text'))
         if preview:
-            page.readonly = req.args.has_key('readonly')
+            self.obj.readonly = req.args.has_key('readonly')
 
         author = req.args.get('author', get_reporter_id(req))
         version = req.args.get('edit_version', None)
@@ -264,19 +271,19 @@ class WikiModule(Module):
         else:
             editrows = req.session.get('wiki_editrows', '20')
 
-        req.hdf['title'] = escape(page.name) + ' (edit)'
+        req.hdf['title'] = self.obj.name() + ' (edit)'
         info = {
-            'page_source': escape(page.text),
-            'version': page.version,
+            'page_source': escape(self.obj.text),
+            'version': self.obj.version,
             'author': escape(author),
             'comment': escape(comment),
-            'readonly': page.readonly,
-            'history_href': escape(self.env.href.wiki(page.name, action='history')),
+            'readonly': self.obj.readonly,
+            'history_href': escape(self.obj.href2(action='history')),
             'edit_rows': editrows,
             'scroll_bar_pos': req.args.get('scroll_bar_pos', '')
         }
         if preview:
-            info['page_html'] = wiki_to_html(page.text, req.hdf, self.env, self.db)
+            info['page_html'] = wiki_to_html(self.obj.text, req.hdf, self.env, self.db)
         req.hdf['wiki'] = info
 
     def _render_history(self, req, pagename):
@@ -295,8 +302,8 @@ class WikiModule(Module):
             if not row:
                 break
             item = {
-                'url': escape(self.env.href.wiki(pagename, row[0])),
-                'diff_url': escape(self.env.href.wiki(pagename, row[0], action='diff')),
+                'url': escape(self.obj.href2(row[0])),
+                'diff_url': escape(self.obj.href2(row[0], action='diff')),
                 'version': row[0],
                 'time': time.strftime('%x %X', time.localtime(int(row[1]))),
                 'author': escape(row[2]),
@@ -325,43 +332,42 @@ class WikiModule(Module):
             self.add_link('alternate', '?format=txt', 'Plain Text',
                           'text/plain')
 
-        page = WikiPage(pagename, version, self.perm, self.env, self.db)
+        self.obj.version = version
 
         info = {
-            'version': page.version,
-            'readonly': page.readonly,
-            'page_html': wiki_to_html(page.text, req.hdf, self.env, self.db),
-            'page_source': page.text, # for plain text view
-            'history_href': escape(self.env.href.wiki(page.name,
-                                                      action='history'))
+            'version': self.obj.version,
+            'readonly': self.obj.readonly,
+            'page_html': wiki_to_html(self.obj.text, req.hdf, self.env, self.db),
+            'page_source': self.obj.text, # for plain text view
+            'history_href': escape(self.obj.href2(action='history'))
         }
         req.hdf['wiki'] = info
 
         self.env.get_attachments_hdf(self.db, 'wiki', pagename, req.hdf,
                                      'wiki.attachments')
-        req.hdf['wiki.attach_href'] = self.env.href.attachment('wiki',
-                                                               pagename, None)
+        req.hdf['wiki.attach_href'] = self.env.href.attachment('wiki', pagename, None)
+        if self.obj.relation_exist(self.db, 'is-a', TracObj('wiki', 'TracTemplate')): # to be continued
+            req.hdf['wiki.create_from_template_href'] = self.obj.href2(action='create_from_template')
 
     def _save_page(self, req, pagename):
         self.perm.assert_permission(perm.WIKI_MODIFY)
 
-        page = WikiPage(pagename, None, self.perm, self.env, self.db)
         if req.args.has_key('text'):
-            page.set_content(req.args.get('text'))
+            self.obj.set_content(req.args.get('text'))
 
         # Modify the read-only flag if it has been changed and the user is
         # WIKI_ADMIN
         if self.perm.has_permission(perm.WIKI_ADMIN):
-            page.readonly = int(req.args.has_key('readonly'))
+            self.obj.readonly = int(req.args.has_key('readonly'))
 
         # We store the page version when we start editing a page.
         # This way we can stop users from saving changes if they are
         # not based on the latest version any more
         edit_version = int(req.args.get('version'))
-        if edit_version != page.version:
+        if edit_version != self.obj.version:
             raise TracError('Sorry, cannot create new version. This page has '
                             'already been modified by someone else.')
 
-        page.commit(req.args.get('author'), req.args.get('comment'),
-                    req.remote_addr)
-        req.redirect(self.env.href.wiki(page.name))
+        self.obj.commit(req.args.get('author'), req.args.get('comment'),
+                        req.remote_addr)
+        req.redirect(self.obj.href2())
