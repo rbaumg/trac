@@ -1,0 +1,16 @@
+@import url(diff.css);
+
+/* Changeset overview */
+#overview .files { padding-top: 1em }
+#overview .files ul { margin: 0; padding: 0 }
+#overview .files li { list-style-type: none }
+#overview .files li .comment { display: none }
+#overview .files li div {
+ border: 1px solid #999;
+ float: left;
+ margin: .2em .5em 0 0;
+ overflow: hidden;
+ width: .8em; height: .8em;
+}
+#overview .message { border: 1px solid #fff; padding-top: 1em }
+#overview dd.message :first-child { margin-top: 0 }
