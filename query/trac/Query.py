@@ -54,6 +54,7 @@ class Query:
         # be displayed
         cols = [ 'id', 'summary', 'status', 'owner', 'priority', 'milestone',
                  'component', 'version', 'severity', 'resolution', 'reporter' ]
+        cols += [f['name'] for f in get_custom_fields(self.env)]
 
         # Semi-intelligently remove columns that are restricted to a single
         # value by a query constraint.
@@ -111,7 +112,7 @@ class Query:
             for col in self.cols:
                 result[col] = escape(row[col] or '--')
             if self.group:
-                result[self.group] = row[self.group]
+                result[self.group] = row[self.group] or 'None'
             if self.verbose:
                 result['description'] = wiki_to_html(row['description'] or '',
                                                      None, self.env, db)
@@ -138,28 +139,30 @@ class Query:
             cols.append('priority')
         if self.verbose:
             cols.append('description')
+        cols.extend([c for c in self.constraints.keys() if not c in cols])
+
+        custom_fields = [f['name'] for f in get_custom_fields(self.env)]
 
         sql = []
-        sql.append("SELECT " + ",".join(cols))
-        custom_fields = [f['name'] for f in get_custom_fields(self.env)]
-        for k in [k for k in self.constraints.keys() if k in custom_fields]:
+        sql.append("SELECT " + ",".join([c for c in cols
+                                         if c not in custom_fields]))
+        for k in [k for k in cols if k in custom_fields]:
             sql.append(", %s.value AS %s" % (k, k))
         sql.append("\nFROM ticket")
-        for k in [k for k in self.constraints.keys() if k in custom_fields]:
+        for k in [k for k in cols if k in custom_fields]:
            sql.append("\n  LEFT OUTER JOIN ticket_custom AS %s ON " \
-                      "(id=%s.ticket AND %s.name='%s')"
-                      % (k, k, k, k))
+                      "(id=%s.ticket AND %s.name='%s')" % (k, k, k, k))
 
         for col in [c for c in ['status', 'resolution', 'priority', 'severity']
                     if c == self.order or c == self.group]:
             sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
-                                         "value AS %s_value " \
-                                         "FROM enum WHERE type='%s')" \
+                                            "value AS %s_value " \
+                                            "FROM enum WHERE type='%s')" \
                        " ON %s_name=%s" % (col, col, col, col, col))
         for col in [c for c in ['milestone', 'version']
                     if c == self.order or c == self.group]:
             sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
-                                         "time AS %s_time FROM %s)" \
+                                            "time AS %s_time FROM %s)" \
                        " ON %s_name=%s" % (col, col, col, col, col))
 
         clauses = []
@@ -283,32 +286,50 @@ class QueryModule(Module):
                 list.append(row[0])
             return list
 
-        properties.append({'name': 'summary', 'type': 'text', 'label': 'Summary'})
+        properties.append({'name': 'summary', 'type': 'text',
+                           'label': 'Summary'})
         properties.append({
             'name': 'status', 'type': 'radio', 'label': 'Status',
-            'options': rows_to_list("SELECT name FROM enum WHERE type='status' ORDER BY value")})
+            'options': rows_to_list("SELECT name FROM enum WHERE type='status' "
+                                    "ORDER BY value")})
         properties.append({
             'name': 'resolution', 'type': 'radio', 'label': 'Resolution',
-            'options': rows_to_list("SELECT name FROM enum WHERE type='resolution' ORDER BY value")})
+            'options': rows_to_list("SELECT name FROM enum "
+                                    "WHERE type='resolution' ORDER BY value")})
         properties.append({
             'name': 'component', 'type': 'select', 'label': 'Component',
-            'options': rows_to_list("SELECT name FROM component ORDER BY name")})
+            'options': rows_to_list("SELECT name FROM component "
+                                    "ORDER BY name")})
         properties.append({
             'name': 'milestone', 'type': 'select', 'label': 'Milestone',
-            'options': rows_to_list("SELECT name FROM milestone ORDER BY name")})
+            'options': rows_to_list("SELECT name FROM milestone "
+                                    "ORDER BY name")})
         properties.append({
             'name': 'version', 'type': 'select', 'label': 'Version',
             'options': rows_to_list("SELECT name FROM version ORDER BY name")})
         properties.append({
             'name': 'priority', 'type': 'select', 'label': 'Priority',
-            'options': rows_to_list("SELECT name FROM enum WHERE type='priority' ORDER BY value")})
+            'options': rows_to_list("SELECT name FROM enum "
+                                    "WHERE type='priority' ORDER BY value")})
         properties.append({
             'name': 'severity', 'type': 'select', 'label': 'Severity',
-            'options': rows_to_list("SELECT name FROM enum WHERE type='severity' ORDER BY value")})
-        properties.append({'name': 'keywords', 'type': 'text', 'label': 'Keywords'})
+            'options': rows_to_list("SELECT name FROM enum "
+                                    "WHERE type='severity' ORDER BY value")})
+        properties.append({'name': 'keywords', 'type': 'text',
+                           'label': 'Keywords'})
         properties.append({'name': 'owner', 'type': 'text', 'label': 'Owner'})
-        properties.append({'name': 'reporter', 'type': 'text', 'label': 'Reporter'})
+        properties.append({'name': 'reporter', 'type': 'text',
+                           'label': 'Reporter'})
         properties.append({'name': 'cc', 'type': 'text', 'label': 'CC list'})
+
+        custom_fields = get_custom_fields(self.env)
+        for field in [field for field in custom_fields
+                      if field['type'] in ['text', 'radio', 'select']]:
+            property = {'name': field['name'], 'type': field['type'],
+                        'label': field['label']}
+            if field.has_key('options'):
+                property['options'] = field['options']
+            properties.append(property)
 
         return properties
 
