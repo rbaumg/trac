@@ -8,6 +8,19 @@ class TicketTestCase(unittest.TestCase):
     def setUp(self):
         from trac.test import InMemoryDatabase
         self.db = InMemoryDatabase()
+        # taken from trac/tests/wiki.py, hum...
+        from trac import Mimeview, Logging
+        from trac.web.href import Href
+        class Environment:
+            def __init__(self):
+                self.log = Logging.logger_factory('null')
+                self.get_config = lambda x,y,z=None: z
+                self.href = Href('/')
+                self.abs_href = Href('http://www.example.com/')
+                self._wiki_pages = {}
+                self.path = ''
+                self.mimeview = Mimeview.Mimeview(self)
+        self.env = Environment()
 
     def test_create_ticket(self):
         """Testing Ticket.insert()"""
@@ -20,7 +33,7 @@ class TicketTestCase(unittest.TestCase):
         self.assertEqual('santa', ticket['reporter'])
         self.assertEqual('Foo', ticket['summary'])
         self.assertEqual('This is a custom field', ticket['custom_foo'])
-        ticket.insert(self.db)
+        ticket.insert(self.env, self.db)
 
         # Retrieving ticket
         ticket2 = Ticket(self.db, 1)
@@ -32,7 +45,7 @@ class TicketTestCase(unittest.TestCase):
         # Modifying ticket
         ticket2['summary'] = 'Bar'
         ticket2['custom_foo'] = 'New value'
-        ticket2.save_changes(self.db, 'santa', 'this is my comment')
+        ticket2.save_changes(self.env, self.db, 'santa', 'this is my comment')
 
         # Retrieving ticket
         ticket3 = Ticket(self.db, 1)

@@ -154,9 +154,12 @@ class Query(object):
         return results
 
     def get_href(self, format=None):
-        return self.env.href.query(self.constraints, self.order, self.desc,
-                                   self.group, self.groupdesc, self.verbose,
-                                   format)
+        return self.env.href.query(self.constraints, order=self.order,
+                                   desc=self.desc and 1 or None,
+                                   group=self.group,
+                                   groupdesc=self.groupdesc and 1 or None,
+                                   verbose=self.verbose and 1 or None,
+                                   format=format)
 
     def get_sql(self):
         if not self.cols:
@@ -284,8 +287,6 @@ class Query(object):
 
 
 class QueryModule(Module):
-    template_name = 'query.cs'
-    template_rss_name = 'query_rss.cs'
 
     def _get_constraints(self, req):
         constraints = {}
@@ -439,12 +440,12 @@ class QueryModule(Module):
         if req.args.has_key('update'):
             req.redirect(query.get_href())
 
-        self.add_link('alternate', query.get_href('rss'), 'RSS Feed',
-            'application/rss+xml', 'rss')
-        self.add_link('alternate', query.get_href('csv'), 'Comma-delimited Text',
-            'text/plain')
-        self.add_link('alternate', query.get_href('tab'), 'Tab-delimited Text',
-            'text/plain')
+        self.add_link(req, 'alternate', query.get_href('rss'), 'RSS Feed',
+                      'application/rss+xml', 'rss')
+        self.add_link(req, 'alternate', query.get_href('csv'),
+                      'Comma-delimited Text', 'text/plain')
+        self.add_link(req, 'alternate', query.get_href('tab'),
+                      'Tab-delimited Text', 'text/plain')
 
         constraints = {}
         for k, v in query.constraints.items():
@@ -473,7 +474,17 @@ class QueryModule(Module):
                     idx = len(query.constraints[field])
                 req.hdf['query.constraints.%s.values.%d' % (field, idx)] = ''
 
-    def display(self, req):
+        format = req.args.get('format')
+        if format == 'rss':
+            self.display_rss(req)
+        elif format == 'csv':
+            self.display_csv(req)
+        elif format == 'tab':
+            self.display_csv(req, '\t')
+        else:
+            self.display_html(req)
+
+    def display_html(self, req):
         req.hdf['title'] = 'Custom Query'
         query = self.query
 
@@ -482,17 +493,22 @@ class QueryModule(Module):
 
         cols = query.get_columns()
         for i in range(len(cols)):
-            req.hdf['query.headers.%d.name' % i] = cols[i]
+            header = {'name': cols[i]}
             if cols[i] == query.order:
-                req.hdf['query.headers.%d.href' % i] = escape(
-                    self.env.href.query(query.constraints, query.order,
-                    not query.desc, query.group, query.groupdesc,
-                    query.verbose))
-                req.hdf['query.headers.%d.order' % i] = query.desc and 'desc' or 'asc'
+                href = self.env.href.query(query.constraints, order=query.order,
+                                           desc=query.desc and None or 1,
+                                           group=query.group,
+                                           groupdesc=query.groupdesc and 1 or None,
+                                           verbose=query.verbose and 1 or None)
+                header['href'] = escape(href)
+                header['order'] = query.desc and 'desc' or 'asc'
             else:
-                req.hdf['query.headers.%d.href' % i] = escape(
-                    self.env.href.query(query.constraints, cols[i], 0,
-                    query.group, query.groupdesc, query.verbose))
+                href = self.env.href.query(query.constraints, order=cols[i],
+                                           group=query.group,
+                                           groupdesc=query.groupdesc and 1 or None,
+                                           verbose=query.verbose and 1 or None)
+                header['href'] = escape(href)
+            req.hdf['query.headers.%d' % i] = header
 
         req.hdf['query.order'] = query.order
         if query.desc:
@@ -549,8 +565,7 @@ class QueryModule(Module):
         req.hdf['query.results'] = tickets
         req.hdf['session.constraints'] = req.session.get('query_constraints')
         req.hdf['session.tickets'] = req.session.get('query_tickets')
-        req.display(self.template_name, 'text/html')
-
+        req.display('query.cs', 'text/html')
 
     def display_csv(self, req, sep=','):
         req.send_response(200)
@@ -586,4 +601,4 @@ class QueryModule(Module):
                                           gmtime(result['time']))
         req.hdf['query.results'] = results
 
-        req.display(self.template_rss_name, 'text/xml')
+        req.display('query_rss.cs', 'application/rss+xml')

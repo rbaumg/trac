@@ -437,5 +437,4 @@ class XrefModule(Module):
             out_relations.append(dict_of_related(*tuple))
         req.hdf['xref.out_relations'] = out_relations
 
-
-        
+        req.display('xref.cs')

@@ -333,7 +333,6 @@ class ZipDiffEditor(BaseDiffEditor):
 
 
 class Changeset(Module):
-    template_name = 'changeset.cs'
 
     # set by the module_factory
     authzperm = None
@@ -410,10 +409,10 @@ class Changeset(Module):
             if new_path:
                 self.path_info[new_path] = (seq, old_path, old_rev)
                 cinfo['rev.new'] = str(rev)
-                cinfo['browser_href.new'] = self.env.href.browser(new_path, rev)
+                cinfo['browser_href.new'] = self.env.href.browser(new_path, rev=rev)
             if old_path:
                 cinfo['rev.old'] = str(old_rev)
-                cinfo['browser_href.old'] = self.env.href.browser(old_path, old_rev)
+                cinfo['browser_href.old'] = self.env.href.browser(old_path, rev=old_rev)
             if change in 'CRm':
                 cinfo['copyfrom_path'] = old_path
             cinfo['change'] = change.upper()
@@ -425,9 +424,9 @@ class Changeset(Module):
     def render(self, req):
         self.perm.assert_permission (perm.CHANGESET_VIEW)
 
-        self.add_link('alternate', '?format=diff', 'Unified Diff',
+        self.add_link(req, 'alternate', '?format=diff', 'Unified Diff',
                       'text/plain', 'diff')
-        self.add_link('alternate', '?format=zip', 'Zip Archive',
+        self.add_link(req, 'alternate', '?format=zip', 'Zip Archive',
                       'application/zip', 'zip')
 
         youngest_rev = svn.fs.youngest_rev(self.fs_ptr, self.pool)
@@ -470,14 +469,23 @@ class Changeset(Module):
             raise authzperm.AuthzPermissionError()
         
         if self.rev > 1:
-            self.add_link('first', self.env.href.changeset(1), 'Changeset 1')
-            self.add_link('prev', self.env.href.changeset(self.rev - 1),
+            self.add_link(req, 'first', self.env.href.changeset(1),
+                          'Changeset 1')
+            self.add_link(req, 'prev', self.env.href.changeset(self.rev - 1),
                           'Changeset %d' % (self.rev - 1))
         if self.rev < youngest_rev:
-            self.add_link('next', self.env.href.changeset(self.rev + 1),
+            self.add_link(req, 'next', self.env.href.changeset(self.rev + 1),
                           'Changeset %d' % (self.rev + 1))
-            self.add_link('last', self.env.href.changeset(youngest_rev),
+            self.add_link(req, 'last', self.env.href.changeset(youngest_rev),
                           'Changeset %d' % youngest_rev)
+
+        format = req.args.get('format')
+        if format == 'diff':
+            self.render_diff(req)
+        elif format == 'zip':
+            self.render_zip(req)
+        else:
+            self.render_html(req)
 
     def render_diffs(self, req, editor_class=HtmlDiffEditor):
         """
@@ -494,12 +502,12 @@ class Changeset(Module):
                                       self.new_root, '', e_ptr, e_baton, authz_cb,
                                       0, 1, 0, 1, self.pool)
 
-    def display(self, req):
+    def render_html(self, req):
         """Pretty HTML view of the changeset"""
         self.render_diffs(req)
-        Module.display(self, req)
+        req.display('changeset.cs')
 
-    def display_diff(self, req):
+    def render_diff(self, req):
         """Raw Unified Diff version"""
         req.send_response(200)
         req.send_header('Content-Type', 'text/plain;charset=utf-8')
@@ -508,7 +516,7 @@ class Changeset(Module):
         req.end_headers()
         self.render_diffs(req, UnifiedDiffEditor)
 
-    def display_zip(self, req):
+    def render_zip(self, req):
         """ZIP archive with all the added and/or modified files."""
         req.send_response(200)
         req.send_header('Content-Type', 'application/zip')
@@ -516,7 +524,3 @@ class Changeset(Module):
                         'filename=Changeset%d.zip' % self.rev)
         req.end_headers()
         self.render_diffs(req, ZipDiffEditor)
-
-    def display_hdf(self, req):
-        self.render_diffs(req)
-        Module.display_hdf(self, req)

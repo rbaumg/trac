@@ -29,7 +29,6 @@ import string
 
 
 class Search(Module):
-    template_name = 'search.cs'
 
     RESULTS_PER_PAGE = 10
 
@@ -208,7 +207,7 @@ class Search(Module):
             item['message'] = escape(self.shorten_result(msg, keywords))
             info.append(item)
         return info, more
-        
+
     def render(self, req):
         self.perm.assert_permission(perm.SEARCH_VIEW)
         req.hdf['title'] = 'Search'
@@ -218,7 +217,7 @@ class Search(Module):
             'wiki': 'checked',
             'results_per_page': self.RESULTS_PER_PAGE
         }
-        
+
         if req.args.has_key('q'):
             query = req.args.get('q')
             req.hdf['title'] = 'Search Results'
@@ -243,15 +242,17 @@ class Search(Module):
                                             wiki, page)
             req.hdf['search.result'] = info
 
-            include = []
-            if tickets: include.append('ticket')
-            if changesets: include.append('changeset')
-            if wiki: include.append('wiki')
+            params = [('q', query)]
+            if tickets: params.append(('ticket', 'on'))
+            if changesets: params.append(('changeset', 'on'))
+            if wiki: params.append(('wiki', 'on'))
             if page:
-                self.add_link('first',
-                              self.env.href.search(query, 0, include))
-                self.add_link('prev',
-                              self.env.href.search(query, page - 1, include))
+                self.add_link(req, 'first',
+                              self.env.href.search(params, page=0))
+                self.add_link(req, 'prev',
+                              self.env.href.search(params, page=page - 1))
             if more:
-                self.add_link('next',
-                              self.env.href.search(query, page + 1, include))
+                self.add_link(req, 'next',
+                              self.env.href.search(params, page=page + 1))
+
+        req.display('search.cs')

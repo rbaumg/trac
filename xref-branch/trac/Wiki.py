@@ -22,7 +22,7 @@
 from trac import perm
 from trac.Diff import get_diff_options, hdf_diff
 from trac.Module import Module
-from trac.util import escape, TracError, get_reporter_id
+from trac.util import enum, escape, TracError, get_reporter_id
 from trac.WikiFormatter import *
 from trac.Xref import TracObj
 
@@ -88,8 +88,8 @@ class WikiPage(TracObj):
         # TODO: use canonical name if it doesn't follow the WikiPageNames conventions
         return escape(self.id)
     
-    def href2(self, **args): # TODO: unify Xref.href, WikiPage.href2 and Href.wiki
-        return self.env.href.wiki(self.id, **args)
+    def href2(self, *args, **kw): # TODO: unify Xref.href, WikiPage.href2 
+        return self.env.href('wiki', *args, **kw)
 
     def set_content(self, text):
         self.modified = self.text != text
@@ -127,7 +127,6 @@ class WikiPage(TracObj):
 
 
 class WikiModule(Module):
-    template_name = 'wiki.cs'
 
     def render(self, req):
         action = req.args.get('action', 'view')
@@ -163,7 +162,12 @@ class WikiModule(Module):
         else:
             self._render_view(req, obj)
 
-    def display_txt(self, req):
+        if req.args.get('format') == 'txt':
+            self.render_txt(req)
+        else:
+            req.display('wiki.cs')
+
+    def render_txt(self, req):
         req.send_response(200)
         req.send_header('Content-Type', 'text/plain;charset=utf-8')
         req.end_headers()
@@ -295,22 +299,18 @@ class WikiModule(Module):
         cursor = self.db.cursor ()
         cursor.execute("SELECT version,time,author,comment,ipnr FROM wiki "
                        "WHERE name=%s ORDER BY version DESC", (obj.id,))
-        i = 0
-        while 1:
-            row = cursor.fetchone()
-            if not row:
-                break
+        for i, row in enum(cursor):
+            version, t, author, comment, ipnr = row
             item = {
-                'url': escape(obj.href2(row[0])),
-                'diff_url': escape(obj.href2(row[0], action='diff')),
-                'version': row[0],
-                'time': time.strftime('%x %X', time.localtime(int(row[1]))),
-                'author': escape(row[2]),
-                'comment': wiki_to_oneliner(row[3] or '', self.env, self.db),
-                'ipaddr': row[4]
+                'url': escape(obj.href2(version)),
+                'diff_url': escape(obj.href2(version=version, action='diff')),
+                'version': version,
+                'time': time.strftime('%x %X', time.localtime(int(t))),
+                'author': escape(author),
+                'comment': wiki_to_oneliner(comment or '', self.env, self.db),
+                'ipaddr': ipnr
             }
             req.hdf['wiki.history.%d' % i] = item
-            i = i + 1
 
     def _render_view(self, req, obj):
         self.perm.assert_permission(perm.WIKI_VIEW)
@@ -322,13 +322,13 @@ class WikiModule(Module):
 
         version = req.args.get('version')
         if version:
-            self.add_link('alternate',
+            self.add_link(req, 'alternate',
                           '?version=%s&amp;format=txt' % version, 'Plain Text',
                           'text/plain')
             # Ask web spiders to not index old versions
             req.hdf['html.norobots'] = 1
         else:
-            self.add_link('alternate', '?format=txt', 'Plain Text',
+            self.add_link(req, 'alternate', '?format=txt', 'Plain Text',
                           'text/plain')
 
         obj.version = version
@@ -344,8 +344,9 @@ class WikiModule(Module):
 
         self.env.get_attachments_hdf(self.db, obj.type, obj.id, req.hdf,
                                      'wiki.attachments')
-        req.hdf['wiki.attach_href'] = self.env.href.attachment('wiki', obj.id, None)
-        if obj.relation_exist(self.db, 'is-a', TracObj('wiki', 'TracTemplate')): # to be continued
+        req.hdf['wiki.attach_href'] = self.env.href.attachment('wiki', obj.id)
+        # xref-branch: template support (pretty much nothing at this point)
+        if obj.relation_exist(self.db, 'is-a', TracObj('wiki', 'TracTemplate')):
             req.hdf['wiki.create_from_template_href'] = obj.href2(action='create_from_template')
 
     def _save_page(self, req, obj):

@@ -24,6 +24,7 @@ import os
 import imp
 import string
 import StringIO
+import urllib
 
 import util
 import Mimeview
@@ -46,10 +47,11 @@ class WikiProcessor:
 
     def __init__(self, env, name):
         self.env = env
+        self.name = name
         self.error = self.set_code_processor(name)
     
     def default_processor(hdf, text, env):
-        return '<pre class="wiki">' + util.escape(text) + '</pre>'
+        return '<pre class="wiki">' + util.escape(text) + '</pre>\n'
     
     def html_processor(hdf, text, env):
         if Formatter._htmlproc_disallow_rule.search(text):
@@ -69,6 +71,8 @@ class WikiProcessor:
                            'default': default_processor}
 
     def process(self, hdf, text, inline=False):
+        if self.error:
+            return system_message('Error: Failed to load processor <code>%s</code>' % self.name, self.error)
         text = self.code_processor(hdf, text, self.env)
         if inline:
             code_block_start = re.compile('^<div class="code-block">')
@@ -96,7 +100,7 @@ class WikiProcessor:
                     self.code_processor = self.mime_processor
                 else:
                     self.code_processor = self.builtin_processors['default']
-                    return 1
+                    return e
         return 0
     
     def load_macro(self, name):
@@ -105,7 +109,7 @@ class WikiProcessor:
             module = imp.load_source(name, os.path.join(self.env.path, 'wiki-macros', name+'.py'))
         except IOError:
             # fall back to site-wide macros
-            macros = __import__('wikimacros.' + name, globals(),  locals(), [])
+            macros = util.safe__import__('wikimacros.' + name)
             module = getattr(macros, name)
         return module.execute
 
@@ -266,6 +270,8 @@ class CommonFormatter:
         if page.find('#') != -1:
             anchor = page[page.find('#'):]
             page = page[:page.find('#')]
+        page = urllib.unquote(page)
+        text = urllib.unquote(text)
         self.make_xref('wiki', page)
         if not self.env._wiki_pages.has_key(page):
             return '<a class="missing wiki" href="%s" rel="nofollow">%s?</a>' \
@@ -339,10 +345,12 @@ class CommonFormatter:
         if match:
             path = match.group(1)
             rev = match.group(2)
+        text = urllib.unquote(text)
+        path = urllib.unquote(path)
         self.make_xref('source', path)
         if rev:
             return '<a class="source" href="%s">%s</a>' \
-                   % (self._href.browser(path, rev), text)
+                   % (self._href.browser(path, rev=rev), text)
         else:
             return '<a class="source" href="%s">%s</a>' \
                    % (self._href.browser(path), text)
@@ -438,7 +446,7 @@ class Formatter(CommonFormatter):
               r"""(?P<table_cell>\|\|)"""]
 
     _compiled_rules = re.compile('(?:' + string.join(_rules, '|') + ')')
-    _processor_re = re.compile('#\!([\w/+-]+)')
+    _processor_re = re.compile('#\!([\w+-]+)')
     _anchor_re = re.compile('[^\w\d\.-:]+', re.UNICODE)
     anchors = None
 
@@ -638,9 +646,6 @@ class Formatter(CommonFormatter):
             if match:
                 name = match.group(1)
                 self.code_processor = WikiProcessor(self.env, name)
-                if self.code_processor.error:
-                    self.out.write(system_message('Error: Failed to load processor <code>%s</code>' % name, e))
-                    self.code_text += line + os.linesep
             else:
                 self.code_text += line + os.linesep 
                 self.code_processor = WikiProcessor(self.env, 'default')

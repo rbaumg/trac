@@ -32,8 +32,6 @@ import svn.util
 import time
 
 class Log (Module):
-    template_name = 'log.cs'
-    template_rss_name = 'log_rss.cs'
 
     # set by the module_factory
     authzperm = None
@@ -63,7 +61,7 @@ class Log (Module):
             'log'      : wiki_to_oneliner(util.shorten_line(util.wiki_escape_newline(log)),
                                           self.env,self.db),
             'shortlog' : util.escape(shortlog),
-            'file_href': self.env.href.browser(self.path, rev),
+            'file_href': self.env.href.browser(self.path, rev=rev),
             'changeset_href': self.env.href.changeset(rev)
         }
         self.log_info.insert (0, item)
@@ -89,7 +87,7 @@ class Log (Module):
         # after each tag/branch/copy/rename.
         path = self.path
         for item in self.log_info:
-            item['file_href'] = self.env.href.browser(path, item['rev'])
+            item['file_href'] = self.env.href.browser(path, rev=item['rev'])
             if self.branch_info.has_key(item['rev']):
                 for info in self.branch_info[item['rev']]:
                     if path[:len(info[1])] == info[1]:
@@ -106,18 +104,18 @@ class Log (Module):
             req.hdf['log.path.%d' % i] = part or 'root'
             url = ''
             if rev_specified:
-                url = self.env.href.browser(path, rev)
+                url = self.env.href.browser(path, rev=rev)
             else:
                 url = self.env.href.browser(path)
             req.hdf['log.path.%d.url' % i] = url
             if i == len(links) - 1:
-                self.add_link('up', url, 'Parent directory')
+                self.add_link(req, 'up', url, 'Parent directory')
             i = i + 1
 
     def render(self, req):
         self.perm.assert_permission(perm.LOG_VIEW)
 
-        self.add_link('alternate', '?format=rss', 'RSS Feed',
+        self.add_link(req, 'alternate', '?format=rss', 'RSS Feed',
             'application/rss+xml', 'rss')
 
         self.path = req.args.get('path', '/')
@@ -167,5 +165,7 @@ class Log (Module):
         req.hdf['log.href'] = self.env.href.log(self.path)
         req.hdf['log.file_href'] = self.env.href.browser(self.path)
 
-    def display_rss(self, req):
-        req.display(self.template_rss_name, 'application/rss+xml')
+        if req.args.get('format') == 'rss':
+            req.display('log_rss.cs', 'application/rss+xml')
+        else:
+            req.display('log.cs')

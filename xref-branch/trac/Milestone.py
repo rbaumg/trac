@@ -59,28 +59,20 @@ def get_tickets_for_milestone(env, db, milestone, field='component'):
 
 
 def get_query_links(env, milestone, grouped_by='component', group=None):
-    queries = {}
+    q = {}
     if not group:
-        queries['all_tickets'] = env.href.query({'milestone': milestone})
-        queries['active_tickets'] = env.href.query({
-            'milestone': milestone, 'status': ['new', 'assigned', 'reopened']
-        })
-        queries['closed_tickets'] = env.href.query({
-            'milestone': milestone, 'status': 'closed'
-        })
+        q['all_tickets'] = env.href.query(milestone=milestone)
+        q['active_tickets'] = env.href.query(milestone=milestone,
+                                             status=('new', 'assigned', 'reopened'))
+        q['closed_tickets'] = env.href.query(milestone=milestone, status='closed')
     else:
-        queries['all_tickets'] = env.href.query({
-            'milestone': milestone, grouped_by: group
-        })
-        queries['active_tickets'] = env.href.query({
-            'milestone': milestone, grouped_by: group,
-            'status': ['new', 'assigned', 'reopened']
-        })
-        queries['closed_tickets'] = env.href.query({
-            'milestone': milestone, grouped_by: group,
-            'status': 'closed'
-        })
-    return queries
+        q['all_tickets'] = env.href.query(milestone=milestone, grouped_by=group)
+        q['active_tickets'] = env.href.query(milestone=milestone,
+                                             grouped_by=group,
+                                             status=('new', 'assigned', 'reopened'))
+        q['closed_tickets'] = env.href.query(milestone=milestone, grouped_by=group,
+                                             status='closed')
+    return q
 
 
 def calc_ticket_stats(tickets):
@@ -106,7 +98,6 @@ def calc_ticket_stats(tickets):
 
 
 class Milestone(Module):
-    template_name = 'milestone.cs'
 
     def save_milestone(self, req, id):
         self.perm.assert_permission(perm.MILESTONE_MODIFY)
@@ -264,7 +255,7 @@ class Milestone(Module):
     def render(self, req):
         self.perm.assert_permission(perm.MILESTONE_VIEW)
 
-        self.add_link('up', self.env.href.roadmap(), 'Roadmap')
+        self.add_link(req, 'up', self.env.href.roadmap(), 'Roadmap')
 
         action = req.args.get('action', 'view')
         id = req.args.get('id')
@@ -286,6 +277,7 @@ class Milestone(Module):
             self.delete_milestone(req, id)
         else:
             self.render_view(req, id)
+        req.display('milestone.cs')
 
     def render_confirm(self, req, id):
         milestone = self.get_milestone(req, id)

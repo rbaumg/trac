@@ -134,8 +134,9 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
         self['id'] = self.ref.id = db.get_last_id()
 
         for name in Ticket.field_xrefs.keys():
-            self.xref_field(env, db, name, self[name],
-                            time.strftime('%c', time.localtime(now)))
+            if self.has_key(name): # hrm, unit test support...
+                self.xref_field(env, db, name, self[name],
+                                time.strftime('%c', time.localtime(now)))
         
         custom_fields = filter(lambda n: n[:7] == 'custom_', self.keys())
         for name in custom_fields:
@@ -253,8 +254,8 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
         Create cross-references and relationships for this ticket.
         """
         assert self.ref.id != -1
-        xref_kind = Ticket.field_xrefs[name]
-        if xref_kind:
+        if Ticket.field_xrefs.has_key(name):
+            xref_kind = Ticket.field_xrefs[name]
             if xref_kind[0] == 'implicit':
                 self.ref.replace_xrefs_from_wiki(env, db, 'field:'+name, self[name])
             elif xref_kind[0] == '1 to 1':
@@ -348,7 +349,6 @@ def insert_custom_fields(env, hdf, vals = {}):
 
 
 class NewticketModule(Module):
-    template_name = 'newticket.cs'
 
     def create_ticket(self, req):
         if not req.args.get('summary'):
@@ -410,8 +410,8 @@ class NewticketModule(Module):
 
         util.sql_to_hdf(self.db, "SELECT name FROM component ORDER BY name",
                         req.hdf, 'newticket.components')
-        util.sql_to_hdf(self.db, "SELECT name FROM milestone WHERE completed=0 "
-                                 "ORDER BY name",
+        util.sql_to_hdf(self.db, "SELECT name FROM milestone WHERE "
+                                 "COALESCE(completed,0)=0 ORDER BY name",
                         req.hdf, 'newticket.milestones')
         util.sql_to_hdf(self.db, "SELECT name FROM version ORDER BY name",
                         req.hdf, 'newticket.versions')
@@ -435,9 +435,10 @@ class NewticketModule(Module):
 
         insert_custom_fields(self.env, req.hdf, ticket)
 
+        req.display('newticket.cs')
+
 
 class TicketModule (Module):
-    template_name = 'ticket.cs'
 
     def save_changes(self, req, id):
         self.perm.assert_permission (perm.TICKET_MODIFY)
@@ -614,13 +615,15 @@ class TicketModule (Module):
             if str(id) in tickets:
                 idx = int(tickets.index(str(id)))
                 if idx > 0:
-                    self.add_link('first', self.env.href.ticket(tickets[0]),
+                    self.add_link(req, 'first', self.env.href.ticket(tickets[0]),
                                   'Ticket #%s' % tickets[0])
-                    self.add_link('prev', self.env.href.ticket(tickets[idx - 1]),
+                    self.add_link(req, 'prev', self.env.href.ticket(tickets[idx - 1]),
                                   'Ticket #%s' % tickets[idx - 1])
                 if idx < len(tickets) - 1:
-                    self.add_link('next', self.env.href.ticket(tickets[idx + 1]),
+                    self.add_link(req, 'next', self.env.href.ticket(tickets[idx + 1]),
                                   'Ticket #%s' % tickets[idx + 1])
-                    self.add_link('last', self.env.href.ticket(tickets[-1]),
+                    self.add_link(req, 'last', self.env.href.ticket(tickets[-1]),
                                   'Ticket #%s' % tickets[-1])
-            self.add_link('up', req.session['query_href'])
+            self.add_link(req, 'up', req.session['query_href'])
+
+        req.display('ticket.cs')

@@ -33,7 +33,6 @@ import posixpath
 
 
 class Browser(Module):
-    template_name = 'browser.cs'
 
     # set by the module_factory
     authzperm = None
@@ -63,7 +62,7 @@ class Browser(Module):
         # to point to a regular file
         if svn.fs.is_file(root, path, self.pool):
             if rev_specified:
-                req.redirect(self.env.href.file(path, revision))
+                req.redirect(self.env.href.file(path, rev=revision))
             else:
                 req.redirect(self.env.href.log(path))
 
@@ -119,12 +118,12 @@ class Browser(Module):
             }
 
             if rev_specified:
-                item['log_href'] = self.env.href.log(fullpath, revision)
+                item['log_href'] = self.env.href.log(fullpath, rev=revision)
                 if is_dir:
                     item['browser_href'] = self.env.href.browser(fullpath,
-                                                                 revision)
+                                                                 rev=revision)
                 else:
-                    item['browser_href'] = self.env.href.file(fullpath, revision)
+                    item['browser_href'] = self.env.href.file(fullpath, rev=revision)
             else:
                 item['log_href'] = self.env.href.log(fullpath)
                 if is_dir:
@@ -140,7 +139,7 @@ class Browser(Module):
         path = '/'
         req.hdf['browser.path.0'] = 'root'
         if rev_specified:
-            req.hdf['browser.path.0.url'] = self.env.href.browser(path, rev)
+            req.hdf['browser.path.0.url'] = self.env.href.browser(path, rev=rev)
         else:
             req.hdf['browser.path.0.url'] = self.env.href.browser(path)
         i = 0
@@ -150,12 +149,12 @@ class Browser(Module):
             req.hdf['browser.path.%d' % i] = part
             url = ''
             if rev_specified:
-                url = self.env.href.browser(path, rev)
+                url = self.env.href.browser(path, rev=rev)
             else:
                 url = self.env.href.browser(path)
             req.hdf['browser.path.%d.url' % i] = url
             if i == len(list) - 1:
-                self.add_link('up', url, 'Parent directory')
+                self.add_link(req, 'up', url, 'Parent directory')
 
     def render(self, req):
         self.perm.assert_permission (perm.BROWSER_VIEW)
@@ -203,9 +202,9 @@ class Browser(Module):
 
         self.generate_path_links(req, path, rev, rev_specified)
         if path != '/':
-            parent = '/'.join(path.split('/')[:-2]) + '/'
+            parent = '/'.join(path.split('/')[:-1]) + '/'
             if rev_specified:
-                req.hdf['browser.parent_href'] = self.env.href.browser(parent, rev)
+                req.hdf['browser.parent_href'] = self.env.href.browser(parent, rev=rev)
             else:
                 req.hdf['browser.parent_href'] = self.env.href.browser(parent)
 
@@ -216,3 +215,5 @@ class Browser(Module):
         req.hdf['browser.order_dir'] = desc and 'desc' or 'asc'
         req.hdf['browser.current_href'] = self.env.href.browser(path)
         req.hdf['browser.log_href'] = self.env.href.log(path)
+
+        req.display('browser.cs')

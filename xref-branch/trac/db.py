@@ -39,12 +39,6 @@ class IterableCursor(object):
     def __init__(self, cursor):
         self.cursor = cursor
 
-    def __del__(self):
-        try:
-            self.cursor.close()
-        except:
-            pass
-
     def __getattr__(self, name):
         return getattr(self.cursor, name)
 
@@ -62,16 +56,10 @@ class ConnectionWrapper(object):
     produced by the connection iterable using IterableCursor.
     """
 
-    __slots__ = 'cnx'
+    __slots__ = ['cnx']
 
     def __init__(self, cnx):
         self.cnx = cnx
-
-    def __del__(self):
-        try:
-            self.cnx.close()
-        except:
-            pass
 
     def __getattr__(self, name):
         return getattr(self.cnx, name)
@@ -89,6 +77,7 @@ class SQLiteConnection(ConnectionWrapper):
     __slots__ = ['cnx']
 
     def __init__(self, dbpath, timeout=10000):
+        self.cnx = None
         if dbpath != ':memory:':
             if not os.access(dbpath, os.F_OK):
                 raise TracError, 'Database "%s" not found.' % dbpath

@@ -79,7 +79,7 @@
     call:ticketprop(prop.label, prop.name, prop.value, 0) ?><?cs
    /if?><?cs
   /each ?>
-	  </tr></table><?cs /if ?>
+  </tr></table><?cs /if ?>
  <?cs if:ticket.description ?><div class="description">
   <?cs var:ticket.description.formatted ?>
  </div><?cs /if ?>
@@ -87,21 +87,24 @@
 </div>
 
 <?cs if:ticket.depends_on.me + ticket.depends_on.others > #0 ?>
-  <h2>Ticket Dependencies:</h2>
-  <p class="dependencies"><?cs
-   if ticket.depends_on.others > #0 ?>
-    This ticket 
-    <a href="<?cs var:trac.href.xref ?>/ticket/<?cs var:ticket.id ?>#outgoing-relations"
-       title="See outgoing &laquo;depends-on&raquo; relations">
-     <?cs call:relation("depends-on") ?></a> <?cs var:ticket.depends_on.others ?> tickets.<?cs
-   /if ?><?cs
-   call:plural($ticket.depends_on.me,
-    "There is one ticket",
-    "There are " + $ticket.depends_on.me + " tickets ") ?> which 
-    <a href="<?cs var:trac.href.xref ?>/ticket/<?cs var:ticket.id ?>#incoming-relations"
-       title="See incoming &laquo;depends-on&raquo; relations">
-     <?cs call:relation("depends-on") ?></a> this ticket.
-  </p>
+<h2>Ticket Dependencies:</h2>
+<p class="dependencies"><?cs
+ if ticket.depends_on.others > #0 ?>
+  This ticket 
+  <a href="<?cs var:trac.href.xref ?>/ticket/<?cs var:ticket.id ?>#outgoing-relations"
+     title="See outgoing &laquo;depends-on&raquo; relations">
+   <?cs call:relation("depends-on") ?></a> <?cs var:ticket.depends_on.others ?> 
+   <?cs call:plural(ticket.depends_on.others, "ticket", "tickets") ?>.<?cs
+ /if ?><?cs
+ if ticket.depends_on.me > #0 ?><?cs
+  call:plural($ticket.depends_on.me,
+   "There is one ticket",
+   "There are " + $ticket.depends_on.me + " tickets ") ?>
+   which <a href="<?cs var:trac.href.xref ?>/ticket/<?cs var:ticket.id ?>#incoming-relations"
+            title="See incoming &laquo;depends-on&raquo; relations">
+    <?cs call:relation("depends-on") ?></a> this ticket.<?cs
+ /if ?>
+</p>
 <?cs /if ?>
 
 <?cs if trac.acl.TICKET_MODIFY || ticket.attachments.0.name ?>
@@ -219,8 +222,7 @@
    <input type="text" id="cc" name="cc" size="30" value="<?cs var:ticket.cc ?>" /><br />
    <label for="depends_on"><?cs call:relation("depends-on") ?>:</label>
    <textarea id="depends_on" name="depends_on" cols="30" rows="2"><?cs 
-     var:ticket.depends_on ?>
-   </textarea>
+     var:ticket.depends_on ?></textarea>
   </div>
   <?cs if:len(ticket.custom) ?><div class="custom">
    <?cs call:ticket_custom_props(ticket) ?>
