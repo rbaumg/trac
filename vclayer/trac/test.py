@@ -97,22 +97,23 @@ class InMemoryDatabase(SQLiteConnection):
 
 
 def suite():
-    from trac.tests import wiki, ticket, perm, environment, diff, query, href, \
-                           tracadmin
-    from trac.web.tests import auth, cgi_frontend, clearsilver, session
-
     suite = unittest.TestSuite()
 
     # trac
+    from trac.tests import wiki, ticket, perm, environment, query, href, tracadmin
     suite.addTest(wiki.suite())
     suite.addTest(ticket.suite())
     suite.addTest(perm.suite())
     suite.addTest(environment.suite())
-    suite.addTest(diff.suite())
     suite.addTest(href.suite())
     suite.addTest(query.suite())
 
+    # trac.versioncontrol
+    from trac.versioncontrol.tests import diff
+    suite.addTest(diff.suite())
+
     # trac.web
+    from trac.web.tests import auth, cgi_frontend, clearsilver, session
     suite.addTest(auth.suite())
     suite.addTest(cgi_frontend.suite())
     suite.addTest(clearsilver.suite())

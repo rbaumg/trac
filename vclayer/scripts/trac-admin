@@ -32,7 +32,6 @@ import StringIO
 
 from trac import perm
 from trac import util
-from trac import sync
 import trac.siteconfig
 import trac.Environment
 

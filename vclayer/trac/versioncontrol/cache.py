@@ -93,12 +93,12 @@ class CachedRepository(Repository):
     def next_rev(self, rev):
         return self.repos.next_rev(rev)
 
+
 class CachedChangeset(Changeset):
 
     def __init__(self, rev, db, authz):
         self.db = db
         self.authz = authz
-        self.changeset = None
         cursor = self.db.cursor()
         cursor.execute("SELECT time,author,message FROM revision "
                        "WHERE rev=%s", (rev,))
