@@ -21,16 +21,12 @@
 
 from trac import perm, util
 from trac.Module import Module
-from trac.WikiFormatter import wiki_to_oneliner
+from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 
 import time
 
 CHUNK_SIZE = 4096
 DISP_MAX_FILE_SIZE = 256 * 1024
-
-def _short_log_message(env, db, message):
-    message = util.shorten_line(util.wiki_escape_newline(message))
-    return wiki_to_oneliner(message, env, db)
 
 def _get_changes(env, db, repos, revs):
     changes = {}
@@ -41,7 +37,8 @@ def _get_changes(env, db, repos, revs):
             'date': time.strftime('%x %X', time.localtime(changeset.date)),
             'age': util.pretty_timedelta(changeset.date),
             'author': changeset.author or 'anonymous',
-            'message': _short_log_message(env, db, changeset.message)
+            'message': wiki_to_oneliner(util.shorten_line(util.wiki_escape_newline(changeset.message)),
+                                        env, db)
         }
     return changes
 
@@ -66,37 +63,32 @@ class BrowserModule(Module):
     def render(self, req):
         rev = req.args.get('rev')
         path = req.args.get('path', '/')
-        order = req.args.get('order', 'name').lower()
-        desc = req.args.has_key('desc')
-
-#       self.authzperm.assert_permission (path)
-
-        repos = self.env.get_repository()
 
         req.hdf['title'] = path
-        req.hdf['browser'] = {
-            'path': path,
-            'order': order,
-            'desc': desc and 1 or 0,
-            'log_href': self.env.href.log(path)
-        }
+        req.hdf['browser'] = {'path': path, 'log_href': self.env.href.log(path)}
 
         path_links = _get_path_links(self.env.href, path, rev)
         req.hdf['browser.path'] = path_links
         if len(path_links) > 1:
             self.add_link('up', path_links[-2]['href'], 'Parent directory')
 
+        repos = self.env.get_repository()
         node = repos.get_node(path, rev)
         if node.isdir:
-            req.hdf['node.is_dir'] = 1
-            self.render_directory(req, repos, node, rev, order, desc)
+            req.hdf['browser.is_dir'] = 1
+            self.render_directory(req, repos, node, rev)
         else:
             self.render_file(req, repos, node, rev)
 
-        req.hdf['browser.revision'] = repos.youngest_rev
+        req.hdf['browser.revision'] = rev or repos.youngest_rev
 
-    def render_directory(self, req, repos, node, rev=None, order=None, desc=0):
+    def render_directory(self, req, repos, node, rev=None):
         self.perm.assert_permission(perm.BROWSER_VIEW)
+
+        order = req.args.get('order', 'name').lower()
+        req.hdf['browser.order'] = order
+        desc = req.args.has_key('desc')
+        req.hdf['browser.desc'] = desc and 1 or 0
 
         info = []
         for entry in node.get_entries():
@@ -107,8 +99,8 @@ class BrowserModule(Module):
                 'is_dir': int(entry.isdir),
                 'rev': entry.rev,
                 'permission': 1, # FIXME
-                'log_href': self.env.href.log(entry.path, entry_rev),
-                'browser_href': self.env.href.browser(entry.path, entry_rev)
+                'log_href': self.env.href.log(entry.path, rev),
+                'browser_href': self.env.href.browser(entry.path, rev)
             })
         changes = _get_changes(self.env, self.db, repos,
                                [i['rev'] for i in info])
@@ -132,26 +124,20 @@ class BrowserModule(Module):
         self.perm.assert_permission(perm.FILE_VIEW)
 
         changeset = repos.get_changeset(node.rev)
-        req.hdf['node'] = {
+        req.hdf['file'] = {
             'rev': node.rev,
             'changeset_href': self.env.href.changeset(node.rev),
             'date': time.strftime('%x %X', time.localtime(changeset.date)),
             'age': util.pretty_timedelta(changeset.date),
             'author': changeset.author or 'anonymous',
-            'message': _short_log_message(self.env, self.db, changeset.message)
+            'message': wiki_to_html(util.wiki_escape_newline(changeset.message),
+                                    req.hdf, self.env, self.db)
         }
-
-        content = node.get_content()
-        first_chunk = content.read(DISP_MAX_FILE_SIZE)
 
         mime_type = node.content_type
         if not mime_type or mime_type == 'application/octet-stream':
-            mime_type = self.env.mimeview.get_mimetype(node.name)
-            if not mime_type:
-                if self.env.mimeview.is_binary(first_chunk):
-                    mime_type = 'application/octet-stream'
-                else:
-                    mime_type = 'text/plain'
+            mime_type = self.env.mimeview.get_mimetype(node.name) \
+                        or mime_type or 'text/plain'
 
         # We don't have to guess if the charset is specified in the
         # svn:mime-type property
@@ -168,24 +154,24 @@ class BrowserModule(Module):
             # request, but this will do as long as modules don't outlive
             # requests
             self.node = node
-            self.content = content
-            self.first_chunk = first_chunk
             self.charset = charset
             return
 
         # Generate HTML preview
-        content = util.to_utf8(first_chunk, charset)
+        content = util.to_utf8(node.get_content().read(DISP_MAX_FILE_SIZE),
+                               charset)
         if len(content) == DISP_MAX_FILE_SIZE:
-            req.hdf['browser.max_file_size_reached'] = 1
-            req.hdf['browser.max_file_size'] = DISP_MAX_FILE_SIZE
+            req.hdf['file.max_file_size_reached'] = 1
+            req.hdf['file.max_file_size'] = DISP_MAX_FILE_SIZE
             preview = ' '
         else:
             preview = self.env.mimeview.display(content, filename=node.name,
                                                 rev=node.rev,
                                                 mimetype=mime_type)
-        req.hdf['browser.preview'] = preview
+        req.hdf['file.preview'] = preview
 
         raw_href = self.env.href.browser(node.path, rev and node.rev, 'raw')
+        req.hdf['file.raw_href'] = raw_href
         self.add_link('alternate', raw_href, 'Original Format', mime_type)
 
     def display_raw(self, req):
@@ -199,8 +185,7 @@ class BrowserModule(Module):
                                       node.last_modified))
         req.end_headers()
 
-        req.write(self.first_chunk)
-        content = self.content
+        content = node.get_content()
         while 1:
             chunk = content.read(CHUNK_SIZE)
             if not chunk:

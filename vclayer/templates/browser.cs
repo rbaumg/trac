@@ -21,7 +21,7 @@
   </form>
  </div>
 
- <?cs if:node.is_dir ?>
+ <?cs if:browser.is_dir ?>
   <table class="listing" id="dirlist">
    <thead>
     <tr>
@@ -84,23 +84,22 @@
   <table id="info" summary="Revision info">
    <tr>
     <th scope="row">
-     Revision <a href="<?cs var:node.changeset_href ?>"><?cs var:node.rev ?></a>
-     (by <?cs var:node.author ?>, <?cs var:node.age ?> ago)
+     Revision <a href="<?cs var:file.changeset_href ?>"><?cs var:file.rev ?></a>
+     (checked in by <?cs var:file.author ?>, <?cs var:file.age ?> ago)
     </th>
-    <td class="message"><?cs var:node.message ?></td>
+    <td class="message"><?cs var:file.message ?></td>
    </tr>
   </table>
   <div id="preview">
-   <?cs if:browser.preview ?>
-    <?cs var:browser.preview ?>
-   <?cs elif:browser.max_file_size_reached ?>
+   <?cs if:file.preview ?>
+    <?cs var:file.preview ?>
+   <?cs elif:file.max_file_size_reached ?>
     <strong>HTML preview not available</strong>, since file-size exceeds
-    <?cs var:browser.max_file_size  ?> bytes.
-    Try <a href="?format=raw">downloading the file</a> instead.
+    <?cs var:file.max_file_size  ?> bytes.
+    Try <a href="<?cs var:file.raw_href ?>">downloading</a> the file instead.
    <?cs else ?>
     <strong>HTML preview not available</strong>. To view, <a href="<?cs
-    var:browser.path + '?rev=' + browser.rev ?>&format=raw">download the
-    file</a>.
+    var:file.raw_href ?>">download</a> the file.
    <?cs /if ?>
   </div>
  <?cs /if ?>

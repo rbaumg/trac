@@ -87,7 +87,8 @@ class Node(object):
     FILE = "file"
 
     def __init__(self, path, rev, kind):
-        self.path = path
+        assert kind in (Node.DIRECTORY, Node.FILE), "Unknown node kind %s" % kind
+        self.path = str(path)
         self.rev = rev
         self.kind = kind
 
