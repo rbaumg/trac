@@ -29,7 +29,7 @@
  /if ?>
 
  <?cs if:$n_links > #0 ?>
-  <h2><?cs 
+  <h2 id='backlinks'><?cs 
    call:anchor(xref.base) ?> is referenced <?cs 
    if $n_links == #1 ?>
     in the Wiki of another Trac Object:<?cs
@@ -50,7 +50,7 @@
  <?cs /if ?>
 
  <?cs if:$n_in_relations > #0 ?>
-  <h2><?cs 
+  <h2 id='incoming-relations'><?cs 
    if $n_in_relations == #1 ?> 
     Another Trac Object has a relation<?cs
    else ?>
@@ -71,7 +71,7 @@
  <?cs /if ?>
 
  <?cs if:$n_out_relations > #0 ?>
-  <h2><?cs 
+  <h2 id='outgoing-relations'><?cs 
    call:anchor(xref.base) ?><?cs 
    if $n_out_relations == #1 ?> 
     has one relation with another Trac Object:<?cs

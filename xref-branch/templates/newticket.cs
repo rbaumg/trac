@@ -67,7 +67,9 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
    /if ?><br />
    <label for="cc">Cc:</label>
    <input type="text" id="cc" name="cc" size="30" value="<?cs
-     var:newticket.cc ?>" />
+     var:newticket.cc ?>" /><br />
+   <label for="depends_on">Depends on:</label>
+   <input type="text" id="depends_on" name="depends_on" size="30" value="<?cs var:ticket.depends_on ?>" />
   </div>
   <?cs if:len(ticket.custom) ?><div class="custom">
    <?cs call:ticket_custom_props(ticket) ?>

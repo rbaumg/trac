@@ -66,8 +66,9 @@
   call:ticketprop("Version", "version", ticket.version, 0) ?><?cs
   call:ticketprop("Resolution", "resolution", ticket.resolution, 0) ?><?cs
   call:ticketprop("Milestone", "milestone", ticket.milestone, 0) ?><?cs
-  set:last_prop = #1 ?><?cs
   call:ticketprop("Keywords", "keywords", ticket.keywords, 0) ?><?cs
+  set:last_prop = #1 ?><?cs
+  call:ticketprop("Depends on", "depends-on", ticket.depends_on, 0) ?><?cs
   set:last_prop = #0 ?>
  </tr></table><?cs if ticket.custom.0.name ?>
  <table><tr><?cs each:prop = ticket.custom ?><?cs
@@ -84,6 +85,13 @@
   <?cs var:ticket.description.formatted ?>
  </div><?cs /if ?>
 </div>
+
+<?cs if:n_depends_on_me ?>
+ <h3>There are <?cs var:n_depends_on_me ?> tickets 
+  <a href="<?cs var:trac.href.xref ?>/ticket/<?cs var:ticket.id ?>#incoming-relations"
+     title="See cross-references">depending on me.</a>
+ </h3>
+<?cs /if ?>
 
 <?cs if trac.acl.TICKET_MODIFY || ticket.attachments.0.name ?>
 <h2>Attachments</h2><?cs
@@ -197,7 +205,9 @@
    <input type="text" id="owner" name="owner" size="20" value="<?cs
      var:ticket.owner ?>" disabled="disabled" /><br />
    <label for="cc">Cc:</label>
-   <input type="text" id="cc" name="cc" size="30" value="<?cs var:ticket.cc ?>" />
+   <input type="text" id="cc" name="cc" size="30" value="<?cs var:ticket.cc ?>" /><br />
+   <label for="depends_on">Depends on:</label>
+   <input type="text" id="depends_on" name="depends_on" size="30" value="<?cs var:ticket.depends_on ?>" />
   </div>
   <?cs if:len(ticket.custom) ?><div class="custom">
    <?cs call:ticket_custom_props(ticket) ?>

@@ -82,6 +82,7 @@ class TracObj:
     def __init__(self, type, id): # TODO: consider adding self.env (esp. for href/href2)
         self.type = type
         self.id   = id
+        self.force_relation = ''
         if type == 'source':            # TODO: oo-ify
             self.id = id.strip('/')
 
@@ -92,6 +93,16 @@ class TracObj:
             return 'Changeset [%s]' % self.id
         elif self.type == 'report':
             return 'Report {%s}' % self.id
+        else:
+            return self.type + ':' + escape(self.id)
+
+    def shortname(self):
+        if self.type == 'ticket':          # TODO: oo-ify
+            return '#%s' % self.id
+        elif self.type == 'changeset':
+            return '[%s]' % self.id
+        elif self.type == 'report':
+            return '{%s}' % self.id
         else:
             return self.type + ':' + escape(self.id)
 
@@ -117,7 +128,7 @@ class TracObj:
     def replace_relation(self, db, relation, dest, facet='', context=''):
         """
         Replace the related object for the given 'relation'.
-        The 'facet' and 'context' are only used to recreate the new relation.
+        The 'facet' and 'context' are only used to recreate the new relation. *** FIXME
         Best suited for 1 to 1 relationships.
         """
         print "- %s:%s --[%s]--> *:*" % (self.type, self.id, relation)
@@ -133,15 +144,18 @@ class TracObj:
         Remove then re-create the cross-references for the given facet.
         """
         self.delete_xrefs(db, facet)
-        self._create_xrefs_from_wiki(env, db, facet, wikitext)
-
-
-    def _create_xrefs_from_wiki(self, env, db, facet, wikitext):
-        """
-        Parse the given 'wikitext' in order to generate all the cross-reference.
-        It is assumed that self is the source object for these references.
-        """
         XRefFormatter(env, db, False).format(wikitext, self, facet)
+
+    def replace_xrefs_from_list(self, env, db, facet, relation, wikitext):
+        """
+        Remove then re-create the cross-references for the given 'facet',
+        forcing 'relation'.
+        """
+        self.delete_xrefs(db, facet)
+        xreffmt = XRefFormatter(env, db, False)
+        self.force_relation = relation
+        xreffmt.format(wikitext.replace('\n', ' '), self, facet)
+        self.force_relation = ''
 
     def delete_xrefs(self, db, facet=None):
         """
@@ -202,39 +216,50 @@ class TracObj:
                        tuple)
         return cursor.fetchone()[0]
 
-    def find_sources(self, db, relation=None):
+    def find_sources(self, db, relation=None, facet=None):
         """
         Retrieve all the incoming relationships for this object.
         If 'relation' is given, only the sources for the given relation
         are retrieved, otherwise all relations are searched, even implicit ones.
         """
-        return self._find(db, 'dest', 'src', relation)
+        return self._find(db, 'dest', 'src', relation, facet)
 
-    def find_destinations(self, db, relation=None):
+    def find_destinations(self, db, relation=None, facet=None):
         """
         Retrieve all the outgoing relationships for this object.
         If 'relation' is given, only the targets for the given relation
         are retrieved, otherwise all relations are searched, even implicit ones.
         """
-        return self._find(db, 'src', 'dest', relation)
+        return self._find(db, 'src', 'dest', relation, facet)
 
-    def _find(self, db, base, other, relation):
+    def _find(self, db, base, other, relation, facet):
         cursor = db.cursor()
-        if relation:
-            relation_clause = "AND relation = %s"
-            tuple = (self.id, self.type, relation)
-        else:
-            relation_clause = ""
-            tuple = (self.id, self.type)
+        relation_clause = facet_clause = ""
+        tuple = (self.id, self.type)
+        if relation == True:
+            relation_clause = "AND relation != '' "
+        elif relation == False:
+            relation_clause = "AND relation = '' "
+        elif relation:
+            relation_clause = "AND relation = %s "
+            tuple += (relation,)
+        if facet:
+            facet_clause = "AND facet = %s "
+            tuple += (facet,)
+        print (("SELECT <other>_type, <other>_id, relation, facet, context "
+                        "FROM xref WHERE <base>_id = %s AND <base>_type = %s "
+                        ).replace('<base>', base).replace('<other>', other) + relation_clause + facet_clause)
         cursor.execute(("SELECT <other>_type, <other>_id, relation, facet, context "
                         "FROM xref WHERE <base>_id = %s AND <base>_type = %s "
-                        ).replace('<base>', base).replace('<other>', other) + relation_clause,
+                        ).replace('<base>', base).replace('<other>', other) + relation_clause + facet_clause,
                        tuple)
         return cursor
 
     # -- used by the WikiFormatter.XRefFormatter:
     
     def insert_xref(self, db, relation, dest, facet, context):
+        if self.force_relation:
+            relation = self.force_relation
         print "+ %s:%s --[%s]--> %s:%s (in %s %s)" % (self.type, self.id, 
                                                       relation,
                                                       dest.type, dest.id,
@@ -371,10 +396,8 @@ class XrefModule(Module):
 
         # -- find outgoing relations 
         out_relations = []
-        for tuple in base.find_destinations(self.db):
-            dict = dict_of_related(*tuple)
-            if dict['relation']:
-                out_relations.append(dict)
+        for tuple in base.find_destinations(self.db, relation=True):
+            out_relations.append(dict_of_related(*tuple))
         req.hdf['xref.out_relations'] = out_relations
 
 

@@ -33,16 +33,21 @@ from UserDict import UserDict
 __all__ = ['Ticket', 'NewticketModule', 'TicketModule']
 
 
-class Ticket(UserDict):
+class Ticket(UserDict): # TODO: inehrit from TracObj
+    # TODO: O-O: use std_fields() etc.
     std_fields = ['time', 'component', 'severity', 'priority', 'milestone',
                   'reporter', 'owner', 'cc', 'url', 'version', 'status',
                   'resolution', 'keywords', 'summary', 'description',
                   'changetime']
-    field_xrefs = { 'description' : ('implicit',),
-                    'summary'     : ('implicit',),
-                    'milestone'   : ('1 to 1', 'milestone'),
-                    'component'   : ('1 to 1', 'wiki') }
-
+    xref_fields = ['depends_on']
+    field_xrefs = {
+        'description' : ('implicit',),
+        'summary'     : ('implicit',),
+        'milestone'   : ('1 to 1', 'milestone'),
+        'component'   : ('1 to 1', 'wiki'),
+        'depends_on'  : ('1 to n', 'ticket'),
+        }
+    
     def __init__(self, *args):
         UserDict.__init__(self)
         self._old = {}
@@ -75,6 +80,18 @@ class Ticket(UserDict):
         for i in range(len(Ticket.std_fields)):
             self[Ticket.std_fields[i]] = row[i] or ''
 
+        # Fetch xref fields
+        obj = TracObj('ticket', id)
+        for relation in Ticket.xref_fields:
+            related = []
+            for dep_type, dep_id, r, f, c in obj.find_destinations(db, relation.replace('_','-'), 'field:'+relation):
+                related.append((TracObj(dep_type, dep_id), f)) # TODO: O-O: use env.object()
+            xref_kind = Ticket.field_xrefs[relation]                
+            if xref_kind[0] == '1 to 1' and len(related) > 1:
+                print 'Warning: more than one related object for %s#%s' % (obj, f)
+            self[relation] = ' '.join(map(lambda rel: util.escape(rel[0].shortname()),
+                                                                            related))
+            
         # Fetch custom fields if available
         cursor.execute("SELECT name,value FROM ticket_custom WHERE ticket=%s",
                        (id,))
@@ -87,7 +104,7 @@ class Ticket(UserDict):
     def populate(self, dict):
         """Populate the ticket with 'suitable' values from a dictionary"""
         def is_field(name):
-            return name in Ticket.std_fields or name[:7] == 'custom_'
+            return name in Ticket.std_fields + Ticket.xref_fields or name[:7] == 'custom_'
         for name in filter(is_field, dict.keys()):
             self[name] = dict.get(name, '')
 
@@ -171,8 +188,9 @@ class Ticket(UserDict):
                                    (id, fname, self[name]))
             else:
                 fname = name
-                cursor.execute("UPDATE ticket SET %s=%s WHERE id=%s",
-                               (fname, self[name], id))
+                if name in Ticket.std_fields:
+                    cursor.execute("UPDATE ticket SET %s=%s WHERE id=%s",
+                                   (fname, self[name], id))
             self.xref_field(env, db, fname, self[name],
                             time.strftime('%c', time.localtime(when)))
             cursor.execute("INSERT INTO ticket_change "
@@ -235,11 +253,19 @@ class Ticket(UserDict):
         xref_kind = Ticket.field_xrefs[name]
         if xref_kind:
             if xref_kind[0] == 'implicit':
-                self.ref.replace_xrefs_from_wiki(env, db, name, self[name])
+                self.ref.replace_xrefs_from_wiki(env, db, 'field:'+name, self[name])
             elif xref_kind[0] == '1 to 1':
-                self.ref.replace_relation(db, 'has-%s' % name, TracObj(xref_kind[1], value), 
-                                          'field', context)
+                if name in Ticket.std_fields:
+                    relation = 'has-'+name
+                else:
+                    relation = name
+                self.ref.replace_relation(db, relation, TracObj(xref_kind[1], value), 
+                                          'field:'+name, context)
+            elif xref_kind[0] == '1 to n':
+                self.ref.replace_xrefs_from_list(env, db, 'field:'+name, name.replace('_','-'), self[name])
 
+    def n_depends_on_me(self, db):
+        return self.ref.count_sources(db, 'depends-on')
 
 
 def get_custom_fields(env):
@@ -451,6 +477,7 @@ class TicketModule (Module):
         evals = dict(zip(ticket.keys(),
                          map(lambda x: util.escape(x), ticket.values())))
         req.hdf['ticket'] = evals
+        req.hdf['n_depends_on_me'] = ticket.n_depends_on_me(self.db)
 
         util.sql_to_hdf(self.db, "SELECT name FROM component ORDER BY name",
                         req.hdf, 'ticket.components')
