@@ -27,6 +27,7 @@ from util import *
 from Module import Module
 import perm
 from Wiki import wiki_to_html
+import util
 from Notify import TicketNotifyEmail
 
 fields = ['time', 'component', 'severity', 'priority', 'milestone', 'reporter',
@@ -181,6 +182,8 @@ class Ticket (Module):
             if self.args.has_key(field):
                 data[field] = self.args[field]
         now = int(time.time())
+        data['id'] = util.get_next_key(self.db, 'ticket')
+        id = data['id']
         data['time'] = now
         data['changetime'] = now
         data.setdefault('reporter',self.req.authname)
@@ -198,9 +201,9 @@ class Ticket (Module):
         nstr = string.join(data.keys(), ',')
         vstr = ('%s,' * len(data.keys()))[:-1]
 
+        sql = 'INSERT INTO ticket (%s) VALUES(%s)' % (nstr, vstr)
         cursor.execute('INSERT INTO ticket (%s) VALUES(%s)' % (nstr, vstr),
                        *data.values())
-        id = self.db.db.sqlite_last_insert_rowid()
         self.db.commit()
 
         # Notify

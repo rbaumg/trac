@@ -101,20 +101,20 @@ class Search(Module):
         q = []
         if changeset:
             q.append('SELECT 1 as type, message AS title, message, author, '
-                     ' "" AS keywords, rev AS data, time,0 AS ver'
+                     ' \'\' AS keywords, \'\'||rev AS data, time,0 AS ver'
                      ' FROM revision WHERE %s' %
                      self.query_to_sql(query, 'message'))
         if tickets:
             q.append('SELECT 2 as type, summary AS title, '
                      ' description AS message, reporter AS author, keywords,'
-                     ' id AS data, time,0 AS ver'
+                     ' \'\'||id AS data, time,0 AS ver'
                      ' FROM ticket WHERE %s OR %s OR %s' %
                       (self.query_to_sql(query, 'summary'),
                        self.query_to_sql(query, 'keywords'),
                        self.query_to_sql(query, 'description')))
         if wiki:
             q.append('SELECT 3 as type, text AS title, text AS message,'
-                     ' author, '' AS keywords, w1.name AS data, time,'
+                     ' author, \'\' AS keywords, w1.name AS data, time,'
                      ' w1.version as ver'
                      ' FROM wiki w1, '
                      ' (SELECT name,max(version) AS ver '
@@ -129,6 +129,7 @@ class Search(Module):
         q_str = string.join(q, ' UNION ALL ')
         q_str += ' ORDER BY time DESC LIMIT %d OFFSET %d' % \
                  (self.RESULTS_PER_PAGE, self.RESULTS_PER_PAGE * page)
+
         cursor.execute(q_str)
 
         # Make the data more HDF-friendly

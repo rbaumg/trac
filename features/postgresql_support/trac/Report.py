@@ -117,7 +117,12 @@ class Report (Module):
 
         # FIXME: fetchall should probably not be used.
         info = cursor.fetchall()
-        cols = cursor.rs.col_defs
+
+        # db api compliant way for retrieving column meta data
+        cols = []
+        for x in cursor.description:
+            cols.append(x)
+
         # Escape the values so that they are safe to have as html parameters
 #        info = map(lambda row: map(lambda x: escape(x), row), info)
         return [cols, info, title]
@@ -127,9 +132,9 @@ class Report (Module):
 
         cursor = self.db.cursor()
         
+        id = get_next_key(self.db, 'report')
         cursor.execute('INSERT INTO report (id, title, sql)'
-                        'VALUES (NULL, %s, %s)', title, sql)
-        id = self.db.db.sqlite_last_insert_rowid()
+                        'VALUES (%s, %s, %s)', id, title, sql)
         self.db.commit()
         self.req.redirect(self.href.report(id))
 

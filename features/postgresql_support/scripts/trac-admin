@@ -31,6 +31,8 @@ import sqlite
 import StringIO
 import trac.siteconfig
 import trac.Environment
+import traceback
+import trac.util
 
 def my_sum(list):
     """Python2.1 doesn't have sum()"""
@@ -89,12 +91,13 @@ class TracAdmin(cmd.Cmd):
             return 0
         return 1
         
-    def env_create(self):
+    def env_create(self, db_str=None):
         try:
-            self.__env = trac.Environment.Environment (self.envname, create=1)
+            self.__env = trac.Environment.Environment (self.envname, create=1, db_str=db_str)
             return self.__env
         except Exception, e:
             print 'Failed to create environment.', e
+            traceback.print_exc()
             sys.exit(1)
 
     def db_open(self):
@@ -104,21 +107,30 @@ class TracAdmin(cmd.Cmd):
             return self.__env.get_db_cnx()
         except Exception, e:
             print 'Failed to open environment.', e
+            traceback.print_exc()
             sys.exit(1)
 
     def db_execsql (self, sql, cursor=None):
-        data = []
+        sql = sql.strip()
+
+        data = None
         if not cursor:
             cnx=self.db_open()
             cursor = cnx.cursor()
         else:
             cnx = None
         cursor.execute(sql)
-        while 1:
-            row = cursor.fetchone()
-            if row == None:
-                break
-            data.append(row)
+
+        if sql.lower().find('select') == 0:
+            # some db drivers throw an exeption if fetchone() is called
+            # after a non-select query was issued
+            data = []
+            while 1:
+                row = cursor.fetchone()
+                if row == None:
+                    break
+                data.append(row)
+
         if cnx:
             cnx.commit()
         return data
@@ -256,7 +268,7 @@ class TracAdmin(cmd.Cmd):
             print 'trac-admin - The Trac Administration Console %s' % trac.__version__
             if not self.interactive:
                 print
-                print "Usage: trac-admin <dbfile> [command [subcommand] [option ...]]\n"
+                print "Usage: trac-admin <trac_env> [command [subcommand] [option ...]]\n"
                 print "Invoking trac-admin without command starts "\
                        "interactive mode."
             self.print_doc (docs)
@@ -437,12 +449,15 @@ class TracAdmin(cmd.Cmd):
                         (user, action))
 
     ## Initdb
-    _help_initdb = [('initdb', 'Create and initializes a new database')]
+    _help_initdb = [('initdb [db_connect_string]', 'Create and initializes a new database')]
 
     def do_initdb(self, line):
         if self.env_check():
             print "Initdb for '%s' failed.\nDoes aa environment already exist?" % self.envname
             return
+
+        args = self.arg_tokenize(line)
+
         try:
             print 'Creating a new Trac project database at %s' % self.envname
             print
@@ -501,7 +516,10 @@ class TracAdmin(cmd.Cmd):
             return
         try:
             print 'Creating and Initializing Project'
-            self.env_create()
+            db_str = None
+            if len(args) > 0:
+                db_str = args[0]
+            self.env_create(db_str)
             print ' Inserting default data'
             self.__env.insert_default_data()
             
@@ -525,6 +543,7 @@ class TracAdmin(cmd.Cmd):
             print 'Done.'
         except Exception, e:
             print 'Failed to initialize database.', e
+            traceback.print_exc()
             cnx.rollback()
 
 
@@ -647,15 +666,15 @@ class TracAdmin(cmd.Cmd):
         
         data = data.replace("'", "''") # Escape ' for safe SQL
         f.close()
-        
-        sql = ("INSERT INTO wiki('version','name','time','author','ipnr','text') "
-               " SELECT 1+ifnull(max(version),0),'%(title)s','%(time)s','%(author)s',"
-               "   '%(ipnr)s','%(text)s' FROM wiki WHERE name='%(title)s'" 
-               % {'title':title,
+
+        next_version = trac.util.get_next_key(None, 'wiki', 'version', cursor)
+
+        sql = ("INSERT INTO wiki (version, name, time, author, ipnr, text) VALUES ( '%(version)s', '%(name)s', '%(time)s', '%(author)s', '%(ipnr)s', '%(text)s')" 
+               % {'version':next_version,
+                  'name':title,
                   'time':int(time.time()),
                   'author':'trac',
                   'ipnr':'127.0.0.1',
-                  'locked':'0',
                   'text':data})
         self.db_execsql(sql, cursor)
 

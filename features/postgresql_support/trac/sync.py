@@ -34,8 +34,11 @@ def sync(db, repos, fs_ptr, pool):
               (util.SVN_VER_MAJOR, util.SVN_VER_MINOR, util.SVN_VER_MICRO)
 
     cursor = db.cursor()
-    cursor.execute('SELECT ifnull(max(rev), 0) FROM revision')
-    youngest_stored =  int(cursor.fetchone()[0])
+    cursor.execute('SELECT max(rev) FROM revision')
+    v = cursor.fetchone()[0]
+    youngest_stored = 0
+    if v:
+        youngest_stored = int(v)
     max_rev = fs.youngest_rev(fs_ptr, pool)
     num = max_rev - youngest_stored
     offset = youngest_stored + 1

@@ -81,11 +81,14 @@ def get_first_line(text, maxlen):
 
 def href_join(u1, *tail):
     for u2 in tail:
-        if u1[-1] == '/' and u2[0] != '/' or \
-            u1[-1] != '/' and u2[0] == '/':
-                u1 = u1 + u2
+        if len(u1) == 0:
+            u1 = u2
+        elif u1[-1] == '/' and u2[0] != '/' or \
+                 u1[-1] != '/' and u2[0] == '/':
+            u1 = u1 + u2
         else:
             u1 = u1 + '/' + u2
+            
     return u1
 
 def add_dictlist_to_hdf(list, hdf, prefix):
@@ -144,6 +147,25 @@ def hex_entropy(bytes=32):
     import md5
     import random
     return md5.md5(str(random.random() + time.time())).hexdigest()[:bytes]
+
+def get_next_key(db, table, key_column='id', cursor=None):
+    '''Provides a very basic way of getting the next available key for a particualr table.'''
+
+    # the currently implementation here is a hack, this should be upgraded to
+    # use something like a separate table to maintain next_key references, but
+    # even this hack should work fine unless millions of records are getting
+    # inserted simultaneously
+    
+    if cursor == None:
+        cursor = db.cursor()
+    cursor.execute('select max(%s) + 1 as next_key from %s' % (key_column, table))
+    row = cursor.fetchone()
+    next_key = row[0]
+
+    if next_key == None:
+        next_key = 1
+        
+    return next_key
 
 class TracError(Exception):
     def __init__(self, message, title=None, show_traceback=0):

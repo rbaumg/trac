@@ -367,7 +367,7 @@ default_config = \
  (('trac', 'htdocs_location', '/trac/'),
   ('trac', 'repository_dir', '/var/svn/myrep'),
   ('trac', 'templates_dir', '/usr/lib/trac/templates'),
-  ('trac', 'database', 'sqlite:db/trac.db'),
+  ('trac', 'database', 'sqlite:"db/trac.db"'),
   ('project', 'name', 'My Project'),
   ('project', 'descr', 'My example project'),
   ('project', 'url', 'http://example.com/'),

@@ -525,13 +525,9 @@ class Page:
             self.perm.assert_permission (perm.WIKI_CREATE)
         else:
             self.perm.assert_permission (perm.WIKI_MODIFY)
-        cursor = self.db.cursor ()
-        cursor.execute ('SELECT MAX(version) FROM (SELECT MAX(version)+1 '
-                        'FROM wiki WHERE name=%s UNION ALL SELECT 1 '
-                        'AS version)', self.name)
-        row = cursor.fetchone()
-        new_version = int(row[0])
+        new_version = int(get_next_key(self.db, 'wiki', 'version'))
         
+        cursor = self.db.cursor ()
         cursor.execute ('INSERT INTO WIKI '
                         '(name, version, time, author, ipnr, text) '
                         'VALUES (%s, %s, %s, %s, %s, %s)',

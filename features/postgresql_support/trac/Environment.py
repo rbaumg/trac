@@ -40,10 +40,10 @@ class Environment:
      * Project specific templates and wiki macros.
      * wiki and ticket attachments.
     """
-    def __init__(self, path, create=0):
+    def __init__(self, path, create=0, db_str=None):
         self.path = path
         if create:
-            self.create()
+            self.create(db_str)
         self.verify()
         self.load_config()
 
@@ -53,23 +53,69 @@ class Environment:
         assert fd.read(26) == 'Trac Environment Version 1'
         fd.close()
 
-    def get_db_cnx(self):
-        db_str = self.get_config('trac', 'database', 'sqlite:db/trac.db')
-        assert db_str[:7] == 'sqlite:'
-        db_name = os.path.join(self.path, db_str[7:])
-        if not os.access(db_name, os.F_OK):
-            raise EnvironmentError, 'Database "%s" not found.' % db_name
-        
-        directory = os.path.dirname(db_name)
-        if not os.access(db_name, os.R_OK + os.W_OK) or \
-               not os.access(directory, os.R_OK + os.W_OK):
-            raise EnvironmentError, \
-                  'The web server user requires read _and_ write permission\n' \
-                  'to the database %s and the directory this file is located in.' % db_name
-        return sqlite.connect(os.path.join(self.path, db_str[7:]),
-                              timeout=10000)
+    def get_db_cnx(self, check_exists=1):
+        db_str = self.get_config('trac',
+                                 'database',
+                                 'sqlite:"db/trac.db",timeout=10000')
 
-    def create(self):
+        pos = db_str.find(':')
+        if pos == -1:
+            raise EnvironmentError, 'Connection param must be of form ' \
+                  '<db_module_name>:<db_connect_params>, the value "%s" ' \
+                  'does not match' % db_str
+
+        module_name = db_str[:pos]
+        connect_params = db_str[pos+1:].split(',')
+        
+        # following is very crude code for parsing the arguments in the
+        # db_connect_params string
+        kargs = {}
+        arg_list = []
+        for x in connect_params:
+            pos1 = x.find('=')
+            pos2 = x.find('"')
+            pos3 = x.find("'")
+            if pos1 > -1:
+                if pos2 > -1 and pos2 < pos1:
+                    arg_list.append(eval(x))
+                elif pos3 > -1 and pos3 < pos1:
+                    arg_list.append(eval(x))
+                else:
+                    name = x[:pos1].strip()
+                    value = eval(x[pos1+1:].strip())
+                    kargs[name] = value
+            else:
+                arg_list.append(eval(x))
+        args = tuple(arg_list)
+
+
+        # since Trac has a slightly closer relationship with sqlite than
+        # other db's, there's a special case setup here so that when the
+        # path to the sqlite db is specified, its relative to TRAC_ENV
+        if module_name == 'sqlite':
+            db_name = os.path.join(self.path, args[0])
+            args = list(args)
+            args[0] = '%s' % db_name
+            args = tuple(args)
+            if check_exists == 1 and not os.access(db_name, os.F_OK):
+                raise EnvironmentError, 'Database "%s" not found.' % db_name
+        
+            directory = os.path.dirname(db_name)
+            if (check_exists == 1 and not os.access(db_name, os.R_OK + os.W_OK)) or not os.access(directory, os.R_OK + os.W_OK):
+                raise EnvironmentError, \
+                      'The web server user requires read _and_ write permission\n' \
+                      'to the database %s and the directory this file is located in.' % db_name
+
+        exec 'import %s' % module_name
+        m = eval(module_name)
+
+        print "Connecting to database module [%s] with: args=%s, kargs=%s" % (module_name, str(args), str(kargs))
+        
+        conn = m.connect(*args, **kargs)
+
+        return conn
+
+    def create(self, db_str=None):
         # Create the directory structure
         os.mkdir(self.path)
         os.mkdir(os.path.join(self.path, 'conf'))
@@ -85,7 +131,12 @@ class Environment:
                  'Visit http://trac.edgewall.com/ for more information.\n')
         fd = open(os.path.join(self.path, 'conf', 'trac.ini'), 'w')
         fd.close()
-        cnx = sqlite.connect(os.path.join(self.path, 'db', 'trac.db'))
+        self.load_config()
+        self.setup_default_config()
+        if db_str:
+            self.cfg.set('trac', 'database', db_str)
+        self.save_config()
+        cnx = self.get_db_cnx(check_exists=0)
         cursor = cnx.cursor()
         cursor.execute(db_default.schema)
         cnx.commit()
@@ -95,7 +146,10 @@ class Environment:
             if v == None:
                 return 'NULL'
             else:
-                return '"%s"' % v
+                prepped = v
+                if type(v) == str:
+                    prepped = prepped.replace("'", "''")
+                return "'%s'" % prepped
         cnx = self.get_db_cnx()
         cursor = cnx.cursor()
         
@@ -106,12 +160,13 @@ class Environment:
                 values = ','.join(map(prep_value, row))
                 sql = "INSERT INTO %s (%s) VALUES(%s);" % (table, cols, values)
                 cursor.execute(sql)
+        cnx.commit()
+
+    def setup_default_config(self):
         for s,n,v in db_default.default_config:
             if not self.cfg.has_section(s):
                 self.cfg.add_section(s)
             self.cfg.set(s, n, v)
-        self.save_config()
-        cnx.commit()
 
     def get_version(self):
         cnx = self.get_db_cnx()
