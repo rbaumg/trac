@@ -1,0 +1,14 @@
+#search-hdr { margin-bottom: 1em }
+#search-result { margin-left: .5em; margin-right: 3em; }
+.result-item { margin: 1.5em 0; }
+a.result-title {  color: #33c; }
+.result-keywords { color: #c33; }
+.result-body, .result-keywords { font-size: 80%; }
+.result-author, .result-date { 
+ font-size: 80%;
+ color: #090;
+ background: transparent;
+}
+.result-match {  background: #ffc800; }
+b { font-weight: normal; }
+#search-notfound { margin: 2em; font-size: 110%; }
