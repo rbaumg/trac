@@ -1,1 +1,7 @@
 This is the local branch for Rocky Burt <rocky@carterscove.com>, r0ky on #trac.
+
+Current feature branches are:
+
+  features/ticket_attachment_support-based_on_trunk
+    Based on:    Trunk
+    Description: Work for Ticket #27.  Provides attachment support for tickets
