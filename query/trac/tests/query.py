@@ -67,6 +67,16 @@ FROM ticket
 WHERE IFNULL(milestone,'')='milestone1'
 ORDER BY IFNULL(id,'')='',id""")
 
+    def test_constrained_by_milestone_not(self):
+        query = Query(self.env, order='id')
+        query.constraints['milestone'] = ['!milestone1']
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,milestone,status,owner,priority,component
+FROM ticket
+WHERE IFNULL(milestone,'')!='milestone1'
+ORDER BY IFNULL(id,'')='',id""")
+
     def test_constrained_by_status(self):
         query = Query(self.env, order='id')
         query.constraints['status'] = ['new', 'assigned', 'reopened']
@@ -75,6 +85,46 @@ ORDER BY IFNULL(id,'')='',id""")
 """SELECT id,summary,status,owner,priority,milestone,component
 FROM ticket
 WHERE status IN ('new','assigned','reopened')
+ORDER BY IFNULL(id,'')='',id""")
+
+    def test_constrained_by_owner_containing(self):
+        query = Query(self.env, order='id')
+        query.constraints['owner'] = ['~someone']
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,owner,status,priority,milestone,component
+FROM ticket
+WHERE IFNULL(owner,'') LIKE '%someone%'
+ORDER BY IFNULL(id,'')='',id""")
+
+    def test_constrained_by_owner_not_containing(self):
+        query = Query(self.env, order='id')
+        query.constraints['owner'] = ['!~someone']
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,owner,status,priority,milestone,component
+FROM ticket
+WHERE IFNULL(owner,'') NOT LIKE '%someone%'
+ORDER BY IFNULL(id,'')='',id""")
+
+    def test_constrained_by_owner_beginswith(self):
+        query = Query(self.env, order='id')
+        query.constraints['owner'] = ['^someone']
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,owner,status,priority,milestone,component
+FROM ticket
+WHERE IFNULL(owner,'') LIKE 'someone%'
+ORDER BY IFNULL(id,'')='',id""")
+
+    def test_constrained_by_owner_endswith(self):
+        query = Query(self.env, order='id')
+        query.constraints['owner'] = ['$someone']
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,owner,status,priority,milestone,component
+FROM ticket
+WHERE IFNULL(owner,'') LIKE '%someone'
 ORDER BY IFNULL(id,'')='',id""")
 
 def suite():
