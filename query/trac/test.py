@@ -12,13 +12,13 @@ import tests.query
 
 def suite():
     suite = unittest.TestSuite()
-#    suite.addTest(tests.wiki.suite())
-#    suite.addTest(tests.href.suite())
-#    suite.addTest(tests.ticket.suite())
-#    suite.addTest(tests.perm_test.suite())
-#    suite.addTest(tests.environment.suite())
-#    suite.addTest(tests.diff.suite())
-#    suite.addTest(tests.tracadmin.suite())
+    suite.addTest(tests.wiki.suite())
+    suite.addTest(tests.href.suite())
+    suite.addTest(tests.ticket.suite())
+    suite.addTest(tests.perm_test.suite())
+    suite.addTest(tests.environment.suite())
+    suite.addTest(tests.diff.suite())
+    suite.addTest(tests.tracadmin.suite())
     suite.addTest(tests.query.suite())
     return suite
 

@@ -10,7 +10,8 @@
 </div>
 
 <div id="content" class="query">
- <h1><?cs var:title ?></h1>
+ <h1><?cs var:title ?> <span class="numrows">(<?cs alt:len(query.results) ?>No<?cs /alt ?> match<?cs
+ if:len(query.results) != 1 ?>es<?cs /if ?>)</span></h1>
 
 <form id="query" method="post" action="<?cs var:trac.href.query ?>">
  <fieldset id="filters">
@@ -127,9 +128,6 @@
   initializeFilters();
 </script>
 
-<p id="nummatches"><?cs alt:len(query.results) ?>No<?cs /alt ?> ticket<?cs
- if:len(query.results) != 1 ?>s<?cs /if ?> matched this query.</p>
-
 <?cs def:thead() ?>
  <thead><tr><?cs each:header = query.headers ?><?cs
   if:name(header) == 0 ?><th class="ticket<?cs
@@ -167,8 +165,8 @@
   /if ?>
   <tr class="<?cs
    if:name(result) % 2 ?>odd<?cs else ?>even<?cs /if ?> <?cs
-   var:result.priority ?>">
-  <?cs each:header = query.headers ?><?cs
+   var:result.priority ?>"><?cs
+  each:header = query.headers ?><?cs
    if:name(header) == 0 ?>
     <td class="ticket"><a href="<?cs var:result.href ?>" title="View ticket"><?cs
       var:result.id ?></a></td><?cs
@@ -180,11 +178,13 @@
      <?cs var:result[header.name] ?><?cs
     /if ?>
     </td><?cs
-   /if ?>
-  <?cs /each ?>
-  <?cs if:result.description ?>
+   /if ?><?cs
+  /each ?>
+  <?cs if:query.verbose ?>
    </tr><tr class="fullrow"><td colspan="<?cs var:len(query.headers) ?>">
-    <?cs var:result.description ?>
+    <p class="meta">Reported by <strong><?cs var:result.reporter ?></strong>,
+    <?cs var:result.created ?><?cs if:result.description ?>:<?cs /if ?></p>
+    <?cs if:result.description ?><p><?cs var:result.description ?></p><?cs /if ?>
    </td>
   <?cs /if ?><?cs set:prev_group = result[query.group] ?>
  </tr><?cs /each ?>

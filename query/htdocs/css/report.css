@@ -1,6 +1,6 @@
 @import url(code.css);
 
-h1 .numrows { font-size: 65%; color: #999; font-weight: normal }
+h1 .numrows { color: #999; font-size: 65%; font-weight: normal }
 h2 {
  background: #f7f7f7;
  border-bottom: 1px solid #d7d7d7;
@@ -26,8 +26,6 @@ h2 {
 #filters td label { font-size: 11px }
 #filters td.filter { width: 100% }
 #filters td.filter label { padding-right: 1em }
-
-#nummatches { font-style: italic; margin: .5em 0 0 }
 
 /* Styles for the report list and the report results table
    (extends the styles for "table.listing") */
@@ -59,11 +57,12 @@ h2 {
  border: none;
  color: #333;
  background: transparent;
- padding: 0 1em 2em !important;
- font-size: 90%;
+ padding: 0 1em 2em 2em !important;
+ font-size: 85%;
 }
 .tickets tbody tr.fullrow:hover { background: transparent !important }
 .tickets .fullrow :link, .tickets .fullrow :visited { display: inline }
+.tickets .fullrow .meta { color: #999; margin-bottom: -.5em; margin-left: -1em }
 .tickets .fullrow hr { display: none }
 
 /* Query results table */

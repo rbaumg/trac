@@ -20,12 +20,13 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from __future__ import nested_scopes
+from time import gmtime, localtime, strftime
 from types import ListType
 
 import perm
 from Module import Module
 from Ticket import get_custom_fields, insert_custom_fields, Ticket
-from Wiki import wiki_to_html
+from Wiki import wiki_to_html, wiki_to_oneliner
 from util import add_to_hdf, escape, sql_escape
 
 
@@ -114,8 +115,9 @@ class Query:
             if self.group:
                 result[self.group] = row[self.group] or 'None'
             if self.verbose:
-                result['description'] = wiki_to_html(row['description'] or '',
-                                                     None, self.env, db)
+                result['description'] = row['description']
+                result['reporter'] = escape(row['reporter'] or 'anonymous')
+                result['created'] = localtime(int(row['time']))
             results.append(result)
         cursor.close()
         return results
@@ -131,14 +133,14 @@ class Query:
 
         cols = self.cols[:]
         if not self.order in cols:
-            cols.append(self.order)
+            cols += [self.order]
         if self.group and not self.group in cols:
-            cols.append(self.group)
+            cols += [self.group]
         if not 'priority' in cols:
             # Always add the priority column for coloring the resolt rows
-            cols.append('priority')
+            cols += ['priority']
         if self.verbose:
-            cols.append('description')
+            cols += ['reporter', 'time', 'description']
         cols.extend([c for c in self.constraints.keys() if not c in cols])
 
         custom_fields = [f['name'] for f in get_custom_fields(self.env)]
@@ -235,6 +237,7 @@ class Query:
 
 class QueryModule(Module):
     template_name = 'query.cs'
+    template_rss_name = 'query_rss.cs'
 
     def _get_constraints(self):
         constraints = {}
@@ -375,11 +378,8 @@ class QueryModule(Module):
         if self.args.has_key('update'):
             self.req.redirect(query.get_href())
 
-        props = self._get_ticket_properties()
-        add_to_hdf(props, self.req.hdf, 'ticket.properties')
-        modes = self._get_constraint_modes()
-        add_to_hdf(modes, self.req.hdf, 'query.modes')
-
+        self.add_link('alternate', query.get_href('rss'), 'RSS Feed',
+            'application/rss+xml', 'rss')
         self.add_link('alternate', query.get_href('csv'), 'Comma-delimited Text',
             'text/plain')
         self.add_link('alternate', query.get_href('tab'), 'Tab-delimited Text',
@@ -397,6 +397,11 @@ class QueryModule(Module):
     def display(self):
         self.req.hdf.setValue('title', 'Custom Query')
         query = self.query
+
+        props = self._get_ticket_properties()
+        add_to_hdf(props, self.req.hdf, 'ticket.properties')
+        modes = self._get_constraint_modes()
+        add_to_hdf(modes, self.req.hdf, 'query.modes')
 
         cols = query.get_columns()
         for i in range(len(cols)):
@@ -440,6 +445,12 @@ class QueryModule(Module):
             self.req.hdf.setValue('query.verbose', '1')
 
         results = query.execute(self.db)
+        for result in results:
+            if result.has_key('description'):
+                result['description'] = wiki_to_oneliner(result['description'] or '',
+                                                     None, self.env, self.db)
+            if result.has_key('created'):
+                result['created'] = strftime('%c', result['created'])
         add_to_hdf(results, self.req.hdf, 'query.results')
         self.req.display(self.template_name, 'text/html')
 
@@ -462,3 +473,19 @@ class QueryModule(Module):
     def display_tab(self):
         self.display_csv('\t')
 
+    def display_rss(self):
+        query = self.query
+        query.verbose = 1
+        results = query.execute(self.db)
+        for result in results:
+            if result['reporter'].find('@') == -1:
+                result['reporter'] = ''
+            if result['description']:
+                result['description'] = escape(wiki_to_html(result['description'] or '',
+                                                            None, self.env, self.db, 1))
+            if result['created']:
+                result['created'] = strftime('%a, %d %b %Y %H:%M:%S GMT',
+                                             gmtime(result['created']))
+        add_to_hdf(results, self.req.hdf, 'query.results')
+
+        self.req.display(self.template_rss_name, 'text/xml')

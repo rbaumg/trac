@@ -25,7 +25,7 @@ ORDER BY IFNULL(id,'')='' DESC,id DESC""")
         query = Query(self.env, order='id', verbose=1)
         sql = query.get_sql()
         self.assertEqual(sql,
-"""SELECT id,summary,status,owner,priority,milestone,component,description
+"""SELECT id,summary,status,owner,priority,milestone,component,reporter,time,description
 FROM ticket
 ORDER BY IFNULL(id,'')='',id""")
 
