@@ -32,7 +32,7 @@ try:
 
     # Load the plugins
     # TODO: the list of plugins to load shouldn't be hard-coded like this
-    from trac.web import chrome, clearsilver, ext_auth
+    from trac.web import chrome, clearsilver, extauth
     from trac.plugins import compat
 
     # Run the application
