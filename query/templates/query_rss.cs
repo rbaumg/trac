@@ -32,8 +32,8 @@
     <link><?cs var:base_url + result.href ?></link>
     <guid isPermaLink="true"><?cs var:base_url + result.href ?></guid>
     <title><?cs var:'#' + result.id + ': ' + result.summary ?></title><?cs
-    if:result.created_gmt ?>
-     <pubDate><?cs var:result.created_gmt ?></pubDate><?cs
+    if:result.created ?>
+     <pubDate><?cs var:result.created ?></pubDate><?cs
     /if ?><?cs
     if:result.reporter ?>
      <author><?cs var:result.reporter ?></author><?cs

@@ -117,7 +117,7 @@ class Query:
             if self.verbose:
                 result['description'] = row['description']
                 result['reporter'] = escape(row['reporter'] or 'anonymous')
-                result['created'] = localtime(int(row['time']))
+                result['created'] = int(row['time'])
             results.append(result)
         cursor.close()
         return results
@@ -450,7 +450,7 @@ class QueryModule(Module):
                 result['description'] = wiki_to_oneliner(result['description'] or '',
                                                      None, self.env, self.db)
             if result.has_key('created'):
-                result['created'] = strftime('%c', result['created'])
+                result['created'] = strftime('%c', localtime(result['created']))
         add_to_hdf(results, self.req.hdf, 'query.results')
         self.req.display(self.template_name, 'text/html')
 
