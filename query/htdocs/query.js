@@ -11,8 +11,8 @@ function addFilter(select) {
   // Convenience function for creating a <label>
   function createLabel(text, htmlFor) {
     var label = document.createElement("label");
-    if (htmlFor) label.htmlFor = htmlFor;
     if (text) label.appendChild(document.createTextNode(text));
+    if (htmlFor) label.htmlFor = htmlFor;
     return label;
   }
 
@@ -20,16 +20,15 @@ function addFilter(select) {
   function createCheckbox(name, value, id) {
     var input = document.createElement("input");
     input.type = "checkbox";
-    if (id) input.id = id;
     if (name) input.name = name;
     if (value) input.value = value;
+    if (id) input.id = id;
     return input;
   }
 
   // Convenience function for creating a <select>
   function createSelect(name, options, id) {
     var select = document.createElement("select");
-    if (id) select.id = id;
     if (name) select.name = name;
     if (options) {
       for (var i = 0; i < options.length; i++) {
@@ -42,11 +41,11 @@ function addFilter(select) {
         select.options[select.options.length] = option;
       }
     }
+    if (id) select.id = id;
     return select;
   }
 
   var propertyName = select.options[select.selectedIndex].value;
-
   var property = properties[propertyName];
   var table = document.getElementById("filters").getElementsByTagName("table")[0];
   var tr = document.createElement("tr");
@@ -86,6 +85,7 @@ function addFilter(select) {
       var element = createSelect(propertyName, property.options);
     } else if (property.type == "text") {
       var element = document.createElement("input");
+      element.name = propertyName;
     }
     td.appendChild(element);
     element.focus();
