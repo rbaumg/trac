@@ -25,21 +25,12 @@ import os
 import sys
 import time
 import tempfile
-from types import *
-from UserDict import UserDict
-from UserList import UserList
 
 TRUE =  ['yes', '1', 1, 'true',  'on',  'aye']
 FALSE = ['no',  '0', 0, 'false', 'off', 'nay']
 
 CRLF = '\r\n'
 
-
-def svn_date_to_string(date, pool):
-    from svn import util
-    date_seconds = util.svn_time_from_cstring(date,
-                                              pool) / 1000000
-    return time.strftime('%x %X', time.localtime(date_seconds))
 
 def wiki_escape_newline(text):
     return text.replace(os.linesep, '[[BR]]' + os.linesep)
@@ -67,12 +58,10 @@ def unescape(text):
     """Reverses Escapes &, <, > and \""""
     if not text:
         return ''
-    if type(text) is StringType:
-        text = text.replace('&#34;', '"') \
-               .replace('&gt;', '>') \
-               .replace('&lt;', '<') \
-               .replace('&amp;', '&') 
-    return text
+    return str(text).replace('&#34;', '"') \
+                    .replace('&gt;', '>') \
+                    .replace('&lt;', '<') \
+                    .replace('&amp;', '&') 
 
 def get_first_line(text, maxlen):
     """
@@ -105,6 +94,10 @@ def rstrip(text, skip):
         else:
             break
     return text
+
+def strip(text, skip):
+    """Python < 2.2.2 doesn't support custom skip characters"""
+    return lstrip(rstrip(text, skip), skip)
 
 def to_utf8(text, charset='iso-8859-15'):
     """Convert a string to utf-8, assume the encoding is either utf-8 or latin1"""
@@ -178,6 +171,15 @@ def hex_entropy(bytes=32):
     import md5
     import random
     return md5.md5(str(random.random() + time.time())).hexdigest()[:bytes]
+
+def http_date(t):
+    t = time.gmtime(t)
+    weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+              'Oct', 'Nov', 'Dec']
+    return '%s, %d %s %04d %02d:%02d:%02d GMT' % (
+           weekdays[t.tm_wday], t.tm_mday, months[t.tm_mon - 1], t.tm_year,
+           t.tm_hour, t.tm_min, t.tm_sec)
 
 def pretty_size(size):
     if size < 1024:

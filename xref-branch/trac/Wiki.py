@@ -20,9 +20,10 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from trac import perm
-from trac.Diff import get_diff_options, hdf_diff
 from trac.Module import Module
 from trac.util import enum, escape, TracError, get_reporter_id
+from trac.versioncontrol.diff import get_diff_options, hdf_diff
+from trac.web.main import add_link
 from trac.WikiFormatter import *
 from trac.Xref import TracObj
 
@@ -215,7 +216,7 @@ class WikiModule(Module):
 
         diff_style, diff_options = get_diff_options(req)
         if req.args.has_key('update'):
-           req.redirect(obj.href2(version, action='diff'))
+           req.redirect(obj.href2(version=version, action='diff'))
 
         # Ask web spiders to not index old versions
         req.hdf['html.norobots'] = 1
@@ -287,6 +288,7 @@ class WikiModule(Module):
         }
         if preview:
             info['page_html'] = wiki_to_html(obj.text, req.hdf, self.env, self.db)
+            info['readonly'] = int(req.args.has_key('readonly'))
         req.hdf['wiki'] = info
 
     def _render_history(self, req, obj):
@@ -322,14 +324,14 @@ class WikiModule(Module):
 
         version = req.args.get('version')
         if version:
-            self.add_link(req, 'alternate',
-                          '?version=%s&amp;format=txt' % version, 'Plain Text',
-                          'text/plain')
+            add_link(req, 'alternate',
+                     '?version=%s&amp;format=txt' % version, 'Plain Text',
+                     'text/plain')
             # Ask web spiders to not index old versions
             req.hdf['html.norobots'] = 1
         else:
-            self.add_link(req, 'alternate', '?format=txt', 'Plain Text',
-                          'text/plain')
+            add_link(req, 'alternate', '?format=txt', 'Plain Text',
+                     'text/plain')
 
         obj.version = version
 

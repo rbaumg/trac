@@ -19,10 +19,9 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
-from trac.core import open_svn_repos
-from trac.perm import PermissionCache
-from trac.util import escape
-from trac.web.main import populate_hdf
+import cgi
+import re
+import urllib
 
 
 class Module:
@@ -34,90 +33,90 @@ class Module:
 
     _name = None
 
-    def run(self, req):
-        populate_hdf(req.hdf, self.env, req)
-        req.hdf['trac.active_module'] = self._name
-        for action in self.perm.permissions():
-            req.hdf['trac.acl.' + action] = 1
-        self._add_default_links(req)
-        self.render(req)
-
-    def _add_default_links(self, req):
-        self.add_link(req, 'start', self.env.href.wiki())
-        self.add_link(req, 'search', self.env.href.search())
-        self.add_link(req, 'help', self.env.href.wiki('TracGuide'))
-        icon = self.env.get_config('project', 'icon')
-        if icon:
-            if not icon[0] == '/' and icon.find('://') < 0:
-                icon = req.hdf.get('htdocs_location', '') + icon
-            mimetype = self.env.mimeview.get_mimetype(icon)
-            self.add_link(req, 'icon', icon, type=mimetype)
-            self.add_link(req, 'shortcut icon', icon, type=mimetype)
-
-    def add_link(self, req, rel, href, title=None, type=None, className=None):
-        link = {'href': escape(href)}
-        if title: link['title'] = escape(title)
-        if type: link['type'] = type
-        if className: link['class'] = className
-        idx = 0
-        while req.hdf.get('links.%s.%d.href' % (rel, idx)):
-            idx += 1
-        req.hdf['links.%s.%d' % (rel, idx)] = link
-
     def render(self, req):
         raise NotImplementedError
 
 
 modules = {
-#    name           (module_name, class_name, requires_svn)
-    'log'         : ('Log', 'Log', 1),
-    'file'        : ('File', 'File', 1),
-    'wiki'        : ('Wiki', 'WikiModule', 0),
-    'about_trac'  : ('About', 'About', 0),
-    'search'      : ('Search', 'Search', 0),
-    'report'      : ('Report', 'Report', 0),
-    'ticket'      : ('Ticket', 'TicketModule', 0),
-    'bug'         : ('Ticket', 'TicketModule', 0),
-    'issue'       : ('Ticket', 'TicketModule', 0),
-    'source'      : ('Browser', 'Browser', 1),
-    'repos'       : ('Browser', 'Browser', 1),
-    'browser'     : ('Browser', 'Browser', 1),
-    'timeline'    : ('Timeline', 'Timeline', 1),
-    'changeset'   : ('Changeset', 'Changeset', 1),
-    'newticket'   : ('Ticket', 'NewticketModule', 0),
-    'query'       : ('Query', 'QueryModule', 0),
-    'attachment'  : ('File', 'Attachment', 0),
-    'roadmap'     : ('Roadmap', 'Roadmap', 0),
-    'settings'    : ('Settings', 'Settings', 0),
-    'milestone'   : ('Milestone', 'Milestone', 0),
-    'xref'        : ('Xref', 'XrefModule', 0),
+#    name           (module_name,   class_name)
+    'about'       : ('About',       'About'),
+    'about_trac'  : ('About',       'About'),
+    'attachment'  : ('attachment',  'AttachmentModule'),
+    'browser'     : ('Browser',     'BrowserModule'),
+    'changeset'   : ('Changeset',   'ChangesetModule'),
+    'file'        : ('Browser',     'FileModule'),
+    'log'         : ('Browser',     'LogModule'),
+    'milestone'   : ('Milestone',   'Milestone'),
+    'newticket'   : ('Ticket',      'NewticketModule'),
+    'query'       : ('Query',       'QueryModule'),
+    'report'      : ('Report',      'Report'),
+    'roadmap'     : ('Roadmap',     'Roadmap'),
+    'search'      : ('Search',      'Search'),
+    'settings'    : ('Settings',    'Settings'),
+    'ticket'      : ('Ticket',      'TicketModule'),
+    'timeline'    : ('Timeline',    'Timeline'),
+    'wiki'        : ('Wiki',        'WikiModule'),
+    'xref'        : ('Xref',        'XrefModule'),
 }
 
-def module_factory(env, db, req):
-    mode = req.args.get('mode', 'wiki')
-    module_name, constructor_name, need_svn = modules[mode]
+def module_factory(mode):
+    module_name, constructor_name = modules[mode]
     module = __import__(module_name, globals(),  locals())
     constructor = getattr(module, constructor_name)
     module = constructor()
     module._name = mode
-
-    module.env = env
-    module.log = env.log
-    module.db = db
-    module.perm = PermissionCache(module.db, req.authname)
-
-    # Only open the subversion repository for the modules that really
-    # need it. This saves us some precious time.
-    from trac.authzperm import AuthzPermission
-    module.authzperm = AuthzPermission(env, req.authname)
-    module.pool = None
-    if need_svn:
-        from trac import sync
-        repos_dir = env.get_config('trac', 'repository_dir')
-        pool, rep, fs_ptr = open_svn_repos(repos_dir)
-        module.repos = rep
-        module.fs_ptr = fs_ptr
-        sync.sync(env, db, rep, fs_ptr, pool)
-        module.pool = pool
-
     return module
+
+def parse_path_info(args, path_info):
+    def set_if_missing(fs, name, value):
+        if value and not fs.has_key(name):
+            fs.list.append(cgi.MiniFieldStorage(name, value))
+
+    match = re.search(r'^/(about(?:_trac)?|wiki)(?:/(.*))?', path_info)
+    if match:
+        set_if_missing(args, 'mode', match.group(1))
+        if match.group(2):
+            set_if_missing(args, 'page', match.group(2))
+        return
+    match = re.search(r'^/(newticket|timeline|search|roadmap|settings|query)/?', path_info)
+    if match:
+        set_if_missing(args, 'mode', match.group(1))
+        return
+    match = re.search(r'^/(ticket|report)(?:/([0-9]+)/*)?', path_info)
+    if match:
+        set_if_missing(args, 'mode', match.group(1))
+        if match.group(2):
+            set_if_missing(args, 'id', match.group(2))
+        return
+    match = re.search(r'^/(browser|log|file)(?:(/.*))?', path_info)
+    if match:
+        set_if_missing(args, 'mode', match.group(1))
+        if match.group(2):
+            set_if_missing(args, 'path', match.group(2))
+        return
+    match = re.search(r'^/changeset/([0-9]+)/?', path_info)
+    if match:
+        set_if_missing(args, 'mode', 'changeset')
+        set_if_missing(args, 'rev', match.group(1))
+        return
+    match = re.search(r'^/attachment/(ticket|wiki)(?:/(.*))?', path_info)
+    if match:
+        set_if_missing(args, 'mode', 'attachment')
+        set_if_missing(args, 'type', match.group(1))
+        set_if_missing(args, 'path', match.group(2))
+        return
+    match = re.search(r'^/milestone(?:/([^\?]+))?(?:/(.*)/?)?', path_info)
+    if match:
+        set_if_missing(args, 'mode', 'milestone')
+        if match.group(1):
+            set_if_missing(args, 'id', urllib.unquote(match.group(1)))
+        return
+    match = re.search('^/xref(?:/([^/]+))?(?:/(.*)/?)?', path_info)
+    if match:
+        set_if_missing(args, 'mode', 'xref')
+        set_if_missing(args, 'type', match.group(1))
+        id = match.group(2)
+        if id:
+            set_if_missing(args, 'id', urllib.unquote(id))
+        return args
+    return args

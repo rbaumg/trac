@@ -61,8 +61,7 @@ class HDFWrapper:
       1 = Item 2
     }
 
-    Simple values can also be easily retrieved using the same syntax. If the
-    requested value is not set, None is returned.
+    Simple values can also be easily retrieved using the same syntax.
 
     >>> hdf = HDFWrapper()
     >>> hdf['time'] = 42
@@ -79,6 +78,20 @@ class HDFWrapper:
     Traceback (most recent call last):
         ...
     KeyError: 'undef'
+    
+    It may be preferable to return a default value if the given key does not exit.
+    It will return 'None' when the specified key is not present:
+
+    >>> hdf.get('time')
+    '42'
+    >>> hdf.get('undef')
+
+    A second argument may be passed to specify the default return value:
+
+    >>> hdf.get('time', 'Undefined Key')
+    '42'
+    >>> hdf.get('undef', 'Undefined Key')
+    'Undefined Key'
 
     The 'in' and 'not in' operators can be used to test whether the HDF contains
     a value with a given name.
@@ -151,7 +164,7 @@ class HDFWrapper:
     def __setitem__(self, name, value):
         def add_value(prefix, value):
             from UserDict import UserDict
-            if isinstance(value, basestring):
+            if isinstance(value, (str, unicode)):
                 self.hdf.setValue(prefix, value)
             elif isinstance(value, (dict, UserDict)):
                 for k in value.keys():
@@ -204,7 +217,7 @@ class HDFWrapper:
         object, or a string. In the latter case it is interpreted as name of the
         template file.
         """
-        if isinstance(template, basestring):
+        if isinstance(template, (str, unicode)):
             filename = template
             import neo_cs
             template = neo_cs.CS(self.hdf)

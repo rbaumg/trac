@@ -19,23 +19,20 @@
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
-from trac.util import escape, href_join, TRUE
+from trac.perm import PermissionCache, PermissionError
+from trac.util import escape, href_join, TracError, TRUE
 from trac.web.auth import Authenticator
 from trac.web.href import Href
 from trac.web.session import Session
 
-import cgi
 import re
-from types import ListType
-import urllib
 
 
-class NotModifiedException(Exception):
-    pass
-
-
-class RedirectException(Exception):
-    pass
+class RequestDone(Exception):
+    """
+    Marker exception that indicates whether request processing has completed
+    and a response was sent.
+    """
 
 
 class Request(object):
@@ -53,6 +50,7 @@ class Request(object):
     remote_addr = None
     remote_user = None
 
+    args = None
     hdf = None
     authname = None
     session = None
@@ -65,16 +63,16 @@ class Request(object):
         self._headers = []
 
     def get_header(self, name):
-        raise RuntimeError, 'Virtual method not implemented'
+        raise NotImplementedError
 
     def send_response(self, code):
-        raise RuntimeError, 'Virtual method not implemented'
+        raise NotImplementedError
 
     def send_header(self, name, value):
-        raise RuntimeError, 'Virtual method not implemented'
+        raise NotImplementedError
 
     def end_headers(self):
-        raise RuntimeError, 'Virtual method not implemented'
+        raise NotImplementedError
 
     def check_modified(self, timesecs, extra=''):
         etag = 'W"%s/%d/%s"' % (self.authname, timesecs, extra)
@@ -84,7 +82,7 @@ class Request(object):
         else:
             self.send_response(304)
             self.end_headers()
-            raise NotModifiedException()
+            raise RequestDone()
 
     def redirect(self, url):
         self.send_response(302)
@@ -101,7 +99,7 @@ class Request(object):
             self.send_header('Set-Cookie', cookie.strip())
         self.end_headers()
         self.write('Redirecting...')
-        raise RedirectException()
+        raise RequestDone()
 
     def display(self, cs, content_type='text/html', response=200):
         assert self.hdf, 'HDF dataset not available'
@@ -128,77 +126,32 @@ class Request(object):
         if self.method != 'HEAD':
             self.write(data)
 
+        raise RequestDone()
+
     def read(self, len):
-        raise RuntimeError, 'Virtual method not implemented'
+        raise NotImplementedError
 
     def write(self, data):
-        raise RuntimeError, 'Virtual method not implemented'
+        raise NotImplementedError
 
 
 def _add_args_to_hdf(args, hdf):
     for k in [k for k in args.keys() if k]:
-        if type(args[k]) == ListType:
+        if isinstance(args[k], (list, tuple)):
             for i in range(len(args[k])):
                 hdf['args.%s.%d' % (k, i)] = args[k][i].value
         else:
             hdf['args.%s' % k] = args[k].value
 
-def _parse_path_info(args, path_info):
-    def set_if_missing(fs, name, value):
-        if value and not fs.has_key(name):
-            fs.list.append(cgi.MiniFieldStorage(name, value))
-
-    if not path_info or path_info in ['/login', '/logout']:
-        return args
-    match = re.search('^/(about_trac|wiki)(?:/(.*))?', path_info)
-    if match:
-        set_if_missing(args, 'mode', match.group(1))
-        if match.group(2):
-            set_if_missing(args, 'page', match.group(2))
-        return args
-    match = re.search('^/(newticket|timeline|search|roadmap|settings|query)/?', path_info)
-    if match:
-        set_if_missing(args, 'mode', match.group(1))
-        return args
-    match = re.search('^/(ticket|bug|issue|report)(?:/([0-9]+)/*)?', path_info)
-    if match:
-        set_if_missing(args, 'mode', match.group(1))
-        if match.group(2):
-            set_if_missing(args, 'id', match.group(2))
-        return args
-    match = re.search('^/(browser|source|repos|log|file)(?:(/.*))?', path_info)
-    if match:
-        set_if_missing(args, 'mode', match.group(1))
-        if match.group(2):
-            set_if_missing(args, 'path', match.group(2))
-        return args
-    match = re.search('^/changeset/([0-9]+)/?', path_info)
-    if match:
-        set_if_missing(args, 'mode', 'changeset')
-        set_if_missing(args, 'rev', match.group(1))
-        return args
-    match = re.search('^/attachment/([a-zA-Z_]+)/([^/]+)(?:/(.*)/?)?', path_info)
-    if match:
-        set_if_missing(args, 'mode', 'attachment')
-        set_if_missing(args, 'type', match.group(1))
-        set_if_missing(args, 'id', urllib.unquote(match.group(2)))
-        set_if_missing(args, 'filename', match.group(3))
-        return args
-    match = re.search('^/milestone(?:/([^\?]+))?(?:/(.*)/?)?', path_info)
-    if match:
-        set_if_missing(args, 'mode', 'milestone')
-        if match.group(1):
-            set_if_missing(args, 'id', urllib.unquote(match.group(1)))
-        return args
-    match = re.search('^/xref(?:/([^/]+))?(?:/(.*)/?)?', path_info)
-    if match:
-        set_if_missing(args, 'mode', 'xref')
-        set_if_missing(args, 'type', match.group(1))
-        id = match.group(2)
-        if id:
-            set_if_missing(args, 'id', urllib.unquote(id))
-        return args
-    return args
+def add_link(req, rel, href, title=None, type=None, class_name=None):
+    link = {'href': escape(href)}
+    if title: link['title'] = escape(title)
+    if type: link['type'] = type
+    if class_name: link['class'] = class_name
+    idx = 0
+    while req.hdf.get('links.%s.%d.href' % (rel, idx)):
+        idx += 1
+    req.hdf['links.%s.%d' % (rel, idx)] = link
 
 def populate_hdf(hdf, env, req=None):
     from trac import __version__
@@ -262,6 +215,17 @@ def populate_hdf(hdf, env, req=None):
         hdf['cgi_location'] = req.cgi_location
         hdf['trac.authname'] = escape(req.authname)
 
+        add_link(req, 'start', env.href.wiki())
+        add_link(req, 'search', env.href.search())
+        add_link(req, 'help', env.href.wiki('TracGuide'))
+        icon = env.get_config('project', 'icon')
+        if icon:
+            if not icon[0] == '/' and icon.find('://') < 0:
+                icon = htdocs_location + icon
+            mimetype = env.mimeview.get_mimetype(icon)
+            add_link(req, 'icon', icon, type=mimetype)
+            add_link(req, 'shortcut icon', icon, type=mimetype)
+
 def absolute_url(req, path=None):
     host = req.get_header('Host')
     if req.get_header('X-Forwarded-Host'):
@@ -270,7 +234,6 @@ def absolute_url(req, path=None):
         # Missing host header, so reconstruct the host from the
         # server name and port
         default_port = {'http': 80, 'https': 443}
-        name = req.server_name
         if req.server_port and req.server_port != default_port[req.scheme]:
             host = '%s:%d' % (req.server_name, req.server_port)
         else:
@@ -285,7 +248,6 @@ def dispatch_request(path_info, req, env):
     if not base_url:
         base_url = absolute_url(req)
     req.base_url = base_url
-    _parse_path_info(req.args, path_info)
 
     env.href = Href(req.cgi_location)
     env.abs_href = Href(req.base_url)
@@ -304,24 +266,26 @@ def dispatch_request(path_info, req, env):
             if path_info == '/logout':
                 authenticator.logout()
                 referer = req.get_header('Referer')
-                if referer and referer[0:len(req.base_url)] != req.base_url:
+                if referer and not referer.startswith(req.base_url):
                     # only redirect to referer if the latter is from the same
                     # instance
                     referer = None
                 req.redirect(referer or env.href.wiki())
-            elif path_info == '/login':
+            elif req.remote_user:
                 authenticator.login(req)
-                referer = req.get_header('Referer')
-                if referer and referer[0:len(req.base_url)] != req.base_url:
-                    # only redirect to referer if the latter is from the same
-                    # instance
-                    referer = None
-                req.redirect(referer or env.href.wiki())
+                if path_info == '/login':
+                    referer = req.get_header('Referer')
+                    if referer and not referer.startswith(req.base_url):
+                        # only redirect to referer if the latter is from the
+                        # same instance
+                        referer = None
+                    req.redirect(referer or env.href.wiki())
             req.authname = authenticator.authname
 
             from trac.web.clearsilver import HDFWrapper
             req.hdf = HDFWrapper(loadpaths=[env.get_templates_dir(),
                                             env.get_config('trac', 'templates_dir')])
+            populate_hdf(req.hdf, env, req)
             req.hdf['HTTP.PathInfo'] = path_info
             _add_args_to_hdf(req.args, req.hdf)
 
@@ -329,25 +293,23 @@ def dispatch_request(path_info, req, env):
             req.session = Session(env, db, req, newsession)
 
             try:
-                pool = None
                 # Load the selected module
-                from trac.Module import module_factory
-                module = module_factory(env, db, req)
-                pool = module.pool
-                module.run(req)
+                from trac.Module import module_factory, parse_path_info
+                parse_path_info(req.args, path_info)
+                module = module_factory(req.args.get('mode', 'wiki'))
+                module.env = env
+                module.log = env.log
+                module.db = db
+                module.perm = PermissionCache(module.db, req.authname)
+                req.hdf['trac.active_module'] = module._name
+                for action in module.perm.permissions():
+                    req.hdf['trac.acl.' + action] = 1
+                module.render(req)
             finally:
-                # We do this even if the cgi will terminate directly after. A
-                # pool destruction might trigger important clean-up functions.
-                if pool:
-                    import svn.core
-                    svn.core.svn_pool_destroy(pool)
-
                 # Give the session a chance to persist changes
                 req.session.save()
 
-        except NotModifiedException:
-            pass
-        except RedirectException:
+        except RequestDone:
             pass
 
     finally:
@@ -368,9 +330,9 @@ def send_pretty_error(e, env, req=None):
             env = open_environment()
             env.href = Href(req.cgi_location)
         populate_hdf(req.hdf, env, req)
-
-        from trac.util import TracError
-        from trac.perm import PermissionError
+        if env and env.log:
+            env.log.error(str(e))
+            env.log.error(tb.getvalue())
 
         if isinstance(e, TracError):
             req.hdf['title'] = e.title or 'Error'
@@ -379,17 +341,24 @@ def send_pretty_error(e, env, req=None):
             req.hdf['error.message'] = e.message
             if e.show_traceback:
                 req.hdf['error.traceback'] = escape(tb.getvalue())
+            req.display('error.cs', response=500)
+
         elif isinstance(e, PermissionError):
             req.hdf['title'] = 'Permission Denied'
             req.hdf['error.type'] = 'permission'
             req.hdf['error.action'] = e.action
             req.hdf['error.message'] = e
+            req.display('error.cs', response=403)
+
         else:
             req.hdf['title'] = 'Oops'
             req.hdf['error.type'] = 'internal'
             req.hdf['error.message'] = escape(str(e))
             req.hdf['error.traceback'] = escape(tb.getvalue())
-        req.display('error.cs', response=500)
+            req.display('error.cs', response=500)
+
+    except RequestDone:
+        pass
     except Exception, e2:
         if env and env.log:
             env.log.error('Failed to render pretty error page: %s' % e2)
@@ -400,6 +369,3 @@ def send_pretty_error(e, env, req=None):
         req.write(str(e))
         req.write('\n')
         req.write(tb.getvalue())
-    if env and env.log:
-        env.log.error(str(e))
-        env.log.error(tb.getvalue())

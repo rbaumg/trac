@@ -70,6 +70,19 @@ class Environment:
     def get_db_cnx(self):
         return db.get_cnx(self)
 
+    def get_repository(self, authname=None):
+        from trac.versioncontrol.cache import CachedRepository
+        from trac.versioncontrol.svn_authz import SubversionAuthorizer
+        from trac.versioncontrol.svn_fs import SubversionRepository
+        repos_dir = self.get_config('trac', 'repository_dir')
+        if not repos_dir:
+            raise EnvironmentError, 'Path to repository not configured'
+        authz = None
+        if authname:
+            authz = SubversionAuthorizer(self, authname)
+        repos = SubversionRepository(repos_dir, authz, self.log)
+        return CachedRepository(self.get_db_cnx(), repos, authz, self.log)
+
     def create(self):
         def _create_file(fname, data=None):
             fd = open(fname, 'w')
@@ -230,7 +243,7 @@ class Environment:
             length = stat[6]
         else:
             length = attachment.file.len
-        if length > max_size:
+        if max_size >= 0 and length > max_size:
             raise util.TracError('Maximum attachment size: %d bytes' % max_size,
                                  'Upload failed')
         dir = os.path.join(self.get_attachments_dir(), type,
@@ -239,13 +252,14 @@ class Environment:
             os.makedirs(dir)
         filename = attachment.filename.replace('\\', '/').replace(':', '/')
         filename = os.path.basename(filename)
+        assert filename, 'No file uploaded'
 
         # We try to normalize the filename to utf-8 NFC if we can.
         # Files uploaded from OS X might be in NFD.
         if sys.version_info[0] > 2 or \
            (sys.version_info[0] == 2 and sys.version_info[1] >= 3):
             filename = unicodedata.normalize('NFC', unicode(filename, 'utf-8')).encode('utf-8')
-            
+
         filename = urllib.quote(filename)
         path, fd = util.create_unique_file(os.path.join(dir, filename))
         filename = os.path.basename(path)
@@ -261,14 +275,28 @@ class Environment:
         return filename
 
     def delete_attachment(self, cnx, type, id, filename):
-        path = os.path.join(self.get_attachments_dir(), type,
-                            urllib.quote(id),
-                            urllib.quote(filename))
         cursor = cnx.cursor()
         cursor.execute('DELETE FROM attachment WHERE type=%s AND id=%s AND '
                        'filename=%s', (type, id, filename))
-        TracObj(type, id).delete_xrefs(cnx, 'attachment:%s' % filename)
-        os.unlink(path)
+
+        qfilename = urllib.quote(filename)
+        
+        TracObj(type, id).delete_xrefs(cnx, 'attachment:%s' % qfilename)
+
+        path = os.path.join(self.get_attachments_dir(), type,
+                            urllib.quote(id), qfilename)
+        try:
+            os.unlink(path)
+        except OSError:
+            # Older versions of Trac saved attachments with unquoted filenames,
+            # so try that. See #1112.
+            path = os.path.join(self.get_attachments_dir(), type,
+                                urllib.quote(id), filename)
+            try:
+                os.unlink(path)
+            except OSError:
+                raise util.TracError, 'Attachment not found'
+
         self.log.info('Attachment removed: %s/%s/%s', type, id, filename)
         cnx.commit()
 

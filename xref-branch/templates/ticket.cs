@@ -107,7 +107,7 @@
 </p>
 <?cs /if ?>
 
-<?cs if trac.acl.TICKET_MODIFY || ticket.attachments.0.name ?>
+<?cs if:ticket.attach_href || len(ticket.attachments) ?>
 <h2>Attachments</h2><?cs
  if ticket.attachments.0.name ?><div id="attachments">
   <ul class="attachments"><?cs each:a = ticket.attachments ?>
@@ -119,10 +119,11 @@
    var:a.time ?></em>.</li><?cs
   /each ?></ul><?cs
  /if ?><?cs
- if trac.acl.TICKET_MODIFY ?>
-  <form method="get" action="<?cs var:ticket.attach_href ?>">
-   <div><input type="submit" value="Attach File" /></div>
-  </form><?cs
+ if:ticket.attach_href ?>
+  <form method="get" action="<?cs var:ticket.attach_href ?>"><div>
+   <input type="hidden" name="action" value="new" />
+   <input type="submit" value="Attach File" />
+  </div></form><?cs
  /if ?><?cs if ticket.attachments.0.name ?></div><?cs /if ?>
 <?cs /if ?>
 

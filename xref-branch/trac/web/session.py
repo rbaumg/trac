@@ -1,7 +1,8 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004 Edgewall Software
+# Copyright (C) 2004, 2005 Edgewall Software
 # Copyright (C) 2004 Daniel Lundin <daniel@edgewall.com>
+# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
 #
 # Trac is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -18,10 +19,10 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 # Author: Daniel Lundin <daniel@edgewall.com>
+#         Christopher Lenz <cmlenz@gmx.de>
 
 from trac.util import hex_entropy, TracError
 
-import sys
 import time
 
 
@@ -94,7 +95,7 @@ class Session(dict):
             raise TracError("Session '%s' already exists.<br />"
                             "Please choose a different session id." % new_sid,
                             "Error renaming session")
-        self.env.log.debug('Changing session ID %s to %s' % (self.sid, newsid))
+        self.env.log.debug('Changing session ID %s to %s' % (self.sid, new_sid))
         cursor.execute("UPDATE session SET sid=%s WHERE sid=%s",
                        (new_sid, self.sid))
         self.db.commit()
@@ -163,9 +164,14 @@ class Session(dict):
                 self.env.log.debug('Changing variable %s from "%s" to "%s" in '
                                    'session %s' % (k, self._old[k], v,
                                    self.sid or self.req.authname))
-                cursor.execute("UPDATE session SET var_value=%s WHERE sid=%s "
-                               "AND username=%s AND var_name=%s",
-                               (v, self.sid, self.req.authname, k))
+                if self.sid:
+                    cursor.execute("UPDATE session SET var_value=%s "
+                                   "WHERE sid=%s AND username='anonymous' "
+                                   "AND var_name=%s", (v, self.sid, k))
+                else:
+                    cursor.execute("UPDATE session SET var_value=%s "
+                                   "WHERE sid IS NULL AND username=%s "
+                                   "AND var_name=%s", (v, self.req.authname, k))
                 changed = 1
 
         # Find all variables that have been deleted and also remove them from

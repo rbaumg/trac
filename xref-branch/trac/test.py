@@ -25,7 +25,7 @@ from trac.db import SQLiteConnection
 import unittest
 
 
-def Mock(bases=(), **kw):
+def Mock(bases=(), *initargs, **kw):
     """
     Simple factory for dummy classes that can be used as replacement for the 
     real implementation in tests.
@@ -76,7 +76,7 @@ def Mock(bases=(), **kw):
     if not isinstance(bases, tuple):
         bases = (bases,)
     cls = type('Mock', bases, {})
-    mock = cls()
+    mock = cls(*initargs)
     for k,v in kw.items():
         setattr(mock, k, v)
     return mock
@@ -97,28 +97,16 @@ class InMemoryDatabase(SQLiteConnection):
 
 
 def suite():
+    import trac.tests
+    import trac.scripts.tests
+    import trac.versioncontrol.tests
+    import trac.web.tests
+
     suite = unittest.TestSuite()
-
-    # trac
-    from trac.tests import diff, env, perm, query, ticket, wiki
-    suite.addTest(diff.suite())
-    suite.addTest(env.suite())
-    suite.addTest(perm.suite())
-    suite.addTest(query.suite())
-    suite.addTest(ticket.suite())
-    suite.addTest(wiki.suite())
-
-    # trac.web
-    from trac.web.tests import auth, cgi_frontend, clearsilver, href, session
-    suite.addTest(auth.suite())
-    suite.addTest(cgi_frontend.suite())
-    suite.addTest(clearsilver.suite())
-    suite.addTest(href.suite())
-    suite.addTest(session.suite())
-
-    # trac.scripts
-    from trac.scripts.tests import admin
-    suite.addTest(admin.suite())
+    suite.addTest(trac.tests.suite())
+    suite.addTest(trac.scripts.tests.suite())
+    suite.addTest(trac.versioncontrol.tests.suite())
+    suite.addTest(trac.web.tests.suite())
 
     return suite
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: iso8859-1 -*-
 __author__ = 'Daniel Lundin <daniel@edgewall.com>, Jonas Borgström <jonas@edgewall.com>'
-__copyright__ = 'Copyright (c) 2004 Edgewall Software'
+__copyright__ = 'Copyright (c) 2005 Edgewall Software'
 __license__ = """
- Copyright (C) 2003, 2004 Edgewall Software
+ Copyright (C) 2003, 2004, 2005 Edgewall Software
  Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
  Copyright (C) 2003, 2004 Daniel Lundin <daniel@edgewall.com>
 
@@ -29,10 +29,18 @@ import cmd
 import shlex
 import StringIO
 
+from trac import perm, util
 from trac.env import Environment
-from trac import perm, util, sync, Xref
+from trac import sync, Xref
 from trac.web import href # bad... do better next time
 import trac.siteconfig
+
+def my_sum(list):
+    """Python2.2 doesn't have sum()"""
+    tot = 0
+    for item in list:
+        tot += item
+    return tot
 
 
 class TracAdmin(cmd.Cmd):
@@ -178,7 +186,7 @@ class TracAdmin(cmd.Cmd):
                 print ("%%-%ds%s" % (colw[cnum], sp)) % (ldata[rnum][cnum] or ''),
             print
             if rnum == 0 and decor:
-                print ''.join(['-' for x in xrange(0,(1+len(sep))*cnum+sum(colw))])
+                print ''.join(['-' for x in xrange(0,(1+len(sep))*cnum+my_sum(colw))])
         print
 
     def print_doc(self,doc,decor=0):
@@ -391,15 +399,30 @@ class TracAdmin(cmd.Cmd):
 
 
     ## Permission
-    _help_permission = [('permission list', 'List permission rules'),
+    _help_permission = [('permission list [user]', 'List permission rules'),
                        ('permission add <user> <action> [action] [...]', 'Add a new permission rule'),
                        ('permission remove <user> <action> [action] [...]', 'Remove permission rule')]
+
+    def complete_permission(self, text, line, begidx, endidx):
+        argv = self.arg_tokenize(line)
+        argc = len(argv)
+        if line[-1] == ' ': # Space starts new argument
+            argc += 1
+        if argc == 2:
+            comp = ['list','add','remove']
+        elif argc >= 4:
+            comp = perm.permissions + perm.meta_permissions.keys()
+            comp.sort()
+        return self.word_complete(text, comp)
 
     def do_permission(self, line):
         arg = self.arg_tokenize(line)
         try:
             if arg[0]  == 'list':
-                self._do_permission_list()
+                user = None
+                if len(arg) > 1:
+                    user = arg[1]
+                self._do_permission_list(user)
             elif arg[0] == 'add' and len(arg) >= 3:
                 user = arg[1]
                 for action in arg[2:]:
@@ -408,14 +431,18 @@ class TracAdmin(cmd.Cmd):
                 user = arg[1]
                 for action in arg[2:]:
                     self._do_permission_remove(user, action)
-            else:    
-                self.do_help ('permission')
+            else:
+                self.do_help('permission')
         except Exception, e:
             print 'Permission %s failed:' % arg[0], e
 
-    def _do_permission_list(self):
-        data = self.db_execsql('SELECT username, action FROM permission ' \
-                               'ORDER BY username, action') 
+    def _do_permission_list(self, user=None):
+        if user:
+            data = self.db_execsql("SELECT username, action FROM permission "
+                                   "WHERE username='%s' ORDER BY action" % user)
+        else:
+            data = self.db_execsql("SELECT username, action FROM permission "
+                                   "ORDER BY username, action")
         self.print_listing(['User', 'Action'], data)
         print
         print 'Available actions:'
@@ -504,18 +531,7 @@ class TracAdmin(cmd.Cmd):
             project_name = arg[0]
             repository_dir = arg[1]
             templates_dir = arg[2]
-        from svn import repos, core
-        core.apr_initialize()
-        pool = core.svn_pool_create(None)
-        try:
-            # Remove any trailing slash or else subversion might abort
-            if not os.path.split(repository_dir)[1]:
-                repository_dir = os.path.split(repository_dir)[0]
-            rep = repos.svn_repos_open(repository_dir, pool)
-            fs_ptr = repos.svn_repos_fs(rep)
-        except Exception, e:
-            print repository_dir, 'Repository access error: %s' % e
-            return
+
         if not os.access(os.path.join(templates_dir, 'browser.cs'), os.F_OK) \
            or not os.access(os.path.join(templates_dir, 'ticket.cs'), os.F_OK):
             print templates_dir, "doesn't look like a Trac templates directory"
@@ -543,9 +559,12 @@ class TracAdmin(cmd.Cmd):
             self.__env.href = href.Href('trac-admin::initenv')
             self.__env._wiki_pages = {}
             Xref.rebuild_cross_references(self.__env, cnx)
+            cnx.commit()
 
             print ' Indexing repository'
-            sync.sync(self.__env, cnx, rep, fs_ptr, pool)
+            repos = self.__env.get_repository()
+            repos.sync()
+            
         except Exception, e:
             print 'Failed to initialize database.', e
             sys.exit(2)
@@ -585,32 +604,23 @@ class TracAdmin(cmd.Cmd):
         print
         
     _help_resync = [('resync', 'Re-synchronize trac with the repository')]
-    
+
     ## Resync
     def do_resync(self, line):
-        from svn import repos, core
-        core.apr_initialize()
-        pool = core.svn_pool_create(None)
-
         self.db_open() # We need to call this function to open the env, really stupid
         self.__env.href = href.Href('trac-admin::resync') # We need this for the WikiFormatter
         self.__env._wiki_pages = {}
 
-        # Remove any trailing slash or else subversion might abort
-        repository_dir = self.__env.get_config('trac', 'repository_dir')
-        if not os.path.split(repository_dir)[1]:
-            repository_dir = os.path.split(repository_dir)[0]
-            
-        rep = repos.svn_repos_open(repository_dir, pool)
-        fs_ptr = repos.svn_repos_fs(rep)
-        
-        cnx = self.__env.get_db_cnx()
         print 'resyncing...'
+        cnx = self.__env.get_db_cnx()
         self.db_execsql("DELETE FROM revision")
         self.db_execsql("DELETE FROM node_change")
-        sync.sync(self.__env, cnx, rep, fs_ptr, pool)
+
+        repos = self.__env.get_repository()
+        repos.sync()
+            
         print 'done.'
-        
+
     _help_xref = [('xref', 'Regenerate all the cross-reference information between trac objects')]
     
     ## XRef
@@ -637,13 +647,13 @@ class TracAdmin(cmd.Cmd):
                   ('wiki upgrade',
                    'Upgrade default wiki pages to current version')]
 
-    def complete_wiki (self, text, line, begidx, endidx):
+    def complete_wiki(self, text, line, begidx, endidx):
         argv = self.arg_tokenize(line)
         argc = len(argv)
         if line[-1] == ' ': # Space starts new argument
             argc += 1
-        if argc==2:
-            comp = ['list','remove','import','export','dump','load']
+        if argc == 2:
+            comp = ['list','remove','import','export','dump','load', 'upgrade']
         else:
             if argv[1] in ['dump','load']:
                 comp = self.get_dir_list(argv[-1], 1)

@@ -21,8 +21,9 @@
 
 from trac import perm, util
 from trac.Module import Module
-from trac.WikiFormatter import wiki_to_html
 from trac.Notify import TicketNotifyEmail
+from trac.web.main import add_link
+from trac.WikiFormatter import wiki_to_html
 from trac.Xref import TracObj, get_dag
 
 import time
@@ -566,8 +567,7 @@ class TicketModule (Module):
         # List attached files
         self.env.get_attachments_hdf(self.db, 'ticket', str(id), req.hdf,
                                      'ticket.attachments')
-        req.hdf['ticket.attach_href'] = self.env.href.attachment('ticket',
-                                                                 str(id), None)
+        req.hdf['ticket.attach_href'] = self.env.href.attachment('ticket', id)
 
     def render(self, req):
         self.perm.assert_permission (perm.TICKET_VIEW)
@@ -615,15 +615,15 @@ class TicketModule (Module):
             if str(id) in tickets:
                 idx = int(tickets.index(str(id)))
                 if idx > 0:
-                    self.add_link(req, 'first', self.env.href.ticket(tickets[0]),
-                                  'Ticket #%s' % tickets[0])
-                    self.add_link(req, 'prev', self.env.href.ticket(tickets[idx - 1]),
-                                  'Ticket #%s' % tickets[idx - 1])
+                    add_link(req, 'first', self.env.href.ticket(tickets[0]),
+                             'Ticket #%s' % tickets[0])
+                    add_link(req, 'prev', self.env.href.ticket(tickets[idx - 1]),
+                             'Ticket #%s' % tickets[idx - 1])
                 if idx < len(tickets) - 1:
-                    self.add_link(req, 'next', self.env.href.ticket(tickets[idx + 1]),
-                                  'Ticket #%s' % tickets[idx + 1])
-                    self.add_link(req, 'last', self.env.href.ticket(tickets[-1]),
-                                  'Ticket #%s' % tickets[-1])
-            self.add_link(req, 'up', req.session['query_href'])
+                    add_link(req, 'next', self.env.href.ticket(tickets[idx + 1]),
+                             'Ticket #%s' % tickets[idx + 1])
+                    add_link(req, 'last', self.env.href.ticket(tickets[-1]),
+                             'Ticket #%s' % tickets[-1])
+                add_link(req, 'up', req.session['query_href'])
 
         req.display('ticket.cs')
