@@ -1,4 +1,4 @@
-trac (0.8.1-1) UNRELEASED; urgency=low
+trac (0.8.1-1) unstable; urgency=low
 
   * debian/control:
     - Add suggestion of enscript and python-docutils (Closes: #284094)
@@ -7,7 +7,7 @@ trac (0.8.1-1) UNRELEASED; urgency=low
     - Recommends a http server instead of depends of it (Closes: #294674)
   * New upstream release (Closes: #298011)
 
- -- Otavio Salvador <otavio@debian.org>  Sat,  5 Mar 2005 17:17:23 -0300
+ -- Otavio Salvador <otavio@debian.org>  Sat,  5 Mar 2005 17:29:21 -0300
 
 trac (0.8-1) unstable; urgency=low
 
