@@ -96,7 +96,7 @@ class ExternalAuthPlugin(Plugin):
             self._logout(req, resp)
 
         referer = req.headers['Referer']
-        if referer and referer[0:len(req.baseURL)] != req.baseURL:
+        if referer and referer.startswith(req.baseURL):
             # only redirect to referer if the latter is from the same instance
             referer = None
         resp.sendRedirect(referer or '/')
