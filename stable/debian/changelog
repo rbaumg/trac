@@ -1,4 +1,4 @@
-trac (0.8.1-2) UNRELEASED; urgency=low
+trac (0.8.1-2) unstable; urgency=low
 
   * debian/rules:
     - Add support for patching in build process;
@@ -8,7 +8,7 @@ trac (0.8.1-2) UNRELEASED; urgency=low
       raised when visiting WikiRestructuredTextLinks after clean install
       bug. (Closes: #301151)
 
- -- Otavio Salvador <otavio@debian.org>  Tue, 29 Mar 2005 20:08:28 -0300
+ -- Otavio Salvador <otavio@debian.org>  Tue, 29 Mar 2005 20:44:07 -0300
 
 trac (0.8.1-1) unstable; urgency=low
 
