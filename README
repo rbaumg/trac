@@ -2,8 +2,7 @@ This is the local branch for Rocky Burt <rocky@carterscove.com>, r0ky on #trac.
 
 Items worked on and/or completed so far:
 
-  - (#27) ticket attachment support: pending merge
-  - (#87) downloadable diffs from changeset view: pending merge
+  - (#27) ticket attachment support: merged
+  - (#87) downloadable diffs from changeset view: merged
+  - (#19) ticket listing sorting capability: merged
   - (#126) database independence: pending merge
-  - (#19) ticket listing sorting capability: merged, pending second merge due
-          to bug in original patch
