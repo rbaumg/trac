@@ -19,6 +19,8 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
+import os
+import tempfile
 import sys
 import time
 import StringIO
@@ -145,10 +147,9 @@ def shorten_line(text):
         shortline = text[:i]+' ...'
     return shortline
 
-import tempfile
 def debug(msg):
     tempDir = tempfile.gettempdir()
-    f = open(tempDir + '/trac.log', 'a')
+    f = open(os.join(tempDir, 'trac.log'), 'a')
     f.write(msg)
     f.write('\n')
     f.close()

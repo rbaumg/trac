@@ -40,7 +40,7 @@ def getAttachmentDir(module, id, createIfNotExist=0):
     if pos > -1:
         typeName = typeName[pos+1:]
 
-    dir = tracReposDir+'/attachments/' + typeName + '/' + str(id)
+    dir = os.path.join(tracReposDir, 'attachments', typeName, str(id))
 
     exists = os.access(dir, os.F_OK)
     if createIfNotExist:
@@ -55,7 +55,8 @@ def getAttachmentDir(module, id, createIfNotExist=0):
 
 def createAttachment(module, id, file):
     dir = getAttachmentDir(module, id, 1)
-    f = open(dir+'/'+file.filename, 'wb')
+    p = os.path.join(dir, file.filename)
+    f = open(p, 'wb')
     f.write(file.value)
     f.close()
 
@@ -70,7 +71,7 @@ def getAttachments(module, id):
 
 def getAttachmentPath(module, id, filename):
     dir = getAttachmentDir(module, id)
-    return dir + '/'+filename
+    return os.path.join(dir, filename)
 
 
 class Attachment:
