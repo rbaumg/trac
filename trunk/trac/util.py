@@ -145,6 +145,14 @@ def shorten_line(text):
         shortline = text[:i]+' ...'
     return shortline
 
+import tempfile
+def debug(msg):
+    tempDir = tempfile.gettempdir()
+    f = open(tempDir + '/trac.log', 'a')
+    f.write(msg)
+    f.write('\n')
+    f.close()
+
 class TracError(Exception):
     def __init__(self, message, title=None, show_traceback=0):
         Exception.__init__(self, message)

@@ -65,7 +65,7 @@
   <h2 id="tkt-changes-hdr">Attachments</h2>
   <div id="tkt-attachments">
     <?cs each:attachment = ticket.attachments ?>
-      <a href="<?cs var:trac.href.attachment ?>ticket/<?cs var:ticket.id ?>/<?cs var:attachment.name ?>"><?cs var:attachment.name ?></a>&nbsp;
+      <a href="<?cs var:attachment.href ?>"><?cs var:attachment.name ?></a>&nbsp;
     <?cs /each ?>
   </div>
 
@@ -102,6 +102,10 @@
       <?cs elif $item.new == "" ?>
         <li class="tkt-chg-change">
            cleared <b><?cs var:item.field?></b>
+        </li>
+      <?cs elif $item.field == "attachment" ?>
+        <li class="tkt-chg-change">
+           <b>Attachment</b> added: <?cs var:item.new ?>
         </li>
       <?cs elif $item.old == "" ?>
         <li class="tkt-chg-change">

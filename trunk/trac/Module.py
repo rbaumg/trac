@@ -58,7 +58,6 @@ class Module:
         self.req.hdf.setValue('trac.active_module', self._name)
         self.req.hdf.setValue('trac.authname', self.authname)
         self.req.hdf.setValue('trac.href.wiki', self.href.wiki())
-        self.req.hdf.setValue('trac.href.attachment', self.href.attachment())
         self.req.hdf.setValue('trac.href.browser', self.href.browser('/'))
         self.req.hdf.setValue('trac.href.timeline', self.href.timeline())
         self.req.hdf.setValue('trac.href.report', self.href.report())

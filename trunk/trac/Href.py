@@ -56,12 +56,8 @@ class Href:
     def ticket(self, ticket):
         return href_join(self.base, 'ticket', str(ticket))
 
-    def attachment(self, file=''):
-        if len(file) > 0:
-            return href_join(self.base, 'attachment', str(file))
-        else:
-            return href_join(self.base, 'attachment/')
-            
+    def attachment(self, module, id, filename):
+        return href_join(self.base, 'attachment', module.__name__, str(id), filename)
 
     def newticket(self):
         return '%s?mode=newticket' % self.base

@@ -43,6 +43,7 @@ modules = {
     'timeline'    : ('Timeline', 'Timeline', 1),
     'changeset'   : ('Changeset', 'Changeset', 1),
     'newticket'   : ('Ticket', 'Newticket', 0),
+    'attachment'  : ('Attachment', 'Attachment', 0),
     }
 
 def parse_args(path_info):
@@ -63,6 +64,13 @@ def parse_args(path_info):
         return args
     if re.search('/search/?', path_info):
         args['mode'] = 'search'
+        return args
+    match = re.search('/attachment/([a-zA-Z_]+)/([0-9]+)/(.*)/?', path_info)
+    if match:
+        args['mode'] = 'attachment'
+        args['type'] = match.group(1)
+        args['id'] = match.group(2)
+        args['filename'] = match.group(3)
         return args
     match = re.search('/wiki/(.*[^/])/?', path_info)
     if match:

@@ -29,13 +29,11 @@ from Module import Module
 import perm
 from Wiki import wiki_to_html
 
+import Attachment
+
 fields = ['time', 'component', 'severity', 'priority', 'milestone', 'reporter',
           'owner', 'cc', 'url', 'version', 'status', 'resolution',
           'summary', 'description']
-
-def getTicketAttachmentDir():
-    dir = os.getenv('TRAC_REPOS')+'/attachments/ticket/'
-    return dir
 
 class Newticket (Module):
     template_name = 'newticket.cs'
@@ -137,14 +135,13 @@ class Ticket (Module):
         if new.has_key('attachment'):
             attachment = new['attachment']
             if hasattr(attachment, 'filename') and attachment.filename:
-                dir = getTicketAttachmentDir()+str(id)
-                exists = os.access(dir, os.F_OK)
-                if exists != 1:
-                    os.makedirs(dir)
-                
-                f = open(dir+'/'+attachment.filename, 'wb')
-                f.write(attachment.value)
-                f.close()
+                Attachment.createAttachment(Ticket, id, attachment)
+
+                cursor.execute ('INSERT INTO ticket_change '
+                                '(ticket,time,author,field,oldvalue,newvalue) '
+                                "VALUES (%s, %s, %s, 'attachment', '', %s)",
+                                id, now, author, attachment.filename)
+                changed = 1
             
         if changed:
             cursor.execute ('UPDATE ticket SET changetime=%s WHERE id=%s',
@@ -224,14 +221,18 @@ class Ticket (Module):
             if field == 'comment':
                 hdf.setValue('ticket.changes.%d.new' % idx,
                                       wiki_to_html(new, self.req.hdf, self.href))
+            elif field == 'attachment':
+                tag = '<a href="%s">%s</a>' % (self.href.attachment(Ticket, id, new), new)
+                hdf.setValue('ticket.changes.%d.new' % idx, tag)
             else:
                 hdf.setValue('ticket.changes.%d.new' % idx, new)
             idx = idx + 1
 
         idx = 0
-        files = os.listdir(getTicketAttachmentDir()+str(id))
+        files = Attachment.getAttachments(Ticket, id)
         while idx < len(files):
             hdf.setValue('ticket.attachments.%d.name' % idx, files[idx])
+            hdf.setValue('ticket.attachments.%d.href' % idx, self.href.attachment(Ticket, id, files[idx]))
             idx = idx + 1
 
     def render (self):
