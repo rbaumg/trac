@@ -113,8 +113,6 @@ class Request(object):
     serverPort = property(fget=lambda x: x._environ.get('SERVER_PORT'))
     serverProtocol = property(fget=lambda x: x._environ.get('SERVER_PROTOCOL'))
     scheme = property(fget=lambda x: x._environ['wsgi.url_scheme'])
-    baseURL = property(fget=lambda x: x._baseURL or x._reconstructBaseURL())
-
     remoteUser = property(fget=lambda x: x._environ.get('REMOTE_USER') or '')
     remoteAddr = property(fget=lambda x: x._environ.get('REMOTE_ADDR') or '')
     remoteHost = property(fget=lambda x: x._environ.get('REMOTE_HOST') or '')
@@ -126,8 +124,8 @@ class Request(object):
         from urllib import quote
         url = '%s://' % self.scheme
 
-        if self.headers['HTTP_HOST']:
-            url += self.headers['HTTP_HOST']
+        if self.headers['Host']:
+            url += self.headers['Host']
         else:
             url += self.serverName
             if self.scheme == 'https':
@@ -140,6 +138,8 @@ class Request(object):
 
         self._baseURL = url
         return self._baseURL
+
+    baseURL = property(fget=lambda x: x._baseURL or x._reconstructBaseURL())
 
 
 class Cookie(object):

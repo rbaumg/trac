@@ -24,7 +24,13 @@ from sys import stdin, stderr, stdout
 
 
 def run(application):
-    """Run the given WSGI application under CGI."""
+    """
+    Run the given WSGI application under CGI.
+    
+    This is a minimalistic implementation heavily inspired by the
+    example in the WSGI specification at
+    http://www.python.org/peps/pep-0333.html#the-server-gateway-side.
+    """
 
     environ = {}
     environ.update(os.environ)

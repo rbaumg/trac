@@ -11,6 +11,8 @@ import tests.tracadmin
 import tests.query
 import tests.plugin
 import tests.web.clearsilver
+import tests.web.main
+
 
 def suite():
     suite = unittest.TestSuite()
@@ -24,6 +26,7 @@ def suite():
     suite.addTest(tests.query.suite())
     suite.addTest(tests.plugin.suite())
     suite.addTest(tests.web.clearsilver.suite())
+    suite.addTest(tests.web.main.suite())
     return suite
 
 if __name__ == '__main__':

@@ -20,21 +20,20 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from trac.plugin import *
+from trac.util import hex_entropy
 from trac.web import chrome, dispatcher
 from trac.web import Cookie
 
 from protocols import *
 
-import md5
-import random
 import time
 
 
 class ExternalAuthPlugin(Plugin):
     """
     This plug-in implements optional login/logout of users based on HTTP
-    # authentication (performed by the web-server) and cookies (for identifying
-    # the user even on requests to non-protected resources).
+    authentication (performed by the web-server) and cookies (for identifying
+    the user even on requests to non-protected resources).
     """
 
     # Plug-in info
@@ -105,7 +104,7 @@ class ExternalAuthPlugin(Plugin):
 
     def _login(self, req, resp):
         assert not req['user'], 'Remote user already logged in'
-        authToken = md5.md5(str(random.random() + time.time())).hexdigest()[:32]
+        authToken = hex_entropy(32)
         db = self.env.getDBConnection()
         try:
             cursor = db.cursor()
