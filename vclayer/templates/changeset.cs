@@ -70,29 +70,23 @@
  </div>
 </form><?cs /if ?>
 
-
 <?cs def:node_change(item,cl,kind) ?><?cs 
   set:ndiffs = len(item.diff) ?><?cs
-  set:nprops = len(item.props) ?><?cs
-  if:$ndiffs + $nprops > #0 && cl != "mod" ?>
-    <div class="<?cs var:cl ?>"><div class="mod"></div></div><?cs 
-  else ?> 
-  <div class="<?cs var:cl ?>"></div><?cs
-  /if ?><?cs 
+  set:nprops = len(item.props) ?>
+  <div class="<?cs var:cl ?>"></div><?cs 
   if:cl == "rem" ?>
-   <a title="Show what was removed (rev. <?cs var:item.rev.old ?>)" 
-      href="<?cs var:item.browser_href.old ?>"><?cs var:item.path.old ?></a><?cs
-  else ?> 
-   <a title="Show entry in browser"
-      href="<?cs var:item.browser_href.new ?>"><?cs var:item.path.new ?></a><?cs
-    /if ?>
-     <span class="comment">(<?cs var:kind ?>)</span><?cs
-  if:item.path.old ?>
-    &nbsp;<small><em>(<?cs var:kind ?>&nbsp;from&nbsp;<a 
-      href="<?cs var:item.browser_href.old ?>" 
-      title="Show original file (rev. <?cs var:item.rev.old ?>)"
-    ><?cs var:item.path.old ?></a>)</em></small><?cs
-  /if ?><?cs 
+   <a title="Show what was removed (rev. <?cs var:item.rev.old ?>)" href="<?cs
+     var:item.browser_href.old ?>"><?cs var:item.path.old ?></a><?cs
+  else ?>
+   <a title="Show entry in browser" href="<?cs
+     var:item.browser_href.new ?>"><?cs var:item.path.new ?></a><?cs
+  /if ?>
+  <span class="comment">(<?cs var:kind ?>)</span><?cs
+  if:item.path.old && item.change == 'copy' || item.change == 'move' ?>
+   <small><em>(<?cs var:kind ?> from <a href="<?cs
+    var:item.browser_href.old ?>" title="Show original file (rev. <?cs
+    var:item.rev.old ?>)"><?cs var:item.path.old ?></a>)</em></small><?cs
+  /if ?><?cs
   if:$ndiffs + $nprops > #0 ?>
     (<a href="#file<?cs var:name(item) ?>" title="Show differences"><?cs
       if:$ndiffs > #0 ?><?cs var:ndiffs ?>&nbsp;diff<?cs if:$ndiffs > #1 ?>s<?cs /if ?><?cs 
@@ -116,18 +110,18 @@
  <dt class="files">Files:</dt>
  <dd class="files">
   <ul><?cs each:item = changeset.changes ?>
-   <li>
-    <?cs if:item.change == "add" ?>
-     <?cs call:node_change(item,"add","added") ?>
-    <?cs elif:item.change == "delete" ?>
-     <?cs call:node_change(item,"rem","deleted") ?>
-    <?cs elif:item.change == "copy" ?>
-     <?cs call:node_change(item,"cp","copied") ?>
-    <?cs elif:item.change == "move" ?>
-     <?cs call:node_change(item,"mv","moved") ?>
-    <?cs elif:item.change == "edit" ?>
-     <?cs call:node_change(item,"mod","modified") ?>
-    <?cs /if ?>
+   <li><?cs
+    if:item.change == 'add' ?><?cs
+     call:node_change(item, 'add', 'added') ?><?cs
+    elif:item.change == 'delete' ?><?cs
+     call:node_change(item, 'rem', 'deleted') ?><?cs
+    elif:item.change == 'copy' ?><?cs
+     call:node_change(item, 'cp', 'copied') ?><?cs
+    elif:item.change == 'move' ?><?cs
+     call:node_change(item, 'mv', 'moved') ?><?cs
+    elif:item.change == 'edit' ?><?cs
+     call:node_change(item, 'mod', 'modified') ?><?cs
+    /if ?>
    </li>
   <?cs /each ?></ul>
  </dd>
@@ -143,7 +137,6 @@
    <dt class="mod"></dt><dd>Modified</dd>
    <dt class="cp"></dt><dd>Copied</dd>
    <dt class="mv"></dt><dd>Moved</dd>
-   <dt class="unmod"><div class="mod"></div></dt><dd><em>(... and modified)</em></dd>
   </dl>
  </div>
  <ul class="entries">

@@ -35,7 +35,7 @@ _kindmap = {core.svn_node_dir: Node.DIRECTORY,
 
 class SubversionRepository(Repository):
     """
-    TODO: authz support
+    Repository implementation based on the svn.fs API.
     """
 
     def __init__(self, path, authz, log):
@@ -187,6 +187,9 @@ class SubversionChangeset(Changeset):
         e_ptr, e_baton = delta.make_editor(editor, self.pool)
         repos.svn_repos_replay(root, e_ptr, e_baton, self.pool)
 
+        idx = 0
+        copies, deletions = {}, {}
+        changes = []
         for path, change in editor.changes.items():
             if not self.authz.has_permission(path):
                 # FIXME: what about base_path?
@@ -197,15 +200,31 @@ class SubversionChangeset(Changeset):
             action = ''
             if not change.path:
                 action = Changeset.DELETE
+                deletions[change.base_path] = idx
             elif change.added:
                 if change.base_path and change.base_rev:
                     action = Changeset.COPY
+                    copies[change.base_path] = idx
                 else:
                     action = Changeset.ADD
             else:
                 action = Changeset.EDIT
             kind = _kindmap[change.item_kind]
-            yield path, kind, action, base_path, base_rev
+            changes.append([path, kind, action, base_path, base_rev])
+            idx += 1
+
+        moves = []
+        for k,v in copies.items():
+            if k in deletions:
+                changes[v][2] = Changeset.MOVE
+                moves.append(deletions[k])
+        offset = 0
+        for i in moves:
+            del changes[i - offset]
+            offset += 1
+
+        for change in changes:
+            yield tuple(change)
 
     def _get_prop(self, name):
         return fs.revision_prop(self.fs_ptr, self.rev, name, self.pool)

@@ -70,11 +70,11 @@ class Changeset(Module):
         self.edits = []
 
         changes = []
+        idx = 0
         for path, kind, change, base_path, base_rev in changeset.get_changes():
             info = {'change': change}
             if base_path:
-                if base_path != path:
-                    info['path.old'] = base_path
+                info['path.old'] = base_path
                 info['rev.old'] = base_rev
                 info['browser_href.old'] = self.env.href.browser(base_path, base_rev)
             if path:
@@ -82,8 +82,9 @@ class Changeset(Module):
                 info['rev.new'] = rev
                 info['browser_href.new'] = self.env.href.browser(path, rev)
             if change == 'edit': # Changeset.EDIT
-                self.edits.append((path, kind, base_path, base_rev))
+                self.edits.append((idx, path, kind, base_path, base_rev))
             changes.append(info)
+            idx += 1
         req.hdf['changeset.changes'] = changes
 
         # FIXME: this code assumes integer revision identifiers
@@ -99,8 +100,7 @@ class Changeset(Module):
 
     def display(self, req):
         """HTML version"""
-        idx = 0
-        for path, kind, base_path, base_rev in self.edits:
+        for idx, path, kind, base_path, base_rev in self.edits:
             old_node = self.repos.get_node(base_path or path, base_rev)
             new_node = self.repos.get_node(path, self.rev)
 
@@ -138,7 +138,6 @@ class Changeset(Module):
                                    ignore_case='-i' in self.diff_options,
                                    ignore_space_changes='-b' in self.diff_options)
                 req.hdf['changeset.changes.%d.diff' % idx] = changes
-                idx += 1
         Module.display(self, req)
 
     def display_diff(self, req):
@@ -149,7 +148,7 @@ class Changeset(Module):
                         'filename=Changeset%s.diff' % req.args.get('rev'))
         req.end_headers()
 
-        for path, kind, base_path, base_rev in self.edits:
+        for idx, path, kind, base_path, base_rev in self.edits:
             old_node = self.repos.get_node(base_path or path, base_rev)
             new_node = self.repos.get_node(path, self.rev)
 
