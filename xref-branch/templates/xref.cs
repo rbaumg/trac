@@ -22,60 +22,41 @@
 
  <h1>Cross-references for <?cs call:anchor(xref.base) ?></h1>
 
- <?cs if:$n_links > #0 ?>
-  <h2 id='backlinks'><?cs 
-   call:anchor(xref.base) ?> is implicitly referenced <?cs 
-    call:plural($n_links,
-     "in the Wiki of another Trac Object:",
-     $n_links + " times in the wiki of other Trac Objects:") ?>
-  </h2>
-  <dl><?cs 
-   set:previous_name = "" ?><?cs
-   each:item = xref.links ?><?cs
-    if item.name != previous_name ?><?cs
-     set previous_name = item.name ?>
-     <dt class="<?cs var:item.icon ?>"><?cs call:anchor(item) ?></dt><?cs
-    /if ?>
-    <dd><?cs var:item.context ?>   <em>(in the <?cs var:item.facet?>)</em></dd><?cs
-   /each ?>
-  </dl>
- <?cs /if ?>
+ <h2 id='backlinks'>Implicit references (<?cs var:$n_links ?>)</h2>
+ <dl><?cs 
+  set:previous_name = "" ?><?cs
+  each:item = xref.links ?><?cs
+   if item.name != previous_name ?><?cs
+    set previous_name = item.name ?>
+    <dt class="<?cs var:item.icon ?>"><?cs call:anchor(item) ?></dt><?cs
+   /if ?>
+   <dd><?cs var:item.context ?>   <em>(in the <?cs var:item.facet?>)</em></dd><?cs
+  /each ?>
+ </dl>
 
- <?cs if:$n_in_relations > #0 ?>
-  <h2 id='incoming-relations'><?cs 
-   call:plural($n_in_relations, 
-    "Incoming relation",
-    "Incoming relations (" + $n_in_relations + ")") ?>
-  </h2>
-  <dl><?cs
-   each:item = xref.in_relations ?>
-    <dt class="<?cs var:item.icon ?>">
-     <a href="<?cs var:item.href ?>">
-       <em><?cs var:item.name ?></em> <?cs call:relation(item.relation) ?> <?cs var:xref.base.name ?>
-     </a>
-    </dt>
-    <dd><?cs var:item.context ?></dd><?cs
-   /each ?>
-  </dl>
- <?cs /if ?>
+ <h2 id='incoming-relations'>Incoming relations (<?cs var:$n_in_relations ?>)</h2>
+ <dl><?cs
+  each:item = xref.in_relations ?>
+   <dt class="<?cs var:item.icon ?>">
+    <a href="<?cs var:item.href ?>">
+      <em><?cs var:item.name ?></em> <?cs call:relation(item.relation) ?> <?cs var:xref.base.name ?>
+    </a>
+   </dt>
+   <dd><?cs var:item.context ?></dd><?cs
+  /each ?>
+ </dl>
 
- <?cs if:$n_out_relations > #0 ?>
-  <h2 id='outgoing-relations'><?cs 
-    call:plural($n_out_relations,
-     "Outgoing relation",
-     "Outgoing relations (" + $n_out_relations + ")") ?>
-  </h2>
-  <dl><?cs
-   each:item = xref.out_relations ?>
-    <dt class="<?cs var:item.icon ?>">
-     <a href="<?cs var:item.href ?>">
-       <?cs var:xref.base.name ?> <?cs call:relation(item.relation) ?> <em><?cs var:item.name ?></em>
-     </a>
-    </dt>
-    <dd><?cs var:item.context ?></dd><?cs
-   /each ?>
-  </dl>
- <?cs /if ?>
+ <h2 id='outgoing-relations'>Outgoing relations (<?cs var:$n_out_relations ?>)</h2>
+ <dl><?cs
+  each:item = xref.out_relations ?>
+   <dt class="<?cs var:item.icon ?>">
+    <a href="<?cs var:item.href ?>">
+      <?cs var:xref.base.name ?> <?cs call:relation(item.relation) ?> <em><?cs var:item.name ?></em>
+    </a>
+   </dt>
+   <dd><?cs var:item.context ?></dd><?cs
+  /each ?>
+ </dl>
 
 </div>
 

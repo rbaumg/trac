@@ -31,7 +31,7 @@ import StringIO
 
 from trac import perm, util
 from trac.env import Environment
-from trac import sync, Xref
+from trac import Xref
 from trac.web import href # bad... do better next time
 import trac.siteconfig
 
