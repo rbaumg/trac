@@ -93,7 +93,7 @@ class BrowserModule(Module):
         else:
             self.render_file(req, repos, node, rev)
 
-        req.hdf['browser.revision'] = repos.rev
+        req.hdf['browser.revision'] = repos.youngest_rev
 
     def render_directory(self, req, repos, node, rev=None, order=None, desc=0):
         self.perm.assert_permission(perm.BROWSER_VIEW)
