@@ -30,11 +30,13 @@ import shlex
 import sqlite
 import StringIO
 
+import trac.Environment # has to be imported before Xref
 from trac import perm
 from trac import util
 from trac import sync
+from trac import Xref
+from trac import Href
 import trac.siteconfig
-import trac.Environment
 
 def my_sum(list):
     """Python2.1 doesn't have sum()"""
@@ -275,6 +277,7 @@ class TracAdmin(cmd.Cmd):
             docs = (self._help_about + self._help_help +
                     self._help_initenv + self._help_hotcopy +
                     self._help_resync + self._help_upgrade +
+                    self._help_xref +
                     self._help_wiki +
 #                    self._help_config + self._help_wiki +
                     self._help_permission + self._help_component +
@@ -545,9 +548,13 @@ class TracAdmin(cmd.Cmd):
             print ' Installing wiki pages'
             cursor = cnx.cursor()
             self._do_wiki_load(trac.siteconfig.__default_wiki_dir__,cursor)
+            print ' Cross-referencing'
+            self.__env.href = Href('trac-admin::initenv')
+            self.__env._wiki_pages = {}
+            Xref.rebuild_cross_references(self.__env, cnx)
 
             print ' Indexing repository'
-            sync.sync(cnx, rep, fs_ptr, pool)
+            sync.sync(self.__env, cnx, rep, fs_ptr, pool)
         except Exception, e:
             print 'Failed to initialize database.', e
             sys.exit(2)
@@ -595,6 +602,8 @@ class TracAdmin(cmd.Cmd):
         pool = core.svn_pool_create(None)
 
         self.db_open() # We need to call this function to open the env, really stupid
+        self.__env.href = Href.Href('trac-admin::resync') # We need this for the WikiFormatter
+        self.__env._wiki_pages = {}
 
         # Remove any trailing slash or else subversion might abort
         repository_dir = self.__env.get_config('trac', 'repository_dir')
@@ -608,7 +617,19 @@ class TracAdmin(cmd.Cmd):
         print 'resyncing...'
         self.db_execsql("DELETE FROM revision")
         self.db_execsql("DELETE FROM node_change")
-        sync.sync(cnx, rep, fs_ptr, pool)
+        sync.sync(self.__env, cnx, rep, fs_ptr, pool)
+        print 'done.'
+        
+    _help_xref = [('xref', 'Regenerate all the cross-reference information between trac objects')]
+    
+    ## XRef
+    def do_xref(self, line):
+        self.db_open() # We need to call this function to open the env, really stupid
+        cnx = self.__env.get_db_cnx()
+        print 'cross-referencing... (except changesets: use \'resync\' for that)'
+        self.__env.href = Href.Href('trac-admin::xref')
+        self.__env._wiki_pages = {}
+        Xref.rebuild_cross_references(self.__env, cnx, False)
         print 'done.'
         
     ## Wiki

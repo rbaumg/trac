@@ -20,11 +20,12 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from svn import fs, util, delta, repos, core
+from trac.Xref import TracObj
 
 import posixpath
 
 
-def sync(db, repos, fs_ptr, pool):
+def sync(env, db, repos, fs_ptr, pool):
     """
     Update the revision and node_change tables to be in sync with
     the repository.
@@ -56,6 +57,7 @@ def sync(db, repos, fs_ptr, pool):
         cursor.execute ('INSERT INTO revision (rev, time, author, message) '
                         'VALUES (%s, %s, %s, %s)', rev + offset, date,
                         author, message)
+        TracObj('changeset', rev + offset).replace_xrefs_from_wiki(env, db, 'content', message)
         insert_change (subpool, fs_ptr, rev + offset, cursor)
         core.svn_pool_clear(subpool)
 
@@ -125,7 +127,7 @@ def insert_change(pool, fs_ptr, rev, cursor):
                 old_path = posixpath.join(old_path, posixpath.split(path)[1])
                 action = 'A'
             else:
-                self._save_change(core.svn_node_file, 'A', path) 
+                self._save_change(core.svn_node_dir, 'A', path) 
                 action = None
 
             if action:

@@ -24,6 +24,7 @@ from trac.Diff import get_diff_options, hdf_diff
 from trac.Module import Module
 from trac.util import escape, TracError, get_reporter_id
 from trac.WikiFormatter import *
+from trac.Xref import TracObj
 
 import os
 import time
@@ -51,8 +52,9 @@ class WikiPage:
     Represents a wiki page (new or existing).
     """
 
-    def __init__(self, name, version, perm_, db):
-        self.db = db
+    def __init__(self, name, version, perm_, env, db):
+        self.env = env
+        self.db  = db
         self.name = name
         self.perm = perm_
         cursor = self.db.cursor ()
@@ -108,6 +110,7 @@ class WikiPage:
                             "%s,%s)", (self.name, self.version + 1,
                             int(time.time()), author, remote_addr, self.text,
                             comment, self.readonly))
+            TracObj('wiki', self.name).replace_xrefs_from_wiki(self.env, self.db, 'content', self.text)
             self.db.commit()
             self.version += 1
             self.old_readonly = self.readonly
@@ -126,6 +129,9 @@ class WikiModule(Module):
         req.hdf['wiki.page_name'] = escape(pagename)
         req.hdf['wiki.current_href'] = escape(self.env.href.wiki(pagename))
 
+        self.ref = TracObj('wiki', pagename)
+        self.ref.add_backlinks(self.db, req)
+
         if action == 'diff':
             version = int(req.args.get('version', 0))
             self._render_diff(req, pagename, version)
@@ -136,7 +142,7 @@ class WikiModule(Module):
         elif action == 'delete':
             version = None
             if req.args.has_key('delete_version'):
-                version = int(req.args['version'])
+                version = int(req.args.get('version'))
             self._delete_page(req, pagename, version)
         elif action == 'save':
             if req.args.has_key('cancel'):
@@ -164,10 +170,17 @@ class WikiModule(Module):
             cursor = self.db.cursor()
             cursor.execute("DELETE FROM wiki WHERE name=%s and version=%s",
                            (pagename, version))
+            self.ref.delete_xrefs(self.db, 'comment:%s' % version)
             self.log.info('Deleted version %d of page %s' % (version, pagename))
             cursor.execute("SELECT COUNT(*) FROM wiki WHERE name=%s", (pagename,))
-            if not cursor.fetchone():
+            last_version = cursor.fetchone()[0]
+            if last_version == 0:
                 page_deleted = 1
+            elif version > last_version: # resurrect the previous 'content' 
+                cursor.execute("SELECT text FROM wiki WHERE name=%s ORDER BY version DESC",
+                               (pagename))
+                text = cursor.fetchone()[0]
+                self.ref.replace_xrefs_from_wiki(self.env, self.db, 'content', text)
         else: # Delete a wiki page completely
             cursor.execute("DELETE FROM wiki WHERE name=%s", (pagename,))
             page_deleted = 1
@@ -175,6 +188,7 @@ class WikiModule(Module):
         self.db.commit()
 
         if page_deleted:
+            self.ref.delete_xrefs(self.db)
             # Delete orphaned attachments
             for attachment in self.env.get_attachments(self.db, 'wiki', pagename):
                 self.env.delete_attachment(self.db, 'wiki', pagename,
@@ -233,7 +247,7 @@ class WikiModule(Module):
     def _render_editor(self, req, pagename, preview=0):
         self.perm.assert_permission(perm.WIKI_MODIFY)
 
-        page = WikiPage(pagename, None, self.perm, self.db)
+        page = WikiPage(pagename, None, self.perm, self.env, self.db)
         if req.args.has_key('text'):
             page.set_content(req.args.get('text'))
         if preview:
@@ -311,7 +325,7 @@ class WikiModule(Module):
             self.add_link('alternate', '?format=txt', 'Plain Text',
                           'text/plain')
 
-        page = WikiPage(pagename, version, self.perm, self.db)
+        page = WikiPage(pagename, version, self.perm, self.env, self.db)
 
         info = {
             'version': page.version,
@@ -331,7 +345,7 @@ class WikiModule(Module):
     def _save_page(self, req, pagename):
         self.perm.assert_permission(perm.WIKI_MODIFY)
 
-        page = WikiPage(pagename, None, self.perm, self.db)
+        page = WikiPage(pagename, None, self.perm, self.env, self.db)
         if req.args.has_key('text'):
             page.set_content(req.args.get('text'))
 

@@ -24,6 +24,7 @@ from __future__ import nested_scopes
 from trac.Diff import get_diff_options, hdf_diff, unified_diff
 from trac.Module import Module
 from trac.WikiFormatter import wiki_to_html
+from trac.Xref import TracObj
 from trac import authzperm, perm
 
 import svn.core
@@ -435,6 +436,8 @@ class Changeset(Module):
         else:
             self.rev = youngest_rev
 
+        TracObj('changeset', self.rev).add_backlinks(self.db, req)
+
         self.diff_options = get_diff_options(req)
         if req.args.has_key('update'):
             req.redirect(self.env.href.changeset(self.rev))
@@ -462,7 +465,7 @@ class Changeset(Module):
         req.hdf['changeset.revision'] = self.rev
         req.hdf['changeset.changes'] = change_info
         req.hdf['changeset.href'] = self.env.href.changeset(self.rev)
-        
+
         if len(change_info) == 0:
             raise authzperm.AuthzPermissionError()
         

@@ -176,3 +176,15 @@
   </div><?cs
  /each ?><?cs
 /def ?>
+
+<?cs def:backlinks(type,id) ?><?cs 
+ if:$xref_count == #0 ?><?cs
+ elif:$xref_count == #1 ?>
+ <li><a href="<?cs var:trac.href.xref ?>/<?cs var:type ?>/<?cs var:id ?>"
+        title="One backlink">Backlink</a></li><?cs
+ else ?>
+ <li><a href="<?cs var:trac.href.xref ?>/<?cs var:type ?>/<?cs var:id ?>"
+        title="<?cs var:xref_count ?> backlinks">Backlinks</a></li><?cs
+ /if ?><?cs
+/def ?>
+

@@ -22,6 +22,7 @@
 from trac import perm, util
 from trac.Module import Module
 from trac.WikiFormatter import wiki_to_oneliner
+from trac.Xref import TracObj
 
 import svn.core
 import svn.fs
@@ -121,6 +122,9 @@ class Log (Module):
 
         self.path = req.args.get('path', '/')
         self.authzperm.assert_permission(self.path)
+
+        TracObj('source', self.path).add_backlinks(self.db, req)
+        
         if req.args.has_key('rev'):
             try:
                 rev = int(req.args.get('rev'))

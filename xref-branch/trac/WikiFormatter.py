@@ -28,6 +28,7 @@ import StringIO
 import util
 import Mimeview
 
+
 __all__ = ['Formatter', 'OneLinerFormatter', 'wiki_to_html', 'wiki_to_oneliner']
 
 
@@ -130,6 +131,7 @@ class CommonFormatter:
 
     _open_tags = []
     env = None
+    xref = None
     absurls = 0
 
     def __init__(self, env, db, absurls=0):
@@ -144,6 +146,8 @@ class CommonFormatter:
                 # Check for preceding escape character '!'
                 if match[0] == '!':
                     return match[1:]
+                if self.xref: # remember the context
+                    self.context = self.xref.extract_context(self.text, fullmatch.start(), fullmatch.end())
                 return getattr(self, '_' + itype + '_formatter')(match, fullmatch)
 
     def tag_open_p(self, tag):
@@ -241,11 +245,22 @@ class CommonFormatter:
         else:
             return '<a href="%s">%s</a>' % (url, text)
 
+    def make_xref(self,type,id):
+        """
+        Create a new cross-reference for the given destination type and id.
+        All the source information (TracObj, facet and context) is
+        already known at this point.
+        """
+        if self.xref:
+            from trac.Xref import TracObj
+            self.xref.insert_xref(self.db, '', TracObj(type, id), self.facet, self.context)
+
     def _make_wiki_link(self, page, text):
         anchor = ''
         if page.find('#') != -1:
             anchor = page[page.find('#'):]
             page = page[:page.find('#')]
+        self.make_xref('wiki', page)
         if not self.env._wiki_pages.has_key(page):
             return '<a class="missing wiki" href="%s" rel="nofollow">%s?</a>' \
                    % (self._href.wiki(page) + anchor, text)
@@ -254,6 +269,7 @@ class CommonFormatter:
                    % (self._href.wiki(page) + anchor, text)
 
     def _make_changeset_link(self, rev, text):
+        self.make_xref('changeset', rev)
         cursor = self.db.cursor()
         cursor.execute('SELECT message FROM revision WHERE rev=%s', (rev,))
         row = cursor.fetchone()
@@ -266,6 +282,7 @@ class CommonFormatter:
                    % (self._href.changeset(rev), text)
 
     def _make_ticket_link(self, id, text):
+        self.make_xref('ticket', id)
         cursor = self.db.cursor()
         cursor.execute("SELECT summary,status FROM ticket WHERE id=%s", (id,))
         row = cursor.fetchone()
@@ -281,12 +298,15 @@ class CommonFormatter:
             return '<a class="missing ticket" href="%s" rel="nofollow">%s</a>' \
                    % (self._href.ticket(id), text)
     _make_bug_link = _make_ticket_link # alias
+    _make_issue_link = _make_ticket_link # alias
 
     def _make_milestone_link(self, name, text):
+        self.make_xref('milestone', name)
         return '<a class="milestone" href="%s">%s</a>' \
                % (self._href.milestone(name), text)
 
     def _make_report_link(self, id, text):
+        self.make_xref('report', id)
         return '<a class="report" href="%s">%s</a>' \
                % (self._href.report(id), text)
 
@@ -300,6 +320,7 @@ class CommonFormatter:
         if match:
             path = match.group(1)
             rev = match.group(2)
+        self.make_xref('source', path)
         if rev:
             return '<a class="source" href="%s">%s</a>' \
                    % (self._href.browser(path, rev), text)
@@ -308,6 +329,50 @@ class CommonFormatter:
                    % (self._href.browser(path), text)
     _make_browser_link = _make_source_link # alias
     _make_repos_link = _make_source_link # alias
+
+
+class XRefFormatter(CommonFormatter):
+    """
+    A special version of the wiki formatter that only cares about Trac objects.
+    This version is used for generating cross-references (see Xref.py).
+    """
+
+    _rules = CommonFormatter._rules 
+
+    _compiled_rules = re.compile('(?:' + string.join(_rules, '|') + ')')
+
+    def format(self, text, xref, facet):
+        if not text:
+            return
+        self.xref = xref      # remember the source's TracObj
+        self.facet = facet    # remember the source's facet
+        self._open_tags = []
+
+        self.in_code_block = 0
+
+        rules = self._compiled_rules
+
+        for line in text.splitlines():
+            # Handle code block
+            if self.in_code_block or line.strip() == '{{{':
+                self.handle_code_block(line)
+                continue
+            # Handle Horizontal ruler
+            elif line[0:4] == '----':
+                continue
+            # Handle new paragraph
+            elif line == '':
+                continue
+
+            self.text = util.escape(line)
+            # Throw a bunch of regexps on the problem
+            result = re.sub(rules, self.replace, self.text)
+
+    def handle_code_block(self, line):
+        if line.strip() == '{{{':
+            self.in_code_block += 1
+        elif line.strip() == '}}}':
+            self.in_code_block -= 1
 
 
 class OneLinerFormatter(CommonFormatter):
@@ -330,7 +395,8 @@ class OneLinerFormatter(CommonFormatter):
 
         rules = self._compiled_rules
 
-        result = re.sub(rules, self.replace, util.escape(text.strip()))
+        text = util.escape(text.strip())
+        result = re.sub(rules, self.replace, text)
         # Close all open 'one line'-tags
         result += self.close_tag(None)
         out.write(result)

@@ -3,7 +3,8 @@
 <?cs include "macros.cs"?>
 
 <div id="ctxtnav" class="nav">
- <ul>
+ <ul><?cs 
+  call:backlinks("source", browser.path) ?>
   <li class="last"><a href="<?cs var:browser.log_href ?>">Revision Log</a></li>
  </ul>
 </div>

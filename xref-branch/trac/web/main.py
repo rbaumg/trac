@@ -153,13 +153,13 @@ def _parse_path_info(args, path_info):
     if match:
         set_if_missing(args, 'mode', match.group(1))
         return args
-    match = re.search('^/(ticket|report)(?:/([0-9]+)/*)?', path_info)
+    match = re.search('^/(ticket|bug|issue|report)(?:/([0-9]+)/*)?', path_info)
     if match:
         set_if_missing(args, 'mode', match.group(1))
         if match.group(2):
             set_if_missing(args, 'id', match.group(2))
         return args
-    match = re.search('^/(browser|log|file)(?:(/.*))?', path_info)
+    match = re.search('^/(browser|source|repos|log|file)(?:(/.*))?', path_info)
     if match:
         set_if_missing(args, 'mode', match.group(1))
         if match.group(2):
@@ -182,6 +182,14 @@ def _parse_path_info(args, path_info):
         set_if_missing(args, 'mode', 'milestone')
         if match.group(1):
             set_if_missing(args, 'id', urllib.unquote(match.group(1)))
+        return args
+    match = re.search('^/(xref|orphans)(?:/([^/]+))?(?:/(.*)/?)?', path_info)
+    if match:
+        set_if_missing(args, 'mode', match.group(1))
+        set_if_missing(args, 'type', match.group(2))
+        id = match.group(3)
+        if id:
+            set_if_missing(args, 'id', urllib.unquote(id))
         return args
     return args
 
@@ -208,6 +216,8 @@ def populate_hdf(hdf, env, req=None):
         'login': env.href.login(),
         'logout': env.href.logout(),
         'settings': env.href.settings(),
+        'xref': env.href.xref(),
+        'orphans': env.href.orphans(),
         'homepage': 'http://trac.edgewall.com/'
     }
 

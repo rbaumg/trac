@@ -3,9 +3,12 @@
 <?cs include "macros.cs"?>
 
 <div id="ctxtnav" class="nav">
- <?cs if:args.mode != 'attachment' && trac.acl.LOG_VIEW ?><ul>
-  <li class="last"><a href="<?cs var:file.logurl ?>">Revision Log</a></li>
- </ul><?cs /if ?>
+ <ul><?cs 
+  call:backlinks("source", file.path) ?><?cs
+  if:args.mode != 'attachment' && trac.acl.LOG_VIEW ?>
+  <li class="last"><a href="<?cs var:file.logurl ?>">Revision Log</a></li><?cs 
+ /if ?>
+ </ul>
 </div>
 
 <div id="content" class="file">

@@ -4,15 +4,16 @@
 
 <div id="ctxtnav" class="nav">
  <h2>Wiki Navigation</h2>
- <ul>
+ <ul><?cs
+  call:backlinks("wiki", wiki.page_name) ?>
   <li><a href="<?cs var:$trac.href.wiki ?>">Start Page</a></li>
   <li><a href="<?cs var:$trac.href.wiki ?>/TitleIndex">Title Index</a></li>
-  <li><a href="<?cs var:$trac.href.wiki ?>/RecentChanges">Recent Changes</a></li>
-  <?cs if:wiki.history_href ?>
-   <li class="last"><a href="<?cs var:wiki.history_href ?>">Page History</a></li>
-  <?cs else ?>
-   <li class="last">Page History</li>
-  <?cs /if ?>
+  <li><a href="<?cs var:$trac.href.wiki ?>/RecentChanges">Recent Changes</a></li><?cs
+  if:wiki.history_href ?>
+   <li class="last"><a href="<?cs var:wiki.history_href ?>">Page History</a></li><?cs
+  else ?>
+   <li class="last">Page History</li><?cs 
+  /if ?>
  </ul>
  <hr />
 </div>

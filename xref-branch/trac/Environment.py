@@ -23,6 +23,8 @@
 #
 
 from trac import db, db_default, Logging, Mimeview, util
+from trac.Xref import TracObj
+
 
 import ConfigParser
 import os
@@ -253,6 +255,7 @@ class Environment:
         cursor.execute('INSERT INTO attachment VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
                        (type, id, filename, length, int(time.time()),
                        description, author, ipnr))
+        TracObj(type, id).replace_xrefs_from_wiki(self, cnx, 'attachment:%s' % filename, description)
         shutil.copyfileobj(attachment.file, fd)
         self.log.info('New attachment: %s/%s/%s by %s', type, id, filename, author)
         cnx.commit()
@@ -265,6 +268,7 @@ class Environment:
         cursor = cnx.cursor()
         cursor.execute('DELETE FROM attachment WHERE type=%s AND id=%s AND '
                        'filename=%s', (type, id, filename))
+        TracObj(type, id).delete_xrefs(cnx, 'attachment:%s' % filename)
         os.unlink(path)
         self.log.info('Attachment removed: %s/%s/%s', type, id, filename)
         cnx.commit()
@@ -324,6 +328,8 @@ class Environment:
                     err = 'No upgrade module for version %i (%s.py)' % (i, upg)
                     raise EnvironmentError, err
                 d.do_upgrade(self, i, cursor)
+                if hasattr(d, 'do_db_upgrade'): # for more complex upgrades, as in 'db9.py'
+                    d.do_db_upgrade(self, i, cnx)
             cursor.execute("UPDATE system SET value=%s WHERE "
                            "name='database_version'", (db_default.db_version))
             self.log.info('Upgraded db version from %d to %d',

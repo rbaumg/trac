@@ -23,6 +23,7 @@ from trac import perm, util
 from trac.Module import Module
 from trac.WikiFormatter import wiki_to_html
 from trac.Notify import TicketNotifyEmail
+from trac.Xref import TracObj
 
 import time
 import string
@@ -37,10 +38,15 @@ class Ticket(UserDict):
                   'reporter', 'owner', 'cc', 'url', 'version', 'status',
                   'resolution', 'keywords', 'summary', 'description',
                   'changetime']
+    field_xrefs = { 'description' : ('implicit',),
+                    'summary'     : ('implicit',),
+                    'milestone'   : ('1 to 1', 'milestone'),
+                    'component'   : ('1 to 1', 'wiki') }
 
     def __init__(self, *args):
         UserDict.__init__(self)
         self._old = {}
+        self.ref = TracObj('ticket', -1)
         if len(args) == 2:
             self._fetch_ticket(*args)
 
@@ -65,7 +71,7 @@ class Ticket(UserDict):
             raise util.TracError('Ticket %d does not exist.' % id,
                                  'Invalid Ticket Number')
 
-        self['id'] = id
+        self['id'] = self.ref.id = id
         for i in range(len(Ticket.std_fields)):
             self[Ticket.std_fields[i]] = row[i] or ''
 
@@ -91,9 +97,10 @@ class Ticket(UserDict):
             if not dict.has_key(name):
                 self[name] = '0'
 
-    def insert(self, db):
+    def insert(self, env, db):
         """Add ticket to database"""
         assert not self.has_key('id')
+        assert self.ref.id == -1
 
         # Add a timestamp
         now = int(time.time())
@@ -107,18 +114,22 @@ class Ticket(UserDict):
                        % (','.join(std_fields),
                           ','.join(['%s'] * len(std_fields))),
                        map(lambda n, self=self: self[n], std_fields))
-        id = db.get_last_id()
+        self['id'] = self.ref.id = db.get_last_id()
 
+        for name in Ticket.field_xrefs.keys():
+            self.xref_field(env, db, name, self[name],
+                            time.strftime('%c', time.localtime(now)))
+        
         custom_fields = filter(lambda n: n[:7] == 'custom_', self.keys())
         for name in custom_fields:
             cursor.execute("INSERT INTO ticket_custom(ticket,name,value) "
-                           "VALUES(%s,%s,%s)", (id, name[7:], self[name]))
+                           "VALUES(%s,%s,%s)", (self.ref.id, name[7:], self[name]))
+            # TODO: support xrefs in custom fields too...
         db.commit()
-        self['id'] = id
         self._forget_changes()
-        return id
+        return self.ref.id
 
-    def save_changes(self, db, author, comment, when = 0):
+    def save_changes(self, env, db, author, comment, when = 0):
         """Store ticket changes in the database.
         The ticket must already exist in the database."""
         assert self.has_key('id')
@@ -162,16 +173,23 @@ class Ticket(UserDict):
                 fname = name
                 cursor.execute("UPDATE ticket SET %s=%s WHERE id=%s",
                                (fname, self[name], id))
+            self.xref_field(env, db, fname, self[name],
+                            time.strftime('%c', time.localtime(when)))
             cursor.execute("INSERT INTO ticket_change "
                            "(ticket,time,author,field,oldvalue,newvalue) "
                            "VALUES (%s, %s, %s, %s, %s, %s)",
                            (id, when, author, fname, self._old[name],
                             self[name]))
         if comment:
+            cursor.execute("SELECT count(*) FROM ticket_change "
+                               "WHERE ticket = %s", # AND oldvalue LIKE '%%%s.' parent (threads)
+                               (id))
+            n = cursor.fetchone()[0] + 1
             cursor.execute("INSERT INTO ticket_change "
                            "(ticket,time,author,field,oldvalue,newvalue) "
-                           "VALUES (%s,%s,%s,'comment','',%s)",
-                           (id, when, author, comment))
+                           "VALUES (%s,%s,%s,'comment',%s,%s)",
+                           (id, when, author, n, comment))
+            self.ref.replace_xrefs_from_wiki(env, db, 'comment:%d' % n, comment)
 
         cursor.execute("UPDATE ticket SET changetime=%s WHERE id=%s",
                        (when, id))
@@ -208,6 +226,20 @@ class Ticket(UserDict):
                 break
             log.append((int(row[0]), row[1], row[2], row[3] or '', row[4] or ''))
         return log
+
+    def xref_field(self, env, db, name, value, context=''):
+        """
+        Create cross-references and relationships for this ticket.
+        """
+        assert self.ref.id != -1
+        xref_kind = Ticket.field_xrefs[name]
+        if xref_kind:
+            if xref_kind[0] == 'implicit':
+                self.ref.replace_xrefs_from_wiki(env, db, name, self[name])
+            elif xref_kind[0] == '1 to 1':
+                self.ref.replace_relation(db, 'has-%s' % name, TracObj(xref_kind[1], value), 
+                                          'field', context)
+
 
 
 def get_custom_fields(env):
@@ -297,7 +329,7 @@ class NewticketModule(Module):
             owner = cursor.fetchone()[0]
             ticket['owner'] = owner
 
-        tktid = ticket.insert(self.db)
+        tktid = ticket.insert(self.env, self.db)
 
         # Notify
         try:
@@ -400,7 +432,8 @@ class TicketModule (Module):
         ticket.populate(req.args)
 
         now = int(time.time())
-        ticket.save_changes(self.db, req.args.get('author', req.authname),
+        ticket.save_changes(self.env, self.db,
+                            req.args.get('author', req.authname),
                             req.args.get('comment'), when=now)
 
         try:
@@ -511,6 +544,8 @@ class TicketModule (Module):
 
         ticket = Ticket(self.db, id)
         reporter_id = util.get_reporter_id(req)
+
+        TracObj('ticket', id).add_backlinks(self.db, req)
 
         if preview:
             # Use user supplied values

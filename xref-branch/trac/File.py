@@ -25,6 +25,7 @@
 from trac import perm, util
 from trac.Module import Module
 from trac.WikiFormatter import wiki_to_html
+from trac.Xref import TracObj
 
 import svn.core
 import svn.fs
@@ -261,6 +262,9 @@ class File(FileCommon):
 
         self.rev = req.args.get('rev', None)
         self.path = req.args.get('path', '/')
+
+        TracObj('source', self.path).add_backlinks(self.db, req)
+        
         if not self.rev:
             rev_specified = 0
             self.rev = svn.fs.youngest_rev(self.fs_ptr, self.pool)

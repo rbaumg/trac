@@ -94,6 +94,16 @@ class HrefTestCase(unittest.TestCase):
         self.assertEqual('/attachment/ticket/42/foo.txt?format=raw',
                          self.href.attachment('ticket', '42', 'foo.txt', 'raw'))
 
+    def test_xref(self):
+        """Testing Href.xref"""
+        self.assertEqual('/xref', self.href.xref())
+        self.assertEqual('/xref/wiki', self.href.xref('wiki'))
+        self.assertEqual('/xref/wiki/WikiStart', self.href.xref('wiki', 'WikiStart'))
+
+    def test_orphans(self):
+        """Testing Href.orphans"""
+        self.assertEqual('/orphans', self.href.orphans())
+
 def suite():
     return unittest.makeSuite(HrefTestCase,'test')
 

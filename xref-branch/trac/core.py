@@ -40,6 +40,10 @@ modules = {
     'search'      : ('Search', 'Search', 0),
     'report'      : ('Report', 'Report', 0),
     'ticket'      : ('Ticket', 'TicketModule', 0),
+    'bug'         : ('Ticket', 'TicketModule', 0),
+    'issue'       : ('Ticket', 'TicketModule', 0),
+    'source'      : ('Browser', 'Browser', 1),
+    'repos'       : ('Browser', 'Browser', 1),
     'browser'     : ('Browser', 'Browser', 1),
     'timeline'    : ('Timeline', 'Timeline', 1),
     'changeset'   : ('Changeset', 'Changeset', 1),
@@ -48,6 +52,8 @@ modules = {
     'attachment'  : ('File', 'Attachment', 0),
     'roadmap'     : ('Roadmap', 'Roadmap', 0),
     'settings'    : ('Settings', 'Settings', 0),
+    'xref'        : ('Xref', 'XrefModule', 0),
+    'orphans'     : ('Xref', 'XrefModule', 0),
     'milestone'   : ('Milestone', 'Milestone', 0)
     }
 
@@ -74,7 +80,7 @@ def module_factory(env, db, req):
         pool, rep, fs_ptr = open_svn_repos(repos_dir)
         module.repos = rep
         module.fs_ptr = fs_ptr
-        sync.sync(db, rep, fs_ptr, pool)
+        sync.sync(env, db, rep, fs_ptr, pool)
         module.pool = pool
 
     return module

@@ -24,6 +24,7 @@ from trac.Module import Module
 from trac.Ticket import get_custom_fields, Ticket
 from trac.WikiFormatter import wiki_to_html
 from trac.util import *
+from trac.Xref import TracObj
 
 import time
 
@@ -159,6 +160,7 @@ class Milestone(Module):
         cursor.execute("INSERT INTO milestone (name,due,completed,description) "
                        "VALUES (%s,%s,%s,%s)",
                        (name, due, completed, description))
+        TracObj('milestone', name).replace_xrefs_from_wiki(self.env, self.db, 'description', description)
         self.db.commit()
         req.redirect(self.env.href.milestone(name))
 
@@ -182,6 +184,7 @@ class Milestone(Module):
                                    "WHERE milestone=%s", (id,))
             self.log.info('Deleting milestone %s' % id)
             cursor.execute("DELETE FROM milestone WHERE name=%s", (id,))
+            TracObj('milestone', id).delete_xrefs(self.db, 'description')
             self.db.commit()
             req.redirect(self.env.href.roadmap())
         else:
@@ -265,6 +268,8 @@ class Milestone(Module):
 
         action = req.args.get('action', 'view')
         id = req.args.get('id')
+
+        TracObj('milestone', id).add_backlinks(self.db, req)
 
         if action == 'new':
             self.perm.assert_permission(perm.MILESTONE_CREATE)

@@ -5,6 +5,7 @@
 <div id="ctxtnav" class="nav">
  <h2>Ticket Navigation</h2>
  <ul><?cs
+  call:backlinks("ticket", ticket.id) ?><?cs
   if:len(links.prev) ?>
    <li class="first<?cs if:!len(links.up) && !len(links.next) ?> last<?cs /if ?>">
     &larr; <a href="<?cs var:links.prev.0.href ?>" title="<?cs

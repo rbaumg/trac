@@ -56,6 +56,9 @@ class Href:
         else:
             return href_join(self.base, 'browser', path)
 
+    def source(self, path, rev=None):
+        return self.browser(path, rev)
+
     def login(self):
         return href_join(self.base, 'login')
 
@@ -176,3 +179,18 @@ class Href:
         if format:
             href += '?format=%s' % format
         return href
+
+    def xref(self, module=None, id=None):
+        if module and id:
+            href = href_join(self.base, 'xref', str(module), str(id))
+        else:
+            href = href_join(self.base, 'xref')
+        return href
+
+    def orphans(self, module=None):
+        if module:
+            href = href_join(self.base, 'orphans', str(module))
+        else:
+            href = href_join(self.base, 'orphans')
+        return href
+

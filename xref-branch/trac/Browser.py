@@ -22,6 +22,7 @@
 from trac import perm, util
 from trac.Module import Module
 from trac.WikiFormatter import wiki_to_oneliner
+from trac.Xref import TracObj
 
 import svn.core
 import svn.fs
@@ -165,7 +166,9 @@ class Browser(Module):
         desc = req.args.has_key('desc')
         
         self.authzperm.assert_permission (path)
-        
+
+        TracObj('source', path).add_backlinks(self.db, req)
+
         if not rev:
             rev_specified = 0
             rev = svn.fs.youngest_rev(self.fs_ptr, self.pool)
