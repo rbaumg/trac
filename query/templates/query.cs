@@ -88,6 +88,30 @@
  <fieldset id="options">
   <legend>Options</legend>
   <p>
+   <label for="group">Group results by</label>
+   <select name="group" id="group">
+    <option></option><?cs
+    each:property = ticket.properties ?><?cs
+     if:property.type == 'select' || property.type == 'radio' ?>
+      <option value="<?cs var:property.name ?>"<?cs
+        if:property.name == query.group ?> selected="selected"<?cs /if ?>><?cs
+        var:property.label ?></option><?cs
+     /if ?><?cs
+    /each ?>
+   </select>
+   <input type="checkbox" name="groupdesc" id="groupdesc"<?cs
+     if:query.groupdesc ?> checked="checked"<?cs /if ?> />
+   <label for="groupdesc">descending</label>
+   <script type="text/javascript">
+     var group = document.getElementById("group");
+     var updateGroupDesc = function() {
+       enableControl('groupdesc', group.selectedIndex > 0);
+     }
+     addEvent(window, 'load', updateGroupDesc);
+     addEvent(group, 'change', updateGroupDesc);
+   </script>
+  </p>
+  <p>
    <input type="checkbox" name="verbose" id="verbose"<?cs
      if:query.verbose ?> checked="checked"<?cs /if ?> />
    <label for="verbose">Show full description under each result</label>
@@ -110,50 +134,66 @@
 <p id="nummatches"><?cs alt:len(query.results) ?>No<?cs /alt ?> ticket<?cs if:len(query.results) != 1 ?>s<?cs
 /if ?> matched this query.</p>
 
-<?cs if:len(query.results) ?>
- <table id="tktlist" class="listing">
-  <thead><tr><?cs each:header = query.headers ?><?cs
-   if:name(header) == 0 ?><th class="ticket<?cs
-    if:header.order ?> <?cs var:header.order ?><?cs /if ?>">
-    <a href="<?cs var:header.href ?>" title="Sort by ID (<?cs
-      if:header.order == 'asc' ?>descending<?cs
-      else ?>ascending<?cs /if ?>)">Ticket</a>
-    </th><?cs
+<?cs def:thead() ?>
+ <thead><tr><?cs each:header = query.headers ?><?cs
+  if:name(header) == 0 ?><th class="ticket<?cs
+   if:header.order ?> <?cs var:header.order ?><?cs /if ?>">
+   <a href="<?cs var:header.href ?>" title="Sort by ID (<?cs
+     if:header.order == 'asc' ?>descending<?cs
+     else ?>ascending<?cs /if ?>)">Ticket</a>
+   </th><?cs
+  else ?>
+   <th<?cs if:header.order ?> class="<?cs var:header.order ?>"<?cs /if ?>>
+    <a href="<?cs var:header.href ?>" title="Sort by <?cs
+      var:header.name ?> (<?cs if:header.order == 'asc' ?>descending<?cs
+      else ?>ascending<?cs /if ?>)"><?cs var:header.name ?></a>
+   </th><?cs
+  /if ?>
+ <?cs /each ?></tr></thead>
+<?cs /def ?>
+
+<?cs if:len(query.results) ?><?cs
+ if:!query.group ?>
+  <table class="listing tickets">
+  <?cs call:thead() ?><tbody><?cs
+ /if ?><?cs
+ each:result = query.results ?><?cs
+  if:result[query.group] != prev_group ?>
+   <?cs if:prev_group ?></tbody></table><?cs /if ?>
+   <h2><?cs
+    each:property = ticket.properties ?><?cs
+     if:property.name == query.group ?><?cs
+      var:property.label ?><?cs
+     /if ?><?cs
+    /each ?>: <?cs var:result[query.group] ?></h2>
+   <table class="listing tickets">
+   <?cs call:thead() ?><tbody><?cs
+  /if ?>
+  <tr class="<?cs
+   if:name(result) % 2 ?>odd<?cs else ?>even<?cs /if ?> <?cs
+   var:result.priority ?>">
+  <?cs each:header = query.headers ?><?cs
+   if:name(header) == 0 ?>
+    <td class="ticket"><a href="<?cs var:result.href ?>" title="View ticket"><?cs
+      var:result.id ?></a></td><?cs
    else ?>
-    <th<?cs if:header.order ?> class="<?cs var:header.order ?>"<?cs /if ?>>
-     <a href="<?cs var:header.href ?>" title="Sort by <?cs
-       var:header.name ?> (<?cs if:header.order == 'asc' ?>descending<?cs
-       else ?>ascending<?cs /if ?>)"><?cs var:header.name ?></a>
-    </th><?cs
+    <td><?cs if:header.name == 'summary' ?>
+     <a href="<?cs var:result.href ?>" title="View ticket"><?cs
+       var:result[header.name] ?></a><?cs
+    else ?>
+     <?cs var:result[header.name] ?><?cs
+    /if ?>
+    </td><?cs
    /if ?>
-  <?cs /each ?></tr></thead>
-  <tbody>
-   <?cs each:result = query.results ?><tr class="<?cs
-     if:name(result) % 2 ?>odd<?cs else ?>even<?cs /if ?> <?cs
-     var:result.priority ?>">
-    <?cs each:header = query.headers ?><?cs
-     if:name(header) == 0 ?>
-      <td class="ticket"><a href="<?cs var:result.href ?>" title="View ticket"><?cs
-        var:result.id ?></a></td><?cs
-     else ?>
-      <td><?cs if:header.name == 'summary' ?>
-       <a href="<?cs var:result.href ?>" title="View ticket"><?cs
-         var:result[header.name] ?></a><?cs
-      else ?>
-       <?cs var:result[header.name] ?><?cs
-      /if ?>
-      </td><?cs
-     /if ?>
-    <?cs /each ?>
-    <?cs if:result.description ?>
-     </tr><tr><td class="fullrow" colspan="<?cs var:len(query.headers) ?>">
-      <?cs var:result.description ?>
-     </td>
-    <?cs /if ?>
-   </tr><?cs /each ?>
-  </tbody>
- </table>
-<?cs /if ?>
+  <?cs /each ?>
+  <?cs if:result.description ?>
+   </tr><tr><td class="fullrow" colspan="<?cs var:len(query.headers) ?>">
+    <?cs var:result.description ?>
+   </td>
+  <?cs /if ?><?cs set:prev_group = result[query.group] ?>
+ </tr><?cs /each ?>
+</tbody></table><?cs
+/if ?>
 
 <div id="help">
  <strong>Note:</strong> See <a href="<?cs var:$trac.href.wiki ?>/TracQuery">TracQuery</a> 

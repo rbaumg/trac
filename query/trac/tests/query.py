@@ -75,6 +75,33 @@ FROM ticket
 WHERE IFNULL(milestone,'')='milestone1'
 ORDER BY IFNULL(id,'')='',id""")
 
+    def test_all_grouped_by_milestone(self):
+        query = Query(self.env, order='id', group='milestone')
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,status,owner,priority,component,version,milestone
+FROM ticket
+  LEFT OUTER JOIN (SELECT name AS milestone_name, time AS milestone_time FROM milestone) ON milestone_name=milestone
+ORDER BY IFNULL(milestone,'')='',IFNULL(milestone_time,0)=0,milestone_time,milestone,IFNULL(id,'')='',id""")
+
+    def test_all_grouped_by_milestone_desc(self):
+        query = Query(self.env, order='id', group='milestone', groupdesc=1)
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,status,owner,priority,component,version,milestone
+FROM ticket
+  LEFT OUTER JOIN (SELECT name AS milestone_name, time AS milestone_time FROM milestone) ON milestone_name=milestone
+ORDER BY IFNULL(milestone,'')='' DESC,IFNULL(milestone_time,0)=0 DESC,milestone_time DESC,milestone DESC,IFNULL(id,'')='',id""")
+
+    def test_grouped_by_priority(self):
+        query = Query(self.env, group='priority')
+        sql = query.to_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,status,owner,milestone,component,version,priority
+FROM ticket
+  LEFT OUTER JOIN (SELECT name AS priority_name, value AS priority_value FROM enum WHERE type='priority') ON priority_name=priority
+ORDER BY IFNULL(priority,'')='',priority_value,id""")
+
     def test_constrained_by_milestone_not(self):
         query = Query(self.env, order='id')
         query.constraints['milestone'] = ['!milestone1']

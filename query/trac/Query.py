@@ -31,11 +31,14 @@ from util import add_to_hdf, escape, sql_escape
 
 class Query:
 
-    def __init__(self, env, constraints=None, order=None, desc=0, verbose=0):
+    def __init__(self, env, constraints=None, order=None, desc=0, group=None,
+                 groupdesc = 0, verbose=0):
         self.env = env
         self.constraints = constraints or {}
         self.order = order
         self.desc = desc
+        self.group = group
+        self.groupdesc = groupdesc
         self.verbose = verbose
         self.cols = [] # lazily initialized
 
@@ -62,6 +65,8 @@ class Query:
             if col == 'status' and not 'closed' in constraint \
                     and 'resolution' in cols:
                 cols.remove('resolution')
+        if self.group in cols:
+            cols.remove(self.group)
 
         def sort_columns(col1, col2):
             constrained_fields = self.constraints.keys()
@@ -80,8 +85,9 @@ class Query:
         # Only display the first seven columns by default
         # FIXME: Make this configurable on a per-user and/or per-query basis
         self.cols = cols[:7]
-        if not self.order in self.cols:
-            # Make sure the column we order by is visible
+        if not self.order in self.cols and not self.order == self.group:
+            # Make sure the column we order by is visible, if it isn't also
+            # the column we group by
             self.cols[-1] = self.order
 
         return self.cols
@@ -90,8 +96,11 @@ class Query:
         if not self.cols:
             self.get_columns()
 
+        sql = self.to_sql()
+        self.env.log.debug("Query SQL: %s" % sql)
+
         cursor = db.cursor()
-        cursor.execute(self.to_sql())
+        cursor.execute(sql)
         results = []
         while 1:
             row = cursor.fetchone()
@@ -101,6 +110,8 @@ class Query:
             result = { 'id': id, 'href': self.env.href.ticket(id) }
             for col in self.cols:
                 result[col] = escape(row[col] or '--')
+            if self.group:
+                result[self.group] = row[self.group]
             if self.verbose:
                 result['description'] = wiki_to_html(row['description'] or '',
                                                      None, self.env, db)
@@ -115,6 +126,8 @@ class Query:
         cols = self.cols[:]
         if not self.order in cols:
             cols.append(self.order)
+        if self.group and not self.group in cols:
+            cols.append(self.group)
         if not 'priority' in cols:
             # Always add the priority column for coloring the resolt rows
             cols.append('priority')
@@ -133,12 +146,13 @@ class Query:
                       % (k, k, k, k))
 
         for col in [c for c in ['status', 'resolution', 'priority', 'severity']
-                    if c == self.order]:
+                    if c == self.order or c == self.group]:
             sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
                                          "value AS %s_value " \
                                          "FROM enum WHERE type='%s')" \
                        " ON %s_name=%s" % (col, col, col, col, col))
-        for col in [c for c in ['milestone', 'version'] if c == self.order]:
+        for col in [c for c in ['milestone', 'version']
+                    if c == self.order or c == self.group]:
             sql.append("\n  LEFT OUTER JOIN (SELECT name AS %s_name, " \
                                          "time AS %s_time FROM %s)" \
                        " ON %s_name=%s" % (col, col, col, col, col))
@@ -177,25 +191,34 @@ class Query:
         if clauses:
             sql.append("\nWHERE " + " AND ".join(clauses))
 
-        sql.append("\nORDER BY IFNULL(%s,'')=''%s,"
-                   % (self.order, self.desc and ' DESC' or ''))
-        if self.order in ['status', 'resolution', 'priority', 'severity']:
-            if self.desc:
-                sql.append("%s_value DESC" % self.order)
+        sql.append("\nORDER BY ")
+        order_cols = [(self.order, self.desc)]
+        if self.group and self.group != self.order:
+            order_cols.insert(0, (self.group, self.groupdesc))
+        for col, desc in order_cols:
+            if desc:
+                sql.append("IFNULL(%s,'')='' DESC," % col)
             else:
-                sql.append("%s_value" % self.order)
-        elif self.order in ['milestone', 'version']:
-            if self.desc:
-                sql.append("IFNULL(%s_time,0)=0 DESC,%s_time DESC,%s DESC"
-                           % (self.order, self.order, self.order))
+                sql.append("IFNULL(%s,'')=''," % col)
+            if col in ['status', 'resolution', 'priority', 'severity']:
+                if desc:
+                    sql.append("%s_value DESC" % col)
+                else:
+                    sql.append("%s_value" % col)
+            elif col in ['milestone', 'version']:
+                if desc:
+                    sql.append("IFNULL(%s_time,0)=0 DESC,%s_time DESC,%s DESC"
+                               % (col, col, col))
+                else:
+                    sql.append("IFNULL(%s_time,0)=0,%s_time,%s"
+                               % (col, col, col))
             else:
-                sql.append("IFNULL(%s_time,0)=0,%s_time,%s"
-                           % (self.order, self.order, self.order))
-        else:
-            if self.desc:
-                sql.append("%s DESC" % self.order)
-            else:
-                sql.append("%s" % self.order)
+                if desc:
+                    sql.append("%s DESC" % col)
+                else:
+                    sql.append("%s" % col)
+            if col == self.group and not col == self.order:
+                sql.append(",")
         if self.order != 'id':
             sql.append(",id")
 
@@ -305,11 +328,13 @@ class QueryModule(Module):
 
         query = Query(self.env, self._get_constraints(),
                       self.args.get('order'), self.args.has_key('desc'),
+                      self.args.get('group'), self.args.has_key('groupdesc'),
                       self.args.has_key('verbose'))
 
         if self.args.has_key('update'):
             self.req.redirect(self.env.href.query(query.constraints,
                                                   query.order, query.desc,
+                                                  query.group, query.groupdesc,
                                                   query.verbose))
 
         props = self._get_ticket_properties()
@@ -334,14 +359,16 @@ class QueryModule(Module):
             self.req.hdf.setValue('query.headers.%d.name' % i, cols[i])
             if cols[i] == query.order:
                 self.req.hdf.setValue('query.headers.%d.href' % i,
-                    self.env.href.query(query.constraints, query.order,
-                                        not query.desc, query.verbose))
+                    escape(self.env.href.query(query.constraints, query.order,
+                                               not query.desc, query.group,
+                                               query.groupdesc, query.verbose)))
                 self.req.hdf.setValue('query.headers.%d.order' % i,
                     query.desc and 'desc' or 'asc')
             else:
                 self.req.hdf.setValue('query.headers.%d.href' % i,
-                    self.env.href.query(query.constraints, cols[i],
-                                        query.verbose))
+                    escape(self.env.href.query(query.constraints, cols[i],
+                                               1, query.group, query.groupdesc,
+                                               query.verbose)))
 
         for k, v in query.constraints.items():
             if len(v) > 1:
@@ -361,6 +388,10 @@ class QueryModule(Module):
         self.req.hdf.setValue('query.order', query.order)
         if query.desc:
             self.req.hdf.setValue('query.desc', '1')
+        if query.group:
+            self.req.hdf.setValue('query.group', query.group)
+            if query.groupdesc:
+                self.req.hdf.setValue('query.groupdesc', '1')
         if query.verbose:
             self.req.hdf.setValue('query.verbose', '1')
 
