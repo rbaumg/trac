@@ -187,10 +187,4 @@ class Href:
             href = href_join(self.base, 'xref')
         return href
 
-    def orphans(self, module=None):
-        if module:
-            href = href_join(self.base, 'orphans', str(module))
-        else:
-            href = href_join(self.base, 'orphans')
-        return href
 

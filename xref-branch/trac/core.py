@@ -53,7 +53,6 @@ modules = {
     'roadmap'     : ('Roadmap', 'Roadmap', 0),
     'settings'    : ('Settings', 'Settings', 0),
     'xref'        : ('Xref', 'XrefModule', 0),
-    'orphans'     : ('Xref', 'XrefModule', 0),
     'milestone'   : ('Milestone', 'Milestone', 0)
     }
 

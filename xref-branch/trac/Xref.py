@@ -320,101 +320,48 @@ def rebuild_cross_references(env, db, do_changesets=True):
     db.commit()
 
 
-
-
-def find_orphaned_objects(db):
-    # Most interesting 'orphans' order: wikis, tickets, milestones then reports and changesets
-    queries = [
-        "SELECT DISTINCT(name), 'wiki' FROM wiki "
-        "WHERE name NOT IN (SELECT DISTINCT(dest_id) FROM xref WHERE dest_type = 'wiki') "
-        ,
-        "SELECT id, 'ticket' FROM ticket "
-        "WHERE id NOT IN (SELECT DISTINCT(dest_id) FROM xref WHERE dest_type = 'ticket') "
-        ,
-        "SELECT name, 'milestone' FROM milestone "
-        "WHERE name NOT IN (SELECT DISTINCT(dest_id) FROM xref WHERE dest_type = 'milestone') "
-        ,
-        "SELECT id, 'report' FROM report "
-        "WHERE id NOT IN (SELECT DISTINCT(dest_id) FROM xref WHERE dest_type = 'report') "
-        , 
-        "SELECT rev, 'changeset' FROM revision "
-        "WHERE rev NOT IN (SELECT DISTINCT(dest_id) FROM xref WHERE dest_type = 'changeset') "
-        ,
-        # Not sure about this one: it works, but produces a huge list (good for testing, though :)
-        # "SELECT DISTINCT(name), 'source' FROM node_change "
-        # "WHERE name NOT IN (SELECT DISTINCT(dest_id) FROM xref WHERE dest_type = 'source') "
-        ]
-    cursor = db.cursor()
-    cursor.execute(" UNION ALL ".join(queries))
-    return cursor
-
-
-
-
 class XrefModule(Module):
     template_name = 'xref.cs'
 
     def render(self, req):
-        mode = req.args.get('mode', 'xref')
-        req.hdf['xref.mode'] = mode
-        if mode == 'orphans':
-            self._orphans(req)
-            self.template_name = 'orphans.cs'
-        else:
-            direction = req.args.get('direction','back')
-            if direction == 'forward':
-                req.hdf['xref.direction.name'] = 'Forward Link'
-                base = self._base(req)
-                self._references(req, base.find_destinations(self.db))
-            else: # direction == back
-                req.hdf['xref.direction.back'] = 1
-                req.hdf['xref.direction.name'] = 'Backlink'
-                base = self._base(req)
-                self._references(req, base.find_sources(self.db))
-
-    def _base(self, req):
         type = req.args.get('type', 'wiki')
         id = req.args.get('id', 'WikiStart')
         base = TracObj(type, id)
-        req.hdf['title'] = req.hdf['xref.direction.name'] + ' for ' + base.name()
-        req.hdf['xref.base.type'] = type
-        req.hdf['xref.base.id'] = escape(id)
-        req.hdf['xref.base.name'] = base.name()
-        req.hdf['xref.base.icon'] = base.icon()
-        req.hdf['xref.base.href'] = base.href(self.env)
-        req.hdf['xref.current_href'] = escape(self.env.href.xref(type, id))
-        return base
 
-    def _references(self, req, refs):
-        links = []
-        relations = []
-        for type, id, relation, facet, context in refs:
-            other_ref = TracObj(type, id)
-            dict = {'type' : type,
-                    'id' : id,
-                    'name' : other_ref.name(),
-                    'icon' : other_ref.icon(),
-                    'href' : other_ref.href(self.env),
+        def dict_of_related(type, id, relation, facet, context):
+            ref = TracObj(type, id)
+            return {'type' : type,
+                    'id' : escape(id),
+                    'name' : ref.name(),
+                    'icon' : ref.icon(),
+                    'href' : ref.href(self.env),
                     'relation' : relation,
                     'facet' : facet,
                     'context' : context}
-            if relation:
-                relations.append(dict)
+
+        req.hdf['title'] = 'Backlinks for %s' % base.name()
+        req.hdf['xref.base'] = dict_of_related(type, id, '', '', '')
+        req.hdf['xref.current_href'] = escape(self.env.href.xref(type, id))
+
+        # -- find backlinks and incoming relations
+        links = []
+        in_relations = []
+        for tuple in base.find_sources(self.db):
+            dict = dict_of_related(*tuple)
+            if dict['relation']:
+                in_relations.append(dict)
             else:
                 links.append(dict)
         req.hdf['xref.links'] = links
-        req.hdf['xref.relations'] = relations
+        req.hdf['xref.in_relations'] = in_relations
 
-    def _orphans(self, req):
-        req.hdf['title'] = 'Orphaned objects'
-        orphans = []
-        for id, type in find_orphaned_objects(self.db):
-            ref = TracObj(type, id)
-            obj = {'type' : type,
-                    'id' : id,
-                    'name' : ref.name(),
-                    'icon' : ref.icon(),
-                    'href' : ref.href(self.env)}
-            orphans.append(obj)
-        req.hdf['orphans'] = orphans
+        # -- find outgoing relations 
+        out_relations = []
+        for tuple in base.find_destinations(self.db):
+            dict = dict_of_related(*tuple)
+            if dict['relation']:
+                out_relations.append(dict)
+        req.hdf['xref.out_relations'] = out_relations
+
+
         

@@ -183,11 +183,11 @@ def _parse_path_info(args, path_info):
         if match.group(1):
             set_if_missing(args, 'id', urllib.unquote(match.group(1)))
         return args
-    match = re.search('^/(xref|orphans)(?:/([^/]+))?(?:/(.*)/?)?', path_info)
+    match = re.search('^/xref(?:/([^/]+))?(?:/(.*)/?)?', path_info)
     if match:
-        set_if_missing(args, 'mode', match.group(1))
-        set_if_missing(args, 'type', match.group(2))
-        id = match.group(3)
+        set_if_missing(args, 'mode', 'xref')
+        set_if_missing(args, 'type', match.group(1))
+        id = match.group(2)
         if id:
             set_if_missing(args, 'id', urllib.unquote(id))
         return args
@@ -217,7 +217,6 @@ def populate_hdf(hdf, env, req=None):
         'logout': env.href.logout(),
         'settings': env.href.settings(),
         'xref': env.href.xref(),
-        'orphans': env.href.orphans(),
         'homepage': 'http://trac.edgewall.com/'
     }
 
