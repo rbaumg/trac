@@ -119,6 +119,7 @@ function initializeFilters() {
         // default value 'on'
         td.appendChild(createCheckbox("__" + propertyName + ":" + option, option,
           propertyName + "_" + option));
+        td.appendChild(document.createTextNode(" "));
         td.appendChild(createLabel(option, propertyName + "_" + option));
       }
       tr.appendChild(td);
