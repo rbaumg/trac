@@ -22,16 +22,18 @@
 import os
 import util
 
+ENV_VAR_NAME = 'TRAC_ENV'
+
 class NoTracReposDefinedException(Exception):
 
     def __init__(self):
-        Exception.__init__(self, "Environment variable TRAC_REPOS needs to be defined")
+        Exception.__init__(self, "Environment variable %s needs to be defined" % ENV_VAR_NAME)
 
 
 def get_attachment_dir(module, id, create_if_not_exist=0):
 
-    trac_repos_dir = os.getenv('TRAC_REPOS')
-    if not trac_repos_dir:
+    trac_env_dir = os.getenv(ENV_VAR_NAME)
+    if not trac_env_dir:
         raise NoTracReposDefinedException()
 
     type_name = module.__name__
@@ -39,7 +41,7 @@ def get_attachment_dir(module, id, create_if_not_exist=0):
     if pos > -1:
         type_name = type_name[pos+1:]
 
-    dir = os.path.join(trac_repos_dir, 'attachments', type_name, str(id))
+    dir = os.path.join(trac_env_dir, 'attachments', type_name, str(id))
 
     exists = os.access(dir, os.F_OK)
     if create_if_not_exist:
