@@ -549,7 +549,7 @@ class TracAdmin(cmd.Cmd):
             cursor = cnx.cursor()
             self._do_wiki_load(trac.siteconfig.__default_wiki_dir__,cursor)
             print ' Cross-referencing'
-            self.__env.href = Href('trac-admin::initenv')
+            self.__env.href = Href.Href('trac-admin::initenv')
             self.__env._wiki_pages = {}
             Xref.rebuild_cross_references(self.__env, cnx)
 
