@@ -97,7 +97,7 @@ class SubversionRepository(Repository):
             except ValueError:
                 rev = None
         if not rev:
-            rev = self.rev
+            rev = self.youngest_rev
 
         return SubversionNode(path, rev, self.authz, self.fs_ptr, self.pool)
 
@@ -119,13 +119,18 @@ class SubversionRepository(Repository):
 class SubversionNode(Node):
 
     def __init__(self, path, rev, authz, fs_ptr, pool):
-        self.root = fs.revision_root(fs_ptr, rev, pool)
-        self.rev = fs.node_created_rev(self.root, path, pool)
         self.authz = authz
         self.fs_ptr = fs_ptr
         self.pool = pool
-        Node.__init__(self, path, self.rev,
-                      _kindmap[fs.check_path(self.root, path, self.pool)])
+        self._requested_rev = rev
+
+        self.root = fs.revision_root(fs_ptr, rev, pool)
+        node_type = fs.check_path(self.root, str(path), self.pool)
+        if not node_type in _kindmap:
+            raise TracError, "No node at %s in revision %s" % (path, rev)
+        self.rev = fs.node_created_rev(self.root, str(path), pool)
+
+        Node.__init__(self, path, self.rev, _kindmap[node_type])
 
     def get_content(self):
         if self.isdir:
@@ -140,8 +145,8 @@ class SubversionNode(Node):
             path = '/'.join((self.path, item))
             if not self.authz.has_permission(path):
                 continue
-            yield SubversionNode(path, self.rev, self.authz, self.fs_ptr,
-                                 self.pool)
+            yield SubversionNode(path, self._requested_rev, self.authz,
+                                 self.fs_ptr, self.pool)
 
     def get_history(self):
         history = []
