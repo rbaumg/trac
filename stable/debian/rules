@@ -2,6 +2,7 @@
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/python-distutils.mk
+include /usr/share/cdbs/1/rules/simple-patchsys.mk
 
 DEB_INSTALL_DOCS_ALL=$(filter-out $(DEB_INSTALL_CHANGELOGS_ALL),$(shell for f in README RELEASE UPGRADE AUTHORS THANKS; do if test -s $(DEB_SRCDIR)/$$f; then echo $(DEB_SRCDIR)/$$f; fi; done))
 
