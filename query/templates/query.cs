@@ -17,21 +17,22 @@
  <fieldset id="filters">
   <legend>Filters</legend>
   <?cs def:checkbox_checked(constraint, option) ?><?cs
-   each:value = constraint ?><?cs
+   each:value = constraint.values ?><?cs
     if:value == option ?> checked="checked"<?cs
     /if ?><?cs
    /each ?><?cs
   /def ?><?cs
   def:option_selected(constraint, option) ?><?cs
-   each:value = constraint ?><?cs
+   each:value = constraint.values ?><?cs
     if:value == option ?> selected="selected"<?cs
     /if ?><?cs
    /each ?><?cs
   /def ?>
-  <table><?cs each:property = ticket.properties ?><?cs
+  <table><col class="header" /><col class="mode" /><col class="filter" />
+   <col class="actions" /><?cs each:property = ticket.properties ?><?cs
    each:constraint = query.constraints ?><?cs
     if:property.name == name(constraint) ?>
-     <tr class="<?cs var:property.name ?>">
+     <tbody><tr class="<?cs var:property.name ?>">
       <th scope="row"><label><?cs var:property.label ?></label></th><?cs
       if:property.type != "radio" ?>
        <td class="mode">
@@ -41,15 +42,26 @@
            if:mode.value == constraint.mode ?> selected="selected"<?cs
            /if ?>><?cs var:mode.name ?></option><?cs
          /each ?>
+        </select>
        </td><?cs
       /if ?>
       <td class="filter"<?cs if:property.type == "radio" ?> colspan="2"<?cs /if ?>><?cs
-       if:property.type == "select" ?>
-        <select name="<?cs var:name(constraint) ?>"><option></option><?cs
-        each:option = property.options ?>
-         <option<?cs call:option_selected(constraint, option) ?>><?cs
-           var:option ?></option><?cs
-        /each ?></select><?cs
+       if:property.type == "select" ?><?cs
+        each:value = constraint.values ?>
+         <select name="<?cs var:name(constraint) ?>"><option></option><?cs
+         each:option = property.options ?>
+          <option<?cs if:option == value ?> selected="selected"<?cs /if ?>><?cs
+            var:option ?></option><?cs
+         /each ?></select><?cs
+         if:name(value) != len(constraint.values) - 1 ?>
+          </td>
+          <td class="actions"><input type="submit" name="rm_filter_<?cs
+             var:property.name ?>" value="-" /></td>
+         </tr><tr class="<?cs var:property.name ?>">
+          <th colspan="2"><label>or</label></th>
+          <td class="filter"><?cs
+         /if ?><?cs
+        /each ?><?cs
        elif:property.type == "radio" ?><?cs
         each:option = property.options ?>
          <input type="checkbox" id="<?cs var:property.name ?>_<?cs
@@ -58,16 +70,24 @@
          <label for="<?cs var:property.name ?>_<?cs var:option ?>"><?cs
            var:option ?></label><?cs
         /each ?><?cs
-       elif:property.type == "text" ?>
+       elif:property.type == "text" ?><?cs
+        each:value = constraint.values ?>
         <input type="text" name="<?cs var:property.name ?>" value="<?cs
-          var:constraint.0 ?>" size="42" /><?cs
+          var:value ?>" size="42" /><?cs
+         if:name(value) != len(constraint.values) - 1 ?>
+          </td>
+          <td class="actions"><input type="submit" name="rm_filter_<?cs
+             var:property.name ?>" value="-" /></td>
+         </tr><tr class="<?cs var:property.name ?>">
+          <th colspan="2"><label>or</label></th>
+          <td class="filter"><?cs
+         /if ?><?cs
+        /each ?><?cs
        /if ?>
       </td>
-      <td class="actions">
-       <input type="submit" name="rm_filter_<?cs
-         var:property.name ?>" value="-" />
-      </td>
-     </tr><?cs /if ?><?cs
+      <td class="actions"><input type="submit" name="rm_filter_<?cs
+         var:property.name ?>" value="-" /></td>
+     </tr></tbody><?cs /if ?><?cs
     /each ?><?cs
    /each ?>
    <tr>
@@ -77,7 +97,9 @@
       <option></option><?cs
       each:property = ticket.properties ?>
        <option value="<?cs var:property.name ?>"<?cs
-         if:len(query.constraints[property.name]) != 0 ?> disabled="disabled"<?cs
+         if:property.type == "radio" ?><?cs
+          if:len(query.constraints[property.name]) != 0 ?> disabled="disabled"<?cs
+          /if ?><?cs
          /if ?>><?cs var:property.label ?></option><?cs
       /each ?>	
      </select>

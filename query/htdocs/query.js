@@ -1,39 +1,69 @@
+function getContent(node) {
+  if (node.nodeType == 3) {
+    return node.nodeValue;
+  } else if (node.nodeType == 1) {
+    var buf = "";
+    for (var i = 0; i < node.childNodes.length; i++) {
+      buf += getContent(node.childeNodes[i]);
+    }
+  }
+}
+
 function initializeFilters() {
 
   // Removes an existing row from the filters table
-  function removeFilter(button, propertyName) {
+  function removeRow(button, propertyName) {
     var tr = getAncestorByTagName(button, "tr");
-    var table = getAncestorByTagName(tr, "table");
 
-    // Ugly hack: Safari removes the DOM nodes, but not the form elements for
-    // some buggy reason, so they'll get submitted twice. Setting the name of
-    // the original elements to an empty string before removing them seems to
-    // solve the problem
+    var mode = button.form.elements[propertyName + "_mode"];
+    if (mode && (getAncestorByTagName(mode, "tr") == tr)) {
+      // Check whether there are more 'or' rows for this filter
+      var next = tr.nextSibling;
+      if (next && (next.className == propertyName)) {
+        next.cells[0].colSpan = 1;
+        next.insertBefore(tr.cells[0], next.cells[0]);
+        next.replaceChild(tr.cells[0], next.cells[1]);
+      }
+    }
+
+    // Ugly hack: Safari < 1.2 removes the DOM nodes, but not the form elements,
+    // so they'll get submitted twice. Setting the name of the original elements
+    // to an empty string before removing them seems to solve the problem
     var inputs = tr.getElementsByTagName("input");
     for (var j = 0; j < inputs.length; j++) inputs[j].name = "";
     var selects = tr.getElementsByTagName("select");
     for (var j = 0; j < selects.length; j++) selects[j].name = "";
 
+    var table = getAncestorByTagName(tr, "table");
     table.deleteRow(tr.rowIndex);
 
-    var select = document.forms["query"].elements["add_filter"];
-    for (var i = 0; i < select.options.length; i++) {
-      var option = select.options[i];
-      if (option.value == propertyName) option.disabled = false;
+    if (propertyName) {
+      var select = document.forms["query"].elements["add_filter"];
+      for (var i = 0; i < select.options.length; i++) {
+        var option = select.options[i];
+        if (option.value == propertyName) option.disabled = false;
+      }
     }
   }
 
   // Initializes a filter row, the 'input' parameter is the submit
   // button for removing the filter
   function initializeFilter(input) {
-    var button = document.createElement("input");
-    button.type = "button";
-    button.value = input.value;
-    button.onclick = function() {
-      removeFilter(button, input.name.substr(10));
-      return false;
+    var removeButton = document.createElement("input");
+    removeButton.type = "button";
+    removeButton.value = input.value;
+    if (input.name.substr(0, 10) == "rm_filter_") {
+      removeButton.onclick = function() {
+        removeRow(removeButton, input.name.substr(10));
+        return false;
+      }
+    } else {
+      removeButton.onclick = function() {
+        removeRow(removeButton);
+        return false;
+      }
     }
-    input.parentNode.replaceChild(button, input);
+    input.parentNode.replaceChild(removeButton, input);
   }
 
   // Make the submit buttons for removing filters client-side triggers
@@ -79,8 +109,8 @@ function initializeFilters() {
 
     // Convenience function for creating a <select>
     function createSelect(name, options, id) {
-      var select = document.createElement("select");
-      if (name) select.name = name;
+      var e = document.createElement("select");
+      if (name) e.name = name;
       if (options) {
         for (var i = 0; i < options.length; i++) {
           var option;
@@ -89,11 +119,11 @@ function initializeFilters() {
           } else {
             option = new Option(options[i], options[i]);
           }
-          select.options[select.options.length] = option;
+          e.options[e.options.length] = option;
         }
       }
-      if (id) select.id = id;
-      return select;
+      if (id) e.id = id;
+      return e;
     }
 
     var propertyName = select.options[select.selectedIndex].value;
@@ -102,10 +132,24 @@ function initializeFilters() {
     var tr = document.createElement("tr");
     tr.className = propertyName;
 
+    var alreadyPresent = false;
+    for (var i = 0; i < table.rows.length; i++) {
+      if (table.rows[i].className == propertyName) {
+        alreadyPresent = true;
+        break;
+      }
+    }
+    alert(alreadyPresent);
+
     // Add the row header
     var th = document.createElement("th");
     th.scope = "row";
-    th.appendChild(createLabel(property.label));
+    if (!alreadyPresent) {
+      th.appendChild(createLabel(property.label));
+    } else {
+      th.colSpan = 2;
+      th.appendChild(createLabel("or"));
+    }
     tr.appendChild(th);
 
     var td = document.createElement("td");
@@ -117,18 +161,21 @@ function initializeFilters() {
         // Another hack for Safari/WebCore, which will not submit dynamically
         // created checkboxes with the vale set for them, but rather with the
         // default value 'on'
-        td.appendChild(createCheckbox("__" + propertyName + ":" + option, option,
-          propertyName + "_" + option));
+        td.appendChild(createCheckbox("__" + propertyName + ":" + option,
+          option, propertyName + "_" + option));
         td.appendChild(document.createTextNode(" "));
         td.appendChild(createLabel(option, propertyName + "_" + option));
       }
       tr.appendChild(td);
     } else {
-      // Add the mode selector
-      td.className = "mode";
-      var modeSelect = createSelect(propertyName + "_mode", modes[property.type]);
-      td.appendChild(modeSelect);
-      tr.appendChild(td);
+      if (!alreadyPresent) {
+        // Add the mode selector
+        td.className = "mode";
+        var modeSelect = createSelect(propertyName + "_mode",
+                                      modes[property.type]);
+        td.appendChild(modeSelect);
+        tr.appendChild(td);
+      }
 
       // Add the selector or text input for the actual filter value
       td = document.createElement("td");
@@ -145,14 +192,13 @@ function initializeFilters() {
       tr.appendChild(td);
     }
 
-    // Add the remove buttons
+    // Add the add and remove buttons
     td = document.createElement("td");
     td.className = "actions";
     var removeButton = document.createElement("input");
     removeButton.type = "button";
-    removeButton.name = "rm_filter_" + propertyName;
     removeButton.value = "-";
-    removeButton.onclick = function() { removeFilter(removeButton, propertyName) };
+    removeButton.onclick = function() { removeRow(removeButton, propertyName) };
     td.appendChild(removeButton);
     tr.appendChild(td);
 
@@ -170,14 +216,12 @@ function initializeFilters() {
     }
 
     // Finally add the new row to the table
-    if (table.tBodies && table.tBodies.length) {
-      table.tBodies[0].insertBefore(tr, insertionPoint);
-    } else { // real XHTML
-      table.insertBefore(tr, insertionPoint);
-    }
+    insertionPoint.parentNode.insertBefore(tr, insertionPoint);
 
     // Disable the add filter in the drop-down list
-    select.options[select.selectedIndex].disabled = true;
+    if (property.type == "radio") {
+      select.options[select.selectedIndex].disabled = true;
+    }
     select.selectedIndex = -1;
   }
 }

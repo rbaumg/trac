@@ -174,5 +174,35 @@ FROM ticket
 WHERE IFNULL(foo,'')='something'
 ORDER BY IFNULL(id,'')='',id""")
 
+    def test_constrained_by_multiple_owners(self):
+        query = Query(self.env, order='id')
+        query.constraints['owner'] = ['someone', 'someone_else']
+        sql = query.get_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,owner,status,priority,milestone,component
+FROM ticket
+WHERE owner IN ('someone','someone_else')
+ORDER BY IFNULL(id,'')='',id""")
+
+    def test_constrained_by_multiple_owners_not(self):
+        query = Query(self.env, order='id')
+        query.constraints['owner'] = ['!someone', '!someone_else']
+        sql = query.get_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,owner,status,priority,milestone,component
+FROM ticket
+WHERE owner NOT IN ('someone','someone_else')
+ORDER BY IFNULL(id,'')='',id""")
+
+    def test_constrained_by_multiple_owners_contain(self):
+        query = Query(self.env, order='id')
+        query.constraints['owner'] = ['~someone', '~someone_else']
+        sql = query.get_sql()
+        self.assertEqual(sql,
+"""SELECT id,summary,owner,status,priority,milestone,component
+FROM ticket
+WHERE (IFNULL(owner,'') LIKE '%someone%' OR IFNULL(owner,'') LIKE '%someone_else%')
+ORDER BY IFNULL(id,'')='',id""")
+
 def suite():
     return unittest.makeSuite(QueryTestCase, 'test')

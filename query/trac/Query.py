@@ -167,36 +167,41 @@ class Query:
                                             "time AS %s_time FROM %s)" \
                        " ON %s_name=%s" % (col, col, col, col, col))
 
+        def get_constraint_sql(name, value, mode, neg):
+            value = sql_escape(value[len(mode and '!' or '' + mode):])
+            if mode == '~' and value:
+                return "IFNULL(%s,'') %sLIKE '%%%s%%'" % (
+                       name, neg and 'NOT ' or '', value)
+            elif mode == '^' and value:
+                return "IFNULL(%s,'') %sLIKE '%s%%'" % (
+                       name, neg and 'NOT ' or '', value)
+            elif mode == '$' and value:
+                return "IFNULL(%s,'') %sLIKE '%%%s'" % (
+                       name, neg and 'NOT ' or '', value)
+            elif mode == '':
+                return "IFNULL(%s,'')%s='%s'" % (name, neg and '!' or '', value)
+
         clauses = []
         for k, v in self.constraints.items():
-            if len(v) > 1:
-                inlist = ["'" + sql_escape(val) + "'" for val in v]
-                clauses.append("%s IN (%s)" % (k, ",".join(inlist)))
-            elif len(v) == 1:
-                val = v[0]
+            # Determine the match mode of the constraint (contains, starts-with,
+            # negation, etc)
+            neg = len(v[0]) and v[0][0] == '!'
+            mode = ''
+            if len(v[0]) and v[0][neg] in "~^$":
+                mode = v[0][neg]
 
-                neg = val[:1] == '!'
+            # Special case for exact matches on multiple values
+            if not mode and len(v) > 1:
+                inlist = ",".join(["'" + sql_escape(val[neg and 1 or 0:]) + "'" for val in v])
+                clauses.append("%s %sIN (%s)" % (k, neg and "NOT " or "", inlist))
+            elif len(v) > 1:
+                constraint_sql = [get_constraint_sql(k, val, mode, neg) for val in v]
                 if neg:
-                    val = val[1:]
-                mode = ''
-                if val[:1] in "~^$":
-                    mode, val = val[:1], val[1:]
-
-                val = sql_escape(val)
-                if mode == '~' and val:
-                    if neg:
-                        clauses.append("IFNULL(%s,'') NOT LIKE '%%%s%%'" % (k, val))
-                    else:
-                        clauses.append("IFNULL(%s,'') LIKE '%%%s%%'" % (k, val))
-                elif mode == '^' and val:
-                    clauses.append("IFNULL(%s,'') LIKE '%s%%'" % (k, val))
-                elif mode == '$' and val:
-                    clauses.append("IFNULL(%s,'') LIKE '%%%s'" % (k, val))
-                elif mode == '':
-                    if neg:
-                        clauses.append("IFNULL(%s,'')!='%s'" % (k, val))
-                    else:
-                        clauses.append("IFNULL(%s,'')='%s'" % (k, val))
+                    clauses.append("(" + " AND ".join(constraint_sql) + ")")
+                else:
+                    clauses.append("(" + " OR ".join(constraint_sql) + ")")
+            elif len(v) == 1:
+                clauses.append(get_constraint_sql(k, v[0][neg and 1 or 0:], mode, neg))
 
         if clauses:
             sql.append("\nWHERE " + " AND ".join(clauses))
@@ -355,7 +360,8 @@ class QueryModule(Module):
     def render(self):
         self.perm.assert_permission(perm.TICKET_VIEW)
 
-        if not self.args.has_key('order'):
+        constraints = self._get_constraints()
+        if not constraints and not self.args.has_key('order'):
             # avoid displaying all tickets when the query module is invoked
             # with no parameters. Instead show only open tickets, possibly
             # associated with the user
@@ -367,8 +373,6 @@ class QueryModule(Module):
                 name = self.req.session.get('name')
                 if email or name:
                     constraints['cc'] = [ '~%s' % email or name ]
-        else:
-            constraints = self._get_constraints()
 
         query = Query(self.env, constraints, self.args.get('order'),
                       self.args.has_key('desc'), self.args.get('group'),
@@ -419,20 +423,20 @@ class QueryModule(Module):
                                                0, query.group, query.groupdesc,
                                                query.verbose)))
 
+        constraints = {}
         for k, v in query.constraints.items():
-            if len(v) > 1:
-                add_to_hdf(v, self.req.hdf, 'query.constraints.%s' % k)
-            elif len(v) == 1:
-                val = v[0]
+            constraint = {'values': [], 'mode': ''}
+            for val in v:
                 neg = val[:1] == '!'
                 if neg:
                     val = val[1:]
                 mode = ''
                 if val[:1] in "~^$":
                     mode, val = val[:1], val[1:]
-                self.req.hdf.setValue('query.constraints.%s.mode' % k,
-                                      (neg and '!' or '') + mode)
-                add_to_hdf([val], self.req.hdf, 'query.constraints.%s' % k)
+                constraint['mode'] = mode + (neg and '!' or '')
+                constraint['values'].append(val)
+            constraints[k] = constraint
+        add_to_hdf(constraints, self.req.hdf, 'query.constraints')
 
         self.req.hdf.setValue('query.order', query.order)
         if query.desc:
@@ -454,7 +458,7 @@ class QueryModule(Module):
         add_to_hdf(results, self.req.hdf, 'query.results')
         self.req.display(self.template_name, 'text/html')
 
-    def display_csv(self,sep=','):
+    def display_csv(self, sep=','):
         self.req.send_response(200)
         self.req.send_header('Content-Type', 'text/plain;charset=utf-8')
         self.req.end_headers()

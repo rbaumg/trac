@@ -20,12 +20,14 @@ h2 {
 #query hr { clear: both; margin: 0; visibility: hidden }
 
 #filters table { width: 100% }
+#filters col.filter { width: 100% }
 #filters tr { height: 2em }
 #filters th, #filters td { padding: 0 .2em; vertical-align: middle }
-#filters th { font-size: 11px; text-align: right; white-space: nowrap }
+#filters th { font-size: 11px; text-align: right; white-space: nowrap; }
 #filters td label { font-size: 11px }
-#filters td.filter { width: 100% }
+#filters td.mode { text-align: right }
 #filters td.filter label { padding-right: 1em }
+#filters td.actions { text-align: right; white-space: nowrap }
 
 /* Styles for the report list and the report results table
    (extends the styles for "table.listing") */

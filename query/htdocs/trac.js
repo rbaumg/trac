@@ -20,8 +20,7 @@ function addEvent(element, type, func){
 // name
 function getAncestorByTagName(e, tagName) {
   tagName = tagName.toLowerCase();
-  var e = e.parentNode;
-  while (e.tagName.toLowerCase() != tagName) e = e.parentNode;
+  do { e = e.parentNode } while (e.tagName.toLowerCase() != tagName);
   return e;
 }
 
