@@ -1,0 +1,78 @@
+Trac 0.6 (Solanum) Release Notes
+================================
+March 23, 2004
+
+Edgewall Software is pleased to announce the release of Trac 0.6 'Solanum'.
+
+Trac is a minimalistic web-based software project management and bug/issue
+tracking system. It provides an interface to the Subversion revision control
+systems, an integrated wiki, flexible issue tracking and convenient report
+facilities. 
+
+Trac allows wiki markup in issue descriptions and commit messages, creating
+links and useful structure between bugs, tasks, changesets, files and wiki
+pages.  A timeline view presents all project events in chronological order,
+making tracking progress or getting an overview of a project easy.
+
+For more information, please visit the main Trac web site:
+
+  <http://trac.edgewall.com/> 
+
+The software, published under the GNU General Public License, is
+available at:
+
+  <http://projects.edgewall.com/trac/download/>
+
+Please report problems and provide feedback in the project issue tracker: 
+
+  <http://projects.edgewall.com/trac/>
+
+For questions, comments and user discussions, please use the Trac mailing list
+. List information, subscription and archive available at:
+
+  <http://projects.edgewall.com/trac/wiki/MailingList>
+
+What's New
+----------
+Highlights in this release include:
+
+ * Trac now also supports reStructuredText (ReST) and HTML markup.
+ * RSS/XML support for timeline, reports and subversion changesets.
+ * Export report data for download.
+ * Many usability improvements.
+ * Colored, grouped reports.
+ * Powerful search capability.
+
+For complete release details, see the ChangeLog at: 
+
+ <http://projects.edgewall.com/trac/wiki/ChangeLog>
+
+About Edgewall
+--------------
+Edgewall Software is a small consulting business focusing on GNU/Linux and
+open source software services. Edgewall offers custom software development,
+Linux consulting and commercial support, including Trac and Subversion
+support.
+
+For more information, visit our web site at <http://www.edgewall.com/> 
+or email us at <mailto:info@edgewall.com>.
+
+Acknowledgements
+----------------
+Many thanks to everyone who has, and continue to, contribute to the project.
+Also our thanks to all people providing feedback and bug reports that helps us
+make Trac better, easier to use and more effective. 
+Without your invaluable help, Trac would not evolve. Thank you.
+
+Finally, we hope Trac will prove itself useful to like-minded programmers
+around the world, and of course that this release is an improvement over the
+last. 
+
+Let us know. :-)
+
+/The Trac Team <http://trac.edgewall.com/>
+
+-- 
+Copyright (c) 2004 Edgewall Software
+Edgewall Software - Professional GNU/Linux & Open Source Consulting
+<http://www.edgewall.com/>
