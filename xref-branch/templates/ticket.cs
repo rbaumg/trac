@@ -66,9 +66,8 @@
   call:ticketprop("Version", "version", ticket.version, 0) ?><?cs
   call:ticketprop("Resolution", "resolution", ticket.resolution, 0) ?><?cs
   call:ticketprop("Milestone", "milestone", ticket.milestone, 0) ?><?cs
-  call:ticketprop("Keywords", "keywords", ticket.keywords, 0) ?><?cs
   set:last_prop = #1 ?><?cs
-  call:ticketprop("Depends on", "depends-on", ticket.depends_on, 0) ?><?cs
+  call:ticketprop("Keywords", "keywords", ticket.keywords, 0) ?><?cs
   set:last_prop = #0 ?>
  </tr></table><?cs if ticket.custom.0.name ?>
  <table><tr><?cs each:prop = ticket.custom ?><?cs
@@ -80,17 +79,29 @@
     call:ticketprop(prop.label, prop.name, prop.value, 0) ?><?cs
    /if?><?cs
   /each ?>
- </tr></table><?cs /if ?>
+	  </tr></table><?cs /if ?>
  <?cs if:ticket.description ?><div class="description">
   <?cs var:ticket.description.formatted ?>
  </div><?cs /if ?>
+
 </div>
 
-<?cs if:n_depends_on_me ?>
- <h3>There are <?cs var:n_depends_on_me ?> tickets 
-  <a href="<?cs var:trac.href.xref ?>/ticket/<?cs var:ticket.id ?>#incoming-relations"
-     title="See cross-references">depending on me.</a>
- </h3>
+<?cs if:ticket.depends_on.me + ticket.depends_on.others > #0 ?>
+  <h2>Ticket Dependencies:</h2>
+  <p class="dependencies"><?cs
+   if ticket.depends_on.others > #0 ?>
+    This ticket 
+    <a href="<?cs var:trac.href.xref ?>/ticket/<?cs var:ticket.id ?>#outgoing-relations"
+       title="See outgoing &laquo;depends-on&raquo; relations">
+     <?cs call:relation("depends-on") ?></a> <?cs var:ticket.depends_on.others ?> tickets.<?cs
+   /if ?><?cs
+   call:plural($ticket.depends_on.me,
+    "There is one ticket",
+    "There are " + $ticket.depends_on.me + " tickets ") ?> which 
+    <a href="<?cs var:trac.href.xref ?>/ticket/<?cs var:ticket.id ?>#incoming-relations"
+       title="See incoming &laquo;depends-on&raquo; relations">
+     <?cs call:relation("depends-on") ?></a> this ticket.
+  </p>
 <?cs /if ?>
 
 <?cs if trac.acl.TICKET_MODIFY || ticket.attachments.0.name ?>
@@ -206,8 +217,10 @@
      var:ticket.owner ?>" disabled="disabled" /><br />
    <label for="cc">Cc:</label>
    <input type="text" id="cc" name="cc" size="30" value="<?cs var:ticket.cc ?>" /><br />
-   <label for="depends_on">Depends on:</label>
-   <input type="text" id="depends_on" name="depends_on" size="30" value="<?cs var:ticket.depends_on ?>" />
+   <label for="depends_on"><?cs call:relation("depends-on") ?>:</label>
+   <textarea id="depends_on" name="depends_on" cols="30" rows="2"><?cs 
+     var:ticket.depends_on ?>
+   </textarea>
   </div>
   <?cs if:len(ticket.custom) ?><div class="custom">
    <?cs call:ticket_custom_props(ticket) ?>
@@ -233,11 +246,15 @@
    <?cs call:action_radio('reopen') ?>
    <label for="reopen">reopen ticket</label><br /><?cs
   /if ?><?cs
-  if $ticket.status == "new" || $ticket.status == "assigned" || $ticket.status == "reopened" ?>
-   <?cs call:action_radio('resolve') ?>
-   <label for="resolve">resolve</label>
-   <label for="resolve_resolution">as:</label>
-   <?cs call:hdf_select(enums.resolution, "resolve_resolution", args.resolve_resolution, 0) ?><br />
+  if $ticket.status == "new" || $ticket.status == "assigned" || $ticket.status == "reopened" ?><?cs
+   if $ticket.can_be_closed ?>
+    <?cs call:action_radio('resolve') ?>
+    <label for="resolve">resolve</label>
+    <label for="resolve_resolution">as:</label>
+    <?cs call:hdf_select(enums.resolution, "resolve_resolution", args.resolve_resolution, 0) ?><br /><?cs
+   else ?>
+	<em>(you must resolve the dependent tickets before you can resolve this one)</em><br /><?cs 
+   /if ?>
    <?cs call:action_radio('reassign') ?>
    <label for="reassign">reassign</label>
    <label>to:<?cs

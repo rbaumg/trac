@@ -51,10 +51,10 @@
 
 
 from trac.Module import Module
-from trac.util import escape
+from trac.util import escape, TracError
 from trac.WikiFormatter import XRefFormatter
 
-__all__ = ['TracObj', 'rebuild_cross_references']
+__all__ = ['TracObj', 'rebuild_cross_references', 'get_dag']
 
 
 how_much_context = 40
@@ -246,9 +246,6 @@ class TracObj:
         if facet:
             facet_clause = "AND facet = %s "
             tuple += (facet,)
-        print (("SELECT <other>_type, <other>_id, relation, facet, context "
-                        "FROM xref WHERE <base>_id = %s AND <base>_type = %s "
-                        ).replace('<base>', base).replace('<other>', other) + relation_clause + facet_clause)
         cursor.execute(("SELECT <other>_type, <other>_id, relation, facet, context "
                         "FROM xref WHERE <base>_id = %s AND <base>_type = %s "
                         ).replace('<base>', base).replace('<other>', other) + relation_clause + facet_clause,
@@ -358,6 +355,46 @@ def rebuild_cross_references(env, db, do_changesets=True):
 
     db.commit()
 
+
+class CycleDetected(TracError):
+    def __init__(self, seq):
+        nameseq = map(lambda (type, id): "%s:%s" % (type, id), flatten_seq(seq))
+        TracError.__init__(self, 'Adding relation %s &rarr; %s would create a cycle, '
+                           'because of the following relation(s): %s' % \
+                           (nameseq[0], nameseq[1], "  &rarr; ".join(nameseq[1:])),
+                           'Cycle Detected')
+
+def flatten_seq(seq):
+    list = []
+    def flatten_req((seq,elt)):
+        if seq:
+            flatten_req(seq)
+        list.append(elt)
+    flatten_req(seq)
+    return list
+        
+def get_dag(db, start_ref, relation):
+    already_visited = {}
+    dag = []
+    def get_dag_rec(seq):
+        elt = seq[1]
+        type, id = elt 
+        already_visited[elt] = 1
+        dag.append(seq)
+        cursor = db.cursor()
+        cursor.execute("SELECT dest_type, dest_id FROM xref "
+                       "WHERE src_id = %s AND src_type = %s AND relation = %s ",
+                       (id, type, relation))
+        for ntype, nid in cursor:
+            elt = (ntype, nid)
+            next_seq = (seq, elt)
+            if elt == start_ref:
+                raise CycleDetected(next_seq)
+            if not already_visited.has_key(elt):
+                get_dag_rec(next_seq)
+    get_dag_rec((None, start_ref))
+    return dag
+    
 
 class XrefModule(Module):
     template_name = 'xref.cs'

@@ -68,8 +68,9 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
    <label for="cc">Cc:</label>
    <input type="text" id="cc" name="cc" size="30" value="<?cs
      var:newticket.cc ?>" /><br />
-   <label for="depends_on">Depends on:</label>
-   <input type="text" id="depends_on" name="depends_on" size="30" value="<?cs var:ticket.depends_on ?>" />
+   <label for="depends_on"><?cs call:relation("depends-on") ?>:</label>
+   <textarea id="depends_on" name="depends_on" cols="30" rows="2"><?cs
+    var:ticket.depends_on ?></textarea>
   </div>
   <?cs if:len(ticket.custom) ?><div class="custom">
    <?cs call:ticket_custom_props(ticket) ?>

@@ -23,7 +23,7 @@ from trac import perm, util
 from trac.Module import Module
 from trac.WikiFormatter import wiki_to_html
 from trac.Notify import TicketNotifyEmail
-from trac.Xref import TracObj
+from trac.Xref import TracObj, get_dag
 
 import time
 import string
@@ -198,6 +198,9 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
                            "VALUES (%s, %s, %s, %s, %s, %s)",
                            (id, when, author, fname, self._old[name],
                             self[name]))
+            
+        get_dag(db, (self.ref.type, str(self.ref.id)), 'depends-on')
+        
         if comment:
             cursor.execute("SELECT count(*) FROM ticket_change "
                                "WHERE ticket = %s", # AND oldvalue LIKE '%%%s.' parent (threads)
@@ -264,8 +267,16 @@ class Ticket(UserDict): # TODO: inehrit from TracObj
             elif xref_kind[0] == '1 to n':
                 self.ref.replace_xrefs_from_list(env, db, 'field:'+name, name.replace('_','-'), self[name])
 
-    def n_depends_on_me(self, db):
-        return self.ref.count_sources(db, 'depends-on')
+    def can_be_closed(self, db):
+        cursor = db.cursor()
+        cursor.execute("""
+          SELECT count(*) FROM (SELECT distinct(id) FROM ticket t 
+                                INNER JOIN xref x ON x.dest_id = t.id
+                                AND x.src_type = 'ticket' AND x.src_id = %s
+                                AND t.status != 'closed')
+          """, (self.ref.id,))
+        return cursor.fetchone()[0] == 0
+
 
 
 def get_custom_fields(env):
@@ -477,7 +488,9 @@ class TicketModule (Module):
         evals = dict(zip(ticket.keys(),
                          map(lambda x: util.escape(x), ticket.values())))
         req.hdf['ticket'] = evals
-        req.hdf['n_depends_on_me'] = ticket.n_depends_on_me(self.db)
+        req.hdf['ticket.depends_on.me'] = ticket.ref.count_sources(self.db, 'depends-on')
+        req.hdf['ticket.depends_on.others'] = ticket.ref.count_destinations(self.db, 'depends-on')
+        req.hdf['ticket.can_be_closed'] = ticket.can_be_closed(self.db) or ''
 
         util.sql_to_hdf(self.db, "SELECT name FROM component ORDER BY name",
                         req.hdf, 'ticket.components')

@@ -184,3 +184,13 @@
  /if ?><?cs
 /def ?>
 
+<?cs def:plural(count,if_one,if_more) ?><?cs
+ if:$count == #1 ?><?cs 
+  var:if_one ?><?cs
+ else ?><?cs
+  var:if_more ?><?cs
+ /if ?><?cs
+/def ?>
+
+<?cs def:relation(rel) ?><span class="relation"><?cs var:rel ?></span><?cs 
+/def ?>

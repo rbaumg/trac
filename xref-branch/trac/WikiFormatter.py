@@ -196,7 +196,7 @@ class CommonFormatter:
 
     def _relation_formatter(self, match, fullmatch):
         self.relname = fullmatch.group('relname')
-        return '<i>&laquo;%s&raquo;</i>' % self.relname
+        return '<span class="relation">%s</span>' % self.relname
 
     def _htmlescapeentity_formatter(self, match, fullmatch):
         #dummy function that match html escape entities in the format:
