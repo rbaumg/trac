@@ -10,22 +10,24 @@ h2 {
 #report-descr { margin: 0 2em; font-size: 90% }
 #report-notfound { margin: 2em; font-size: 110% }
 
+#query { clear: right }
 #query fieldset, #query fieldset input, #query fieldset select { font-size: 11px }
 #query fieldset { margin-top: 1em }
-#query .field { margin: .5em 0 }
-#query .buttons { float: right; margin-top: 0 }
+#query .option, #query .option input, #query .option select { font-size: 11px }
+#query .option { float: left; margin: 1em 2.5em 0 .5em; padding: 0 0 .1em }
+#query .buttons { float: right; margin-top: .5em }
+#query .buttons input { margin: .5em }
+#query hr { clear: both; margin: 0; visibility: hidden }
 
 #filters table { width: 100% }
 #filters tr { height: 2em }
 #filters th, #filters td { padding: 0 .2em; vertical-align: middle }
-#filters th { font-size: 12px; font-weight: bold; text-align: right; white-space: nowrap }
+#filters th { font-size: 11px; text-align: right; white-space: nowrap }
 #filters td label { font-size: 11px }
 #filters td.filter { width: 100% }
 #filters td.filter label { padding-right: 1em }
 
-#options p { margin: .5em }
-
-#nummatches { font-style: italic }
+#nummatches { font-style: italic; margin: .5em 0 0 }
 
 /* Styles for the report list and the report results table
    (extends the styles for "table.listing") */
@@ -53,15 +55,16 @@ h2 {
 .tickets tr.color6-odd  { background: #f0f0f0; border-color: #ddd; color: #888 }
 .tickets tr.color6-even { background: #f7f7f7; border-color: #ddd; color: #888 }
 .tickets tr.color6-odd a, .color6-even a { color: #b66 }
-.tickets tbody td.fullrow {
+.tickets tbody tr.fullrow td, .tickets tbody td.fullrow {
  border: none;
  color: #333;
  background: transparent;
  padding: 0 1em 2em !important;
  font-size: 90%;
 }
-.tickets td.fullrow :link, .tickets td.fullrow :visited { display: inline }
-.tickets td.fullrow hr { display: none }
+.tickets tbody tr.fullrow:hover { background: transparent !important }
+.tickets .fullrow :link, .tickets .fullrow :visited { display: inline }
+.tickets .fullrow hr { display: none }
 
 .tickets tr.odd.highest { background: #fdc; border-color: #e88; color: #a22 }
 .tickets tr.even.highest { background: #fed; border-color: #e99; color: #a22 }

@@ -96,7 +96,7 @@ class Query:
         if not self.cols:
             self.get_columns()
 
-        sql = self.to_sql()
+        sql = self.get_sql()
         self.env.log.debug("Query SQL: %s" % sql)
 
         cursor = db.cursor()
@@ -119,12 +119,12 @@ class Query:
         cursor.close()
         return results
 
-    def to_href(self, format=None):
+    def get_href(self, format=None):
         return self.env.href.query(self.constraints, self.order, self.desc,
                                    self.group, self.groupdesc, self.verbose,
                                    format)
 
-    def to_sql(self):
+    def get_sql(self):
         if not self.cols:
             self.get_columns()
 
@@ -337,16 +337,16 @@ class QueryModule(Module):
                       self.args.has_key('verbose'))
 
         if self.args.has_key('update'):
-            self.req.redirect(query.to_href())
+            self.req.redirect(query.get_href())
 
         props = self._get_ticket_properties()
         add_to_hdf(props, self.req.hdf, 'ticket.properties')
         modes = self._get_constraint_modes()
         add_to_hdf(modes, self.req.hdf, 'query.modes')
 
-        self.add_link('alternate', query.to_href('csv'), 'Comma-delimited Text',
+        self.add_link('alternate', query.get_href('csv'), 'Comma-delimited Text',
             'text/plain')
-        self.add_link('alternate', query.to_href('tab'), 'Tab-delimited Text',
+        self.add_link('alternate', query.get_href('tab'), 'Tab-delimited Text',
             'text/plain')
 
         self.query = query

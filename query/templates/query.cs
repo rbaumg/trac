@@ -12,7 +12,7 @@
 <div id="content" class="query">
  <h1><?cs var:title ?></h1>
 
-<form id="query" method="post" action="<?cs var:cgi_location ?>">
+<form id="query" method="post" action="<?cs var:trac.href.query ?>">
  <fieldset id="filters">
   <legend>Filters</legend>
   <?cs def:checkbox_checked(constraint, option) ?><?cs
@@ -71,7 +71,7 @@
    /each ?>
    <tr>
     <td class="actions" colspan="4" style="text-align: right">
-     <label for="add_filter">Add filter</label>
+     <label for="add_filter">Add filter</label>&nbsp;
      <select name="add_filter" id="add_filter">
       <option></option><?cs
       each:property = ticket.properties ?>
@@ -85,54 +85,50 @@
    </tr>
   </table>
  </fieldset>
- <fieldset id="options">
-  <legend>Options</legend>
-  <p>
-   <label for="group">Group results by</label>
-   <select name="group" id="group">
-    <option></option><?cs
-    each:property = ticket.properties ?><?cs
-     if:property.type == 'select' || property.type == 'radio' ?>
-      <option value="<?cs var:property.name ?>"<?cs
-        if:property.name == query.group ?> selected="selected"<?cs /if ?>><?cs
-        var:property.label ?></option><?cs
-     /if ?><?cs
-    /each ?>
-   </select>
-   <input type="checkbox" name="groupdesc" id="groupdesc"<?cs
-     if:query.groupdesc ?> checked="checked"<?cs /if ?> />
-   <label for="groupdesc">descending</label>
-   <script type="text/javascript">
-     var group = document.getElementById("group");
-     var updateGroupDesc = function() {
-       enableControl('groupdesc', group.selectedIndex > 0);
-     }
-     addEvent(window, 'load', updateGroupDesc);
-     addEvent(group, 'change', updateGroupDesc);
-   </script>
-  </p>
-  <p>
-   <input type="checkbox" name="verbose" id="verbose"<?cs
-     if:query.verbose ?> checked="checked"<?cs /if ?> />
-   <label for="verbose">Show full description under each result</label>
-  </p>
- </fieldset>
+ <p class="option">
+  <label for="group">Group results by</label>
+  <select name="group" id="group">
+   <option></option><?cs
+   each:property = ticket.properties ?><?cs
+    if:property.type == 'select' || property.type == 'radio' ?>
+     <option value="<?cs var:property.name ?>"<?cs
+       if:property.name == query.group ?> selected="selected"<?cs /if ?>><?cs
+       var:property.label ?></option><?cs
+    /if ?><?cs
+   /each ?>
+  </select>
+  <input type="checkbox" name="groupdesc" id="groupdesc"<?cs
+    if:query.groupdesc ?> checked="checked"<?cs /if ?> />
+  <label for="groupdesc">descending</label>
+  <script type="text/javascript">
+    var group = document.getElementById("group");
+    var updateGroupDesc = function() {
+      enableControl('groupdesc', group.selectedIndex > 0);
+    }
+    addEvent(window, 'load', updateGroupDesc);
+    addEvent(group, 'change', updateGroupDesc);
+  </script>
+ </p>
+ <p class="option">
+  <input type="checkbox" name="verbose" id="verbose"<?cs
+    if:query.verbose ?> checked="checked"<?cs /if ?> />
+  <label for="verbose">Show full description under each result</label>
+ </p>
  <div class="buttons">
-  <input type="hidden" name="mode" value="query" />
   <input type="hidden" name="order" value="<?cs var:query.order ?>" />
   <?cs if:query.desc ?><input type="hidden" name="desc" value="1" /><?cs /if ?>
   <input type="submit" name="update" value="Update" />
  </div>
+ <hr />
 </form>
 <script type="text/javascript" src="<?cs
-  var:htdocs_location ?>query.js" defer="defer"></script>
-<script type="text/javascript" defer="defer">
+  var:htdocs_location ?>query.js"></script>
+<script type="text/javascript">
   initializeFilters();
-  stackFieldsets("filters", "options");
 </script>
 
-<p id="nummatches"><?cs alt:len(query.results) ?>No<?cs /alt ?> ticket<?cs if:len(query.results) != 1 ?>s<?cs
-/if ?> matched this query.</p>
+<p id="nummatches"><?cs alt:len(query.results) ?>No<?cs /alt ?> ticket<?cs
+ if:len(query.results) != 1 ?>s<?cs /if ?> matched this query.</p>
 
 <?cs def:thead() ?>
  <thead><tr><?cs each:header = query.headers ?><?cs
@@ -187,7 +183,7 @@
    /if ?>
   <?cs /each ?>
   <?cs if:result.description ?>
-   </tr><tr><td class="fullrow" colspan="<?cs var:len(query.headers) ?>">
+   </tr><tr class="fullrow"><td colspan="<?cs var:len(query.headers) ?>">
     <?cs var:result.description ?>
    </td>
   <?cs /if ?><?cs set:prev_group = result[query.group] ?>
