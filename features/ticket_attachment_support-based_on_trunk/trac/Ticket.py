@@ -229,7 +229,7 @@ class Ticket (Module):
             idx = idx + 1
 
         idx = 0
-        files = Attachment.getAttachments(Ticket, id)
+        files = Attachment.get_attachments(Ticket, id)
         while idx < len(files):
             hdf.setValue('ticket.attachments.%d.name' % idx, files[idx])
             hdf.setValue('ticket.attachments.%d.href' % idx, self.href.attachment(Ticket, id, files[idx]))

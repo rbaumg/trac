@@ -21,7 +21,6 @@
 
 import os
 import util
-from Module import Module
 
 class NoTracReposDefinedException(Exception):
 
@@ -29,21 +28,21 @@ class NoTracReposDefinedException(Exception):
         Exception.__init__(self, "Environment variable TRAC_REPOS needs to be defined")
 
 
-def getAttachmentDir(module, id, createIfNotExist=0):
+def get_attachment_dir(module, id, create_if_not_exist=0):
 
-    tracReposDir = os.getenv('TRAC_REPOS')
-    if not tracReposDir:
+    trac_repos_dir = os.getenv('TRAC_REPOS')
+    if not trac_repos_dir:
         raise NoTracReposDefinedException()
 
-    typeName = module.__name__
-    pos = typeName.rfind('.')
+    type_name = module.__name__
+    pos = type_name.rfind('.')
     if pos > -1:
-        typeName = typeName[pos+1:]
+        type_name = type_name[pos+1:]
 
-    dir = os.path.join(tracReposDir, 'attachments', typeName, str(id))
+    dir = os.path.join(trac_repos_dir, 'attachments', type_name, str(id))
 
     exists = os.access(dir, os.F_OK)
-    if createIfNotExist:
+    if create_if_not_exist:
         if not exists:
             os.makedirs(dir)
 
@@ -53,24 +52,24 @@ def getAttachmentDir(module, id, createIfNotExist=0):
 
     return dir
 
-def createAttachment(module, id, file):
-    dir = getAttachmentDir(module, id, 1)
+def create_attachment(module, id, file):
+    dir = get_attachment_dir(module, id, 1)
     p = os.path.join(dir, file.filename)
     f = open(p, 'wb')
     f.write(file.value)
     f.close()
 
 
-def getAttachments(module, id):
-    dir = getAttachmentDir(module, id)
+def get_attachments(module, id):
+    dir = get_attachment_dir(module, id)
     files = []
     if dir:
         files = os.listdir(dir)
 
     return files
 
-def getAttachmentPath(module, id, filename):
-    dir = getAttachmentDir(module, id)
+def get_attachment_path(module, id, filename):
+    dir = get_attachment_dir(module, id)
     return os.path.join(dir, filename)
 
 
@@ -89,6 +88,6 @@ class Attachment:
 
         m = __import__(self.args['type'], globals(),  locals(), [])
 
-        f = open(getAttachmentPath(m, self.args['id'], self.args['filename']), 'rb')
+        f = open(get_attachment_path(m, self.args['id'], self.args['filename']), 'rb')
         self.req.write(f.read())
         f.close()

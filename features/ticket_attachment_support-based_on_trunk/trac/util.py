@@ -148,8 +148,8 @@ def shorten_line(text):
     return shortline
 
 def debug(msg):
-    tempDir = tempfile.gettempdir()
-    f = open(os.join(tempDir, 'trac.log'), 'a')
+    temp_dir = tempfile.gettempdir()
+    f = open(os.join(temp_dir, 'trac.log'), 'a')
     f.write(msg)
     f.write('\n')
     f.close()
