@@ -404,8 +404,7 @@ class Report (Module):
                                    req.args.get('description', ''),
                                    req.args.get('sql', ''))
 
-        if id != -1:
-            TracObj('report', id).add_cross_refs(self.db, req)
+        TracObj('report', id).add_cross_refs(self.db, req)
 
         if id != -1 or action == 'new':
             self.add_link('up', self.env.href.report(), 'Available Reports')
