@@ -30,7 +30,7 @@ from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
 
 
-class Changeset(Module):
+class ChangesetModule(Module):
     template_name = 'changeset.cs'
 
     def render(self, req):
@@ -81,7 +81,7 @@ class Changeset(Module):
                 info['path.new'] = path
                 info['rev.new'] = rev
                 info['browser_href.new'] = self.env.href.browser(path, rev)
-            if change == 'edit': # Changeset.EDIT
+            if change in (Changeset.COPY, Changeset.EDIT, Changeset.MOVE):
                 self.edits.append((idx, path, kind, base_path, base_rev))
             changes.append(info)
             idx += 1

@@ -35,7 +35,7 @@ modules = {
     'report'      : ('Report', 'Report'),
     'ticket'      : ('Ticket', 'TicketModule'),
     'timeline'    : ('Timeline', 'Timeline'),
-    'changeset'   : ('Changeset', 'Changeset'),
+    'changeset'   : ('Changeset', 'ChangesetModule'),
     'newticket'   : ('Ticket', 'NewticketModule'),
     'query'       : ('Query', 'QueryModule'),
     'attachment'  : ('attachment', 'AttachmentModule'),
