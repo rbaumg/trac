@@ -204,7 +204,7 @@ class Query:
                 clauses.append(get_constraint_sql(k, v[0][neg and 1 or 0:], mode, neg))
 
         if clauses:
-            sql.append("\nWHERE " + " AND ".join(clauses))
+            sql.append("\nWHERE " + " AND ".join(filter(None, clauses)))
 
         sql.append("\nORDER BY ")
         order_cols = [(self.order, self.desc)]

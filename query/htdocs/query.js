@@ -188,6 +188,7 @@ function initializeFilters() {
         var element = createSelect(propertyName, property.options);
       } else if (property.type == "text") {
         var element = document.createElement("input");
+        element.type = "text";
         element.name = propertyName;
         element.size = 42;
       }
