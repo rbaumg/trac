@@ -178,13 +178,9 @@
 /def ?>
 
 <?cs def:backlinks(type,id) ?><?cs 
- if:$xref_count == #0 ?><?cs
- elif:$xref_count == #1 ?>
+ if:$xref_nbacklinks + $xref_nrelations > #0 ?>
  <li><a href="<?cs var:trac.href.xref ?>/<?cs var:type ?>/<?cs var:id ?>"
-        title="One backlink">Backlink</a></li><?cs
- else ?>
- <li><a href="<?cs var:trac.href.xref ?>/<?cs var:type ?>/<?cs var:id ?>"
-        title="<?cs var:xref_count ?> backlinks">Backlinks</a></li><?cs
+	title="<?cs var:$xref_nbacklinks ?> backlinks, <?cs var:$xref_nrelations ?> relations">Cross-references</a></li><?cs
  /if ?><?cs
 /def ?>
 

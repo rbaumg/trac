@@ -546,7 +546,7 @@ class TicketModule (Module):
         ticket = Ticket(self.db, id)
         reporter_id = util.get_reporter_id(req)
 
-        TracObj('ticket', id).add_backlinks(self.db, req)
+        TracObj('ticket', id).add_cross_refs(self.db, req)
 
         if preview:
             # Use user supplied values

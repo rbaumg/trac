@@ -136,7 +136,7 @@ class WikiModule(Module):
         req.hdf['wiki.page_name'] = escape(pagename)
 
         self.obj = WikiPage(pagename, None, self.perm, self.env, self.db)
-        self.obj.add_backlinks(self.db, req)
+        self.obj.add_cross_refs(self.db, req)
 
         req.hdf['wiki.current_href'] = escape(self.obj.href2())
 

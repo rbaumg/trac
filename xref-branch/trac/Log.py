@@ -123,7 +123,7 @@ class Log (Module):
         self.path = req.args.get('path', '/')
         self.authzperm.assert_permission(self.path)
 
-        TracObj('source', self.path).add_backlinks(self.db, req)
+        TracObj('source', self.path).add_cross_refs(self.db, req)
         
         if req.args.has_key('rev'):
             try:

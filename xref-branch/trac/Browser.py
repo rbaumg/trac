@@ -167,7 +167,7 @@ class Browser(Module):
         
         self.authzperm.assert_permission (path)
 
-        TracObj('source', path).add_backlinks(self.db, req)
+        TracObj('source', path).add_cross_refs(self.db, req)
 
         if not rev:
             rev_specified = 0

@@ -110,8 +110,9 @@ class TracObj:
 
     # -- used by other Modules, for cross-referencing 
 
-    def add_backlinks(self, db, req):
-        req.hdf['xref_count'] = self.count_sources(db)
+    def add_cross_refs(self, db, req):
+        req.hdf['xref_nbacklinks'] = self.count_sources(db, relation=False)
+        req.hdf['xref_nrelations'] = self.count_sources(db, relation=True) + self.count_destinations(db, relation=True)
 
     def replace_relation(self, db, relation, dest, facet='', context=''):
         """
@@ -161,17 +162,30 @@ class TracObj:
                        tuple)
 
 
-    def count_sources(self, db):
-        return self._count(db, 'dest')
+    def count_sources(self, db, relation=None, facet=None):
+        return self._count(db, 'dest', relation, facet)
 
-    def count_destinations(self, db):
-        return self._count(db, 'src')
+    def count_destinations(self, db, relation=None, facet=None):
+        return self._count(db, 'src', relation, facet)
 
-    def _count(self, db, base):
+    def _count(self, db, base, relation=None, facet=None):
         cursor = db.cursor()
-        cursor.execute("SELECT count(*) FROM xref "
-                       "WHERE <base>_id = %s AND <base>_type = %s ".replace('<base>', base),
-                       (self.id, self.type))
+        relation_clause = facet_clause = ""
+        tuple = (self.id, self.type)
+        if relation == True:
+            relation_clause = "AND relation != '' "
+        elif relation == False:
+            relation_clause = "AND relation = '' "
+        elif relation:
+            relation_clause = "AND relation = %s "
+            tuple += (relation,)
+        if facet:
+            facet_clause = "AND facet = %s "
+            tuple += (facet,)
+        cursor.execute(("SELECT count(*) FROM xref "
+                        "WHERE <base>_id = %s AND <base>_type = %s "
+                        ).replace('<base>', base) + relation_clause + facet_clause,
+                       tuple)
         return cursor.fetchone()[0]
 
     def relation_exist(self, db, relation, other=None):

@@ -436,7 +436,7 @@ class Changeset(Module):
         else:
             self.rev = youngest_rev
 
-        TracObj('changeset', self.rev).add_backlinks(self.db, req)
+        TracObj('changeset', self.rev).add_cross_refs(self.db, req)
 
         self.diff_options = get_diff_options(req)
         if req.args.has_key('update'):

@@ -269,7 +269,7 @@ class Milestone(Module):
         action = req.args.get('action', 'view')
         id = req.args.get('id')
 
-        TracObj('milestone', id).add_backlinks(self.db, req)
+        TracObj('milestone', id).add_cross_refs(self.db, req)
 
         if action == 'new':
             self.perm.assert_permission(perm.MILESTONE_CREATE)

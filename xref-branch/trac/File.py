@@ -263,7 +263,7 @@ class File(FileCommon):
         self.rev = req.args.get('rev', None)
         self.path = req.args.get('path', '/')
 
-        TracObj('source', self.path).add_backlinks(self.db, req)
+        TracObj('source', self.path).add_cross_refs(self.db, req)
         
         if not self.rev:
             rev_specified = 0
