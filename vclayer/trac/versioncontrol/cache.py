@@ -24,10 +24,6 @@ from __future__ import generators
 from trac.util import TracError
 from trac.versioncontrol import Changeset, Node, Repository
 
-import os.path
-import re
-import time
-
 
 _kindmap = {'D': Node.DIRECTORY, 'F': Node.FILE}
 _actionmap = {'A': Changeset.ADD, 'C': Changeset.COPY,
@@ -43,8 +39,8 @@ class CachedRepository(Repository):
         self.repos = repos
         self.synced = 0
 
-    def __getattr__(self, name):
-        return getattr(self.repos, name)
+    def close(self):
+        self.repos.close()
 
     def get_changeset(self, rev):
         if not self.synced:
@@ -56,45 +52,58 @@ class CachedRepository(Repository):
         self.log.debug("Checking whether sync with repository is needed")
         cursor = self.db.cursor()
         cursor.execute("SELECT COALESCE(max(rev), 0) FROM revision")
-        youngest_stored =  int(cursor.fetchone()[0])
-        if youngest_stored < self.repos.rev:
+        youngest_stored =  cursor.fetchone()[0]
+        if youngest_stored != str(self.repos.youngest_rev):
             kindmap = dict(zip(_kindmap.values(), _kindmap.keys()))
             actionmap = dict(zip(_actionmap.values(), _actionmap.keys()))
             self.log.info("Syncing with repository (%s to %s)"
-                          % (youngest_stored, self.repos.rev))
-            for rev in range(youngest_stored + 1, self.repos.rev + 1):
-                changeset = self.repos.get_changeset(rev)
+                          % (youngest_stored, self.repos.youngest_rev))
+            current_rev = self.repos.next_rev(youngest_stored)
+            while current_rev:
+                changeset = self.repos.get_changeset(current_rev)
                 cursor.execute("INSERT INTO revision (rev,time,author,message) "
-                               "VALUES (%s,%s,%s,%s)", (rev, changeset.date,
-                               changeset.author, changeset.message))
+                               "VALUES (%s,%s,%s,%s)", (current_rev,
+                               changeset.date, changeset.author,
+                               changeset.message))
                 for path,kind,action,base_path,base_rev in changeset.get_changes():
                     self.log.debug("Caching node change in [%s]: %s"
-                                   % (rev, (path, kind, action, base_path, base_rev)))
+                                   % (current_rev, (path, kind, action,
+                                      base_path, base_rev)))
                     kind = kindmap[kind]
                     action = actionmap[action]
                     cursor.execute("INSERT INTO node_change (rev,path,kind,"
                                    "change,base_path,base_rev) "
-                                   "VALUES (%s,%s,%s,%s,%s,%s)", (rev, path,
-                                   kind, action, base_path, base_rev))
+                                   "VALUES (%s,%s,%s,%s,%s,%s)", (current_rev,
+                                   path, kind, action, base_path, base_rev))
+                current_rev = self.repos.next_rev(current_rev)
             self.db.commit()
 
     def get_node(self, path, rev=None):
         return self.repos.get_node(path, rev)
 
+    def get_oldest_rev(self):
+        return self.repos.oldest_rev
+
+    def get_youngest_rev(self):
+        return self.repos.youngest_rev
+
+    def previous_rev(self, rev):
+        return self.repos.previous_rev(rev)
+
+    def next_rev(self, rev):
+        return self.repos.next_rev(rev)
 
 class CachedChangeset(Changeset):
 
     def __init__(self, rev, db, authz):
         self.db = db
         self.authz = authz
+        self.changeset = None
         cursor = self.db.cursor()
         cursor.execute("SELECT time,author,message FROM revision "
                        "WHERE rev=%s", (rev,))
         date, author, message = cursor.fetchone()
         Changeset.__init__(self, rev, message, author, int(date))
-
-    def __getattr__(self, name):
-        return getattr(self.repos, name)
 
     def get_changes(self):
         cursor = self.db.cursor()

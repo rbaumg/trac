@@ -101,6 +101,20 @@ class SubversionRepository(Repository):
 
         return SubversionNode(path, rev, self.authz, self.fs_ptr, self.pool)
 
+    def get_oldest_rev(self):
+        return 1
+
+    def get_youngest_rev(self):
+        return self.rev
+
+    def previous_rev(self, rev):
+        return int(rev) - 1
+
+    def next_rev(self, rev):
+        if int(rev) == self.rev:
+            return None
+        return int(rev) + 1
+
 
 class SubversionNode(Node):
 
@@ -135,9 +149,9 @@ class SubversionNode(Node):
             # For Subversion >= 1.1
             def authz_cb(root, path, pool):
                 return self.authz.has_permission(path) and 1 or 0
-            def history_cb(path, rev, pool):
+            def history2_cb(path, rev, pool):
                 history.append((path, rev))
-            repos.svn_repos_history2(self.fs_ptr, self.path, history_cb,
+            repos.svn_repos_history2(self.fs_ptr, self.path, history2_cb,
                                      authz_cb, self.rev, 0, 1, self.pool)
         else:
             # For Subversion 1.0.x

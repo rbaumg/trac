@@ -87,16 +87,20 @@ class ChangesetModule(Module):
             idx += 1
         req.hdf['changeset.changes'] = changes
 
-        # FIXME: this code assumes integer revision identifiers
-        if int(rev) > 1:
-            self.add_link('first', self.env.href.changeset(1), 'Changeset 1')
-            self.add_link('prev', self.env.href.changeset(int(rev) - 1),
-                          'Changeset %s' % (int(rev) - 1))
-        if int(rev) < int(repos.rev):
-            self.add_link('next', self.env.href.changeset(int(rev) + 1),
-                          'Changeset %s' % (int(rev) + 1))
-            self.add_link('last', self.env.href.changeset(repos.rev),
-                          'Changeset %s' % repos.rev)
+        oldest_rev = repos.oldest_rev
+        if rev != oldest_rev:
+            self.add_link('first', self.env.href.changeset(oldest_rev),
+                          'Changeset %s' % oldest_rev)
+            previous_rev = repos.previous_rev(rev)
+            self.add_link('prev', self.env.href.changeset(previous_rev),
+                          'Changeset %s' % previous_rev)
+        youngest_rev = repos.youngest_rev
+        if rev != youngest_rev:
+            next_rev = repos.next_rev(rev)
+            self.add_link('next', self.env.href.changeset(next_rev),
+                          'Changeset %s' % next_rev)
+            self.add_link('last', self.env.href.changeset(youngest_rev),
+                          'Changeset %s' % youngest_rev)
 
     def display(self, req):
         """HTML version"""
@@ -186,7 +190,10 @@ class ChangesetModule(Module):
                         'filename=Changeset%s.zip' % req.args.get('rev'))
         req.end_headers()
 
-        from cStringIO import StringIO
+        try:
+            from cStringIO import StringIO
+        except ImportError:
+            from StringIO import StringIO
         from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
         buf = StringIO()

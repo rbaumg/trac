@@ -21,22 +21,67 @@
 
 
 class Repository(object):
+    """
+    Base class for a repository provided by a version control system.
+    """
 
     def __init__(self, authz, log):
         self.authz = authz or Authorizer()
         self.log = log
 
     def close(self):
+        """
+        Close the connection to the repository.
+        """
         raise NotImplementedError
 
     def get_changeset(self, rev):
+        """
+        Retrieve a Changeset object that describes the changes made in
+        revision 'rev'.
+        """
         raise NotImplementedError
 
     def get_node(self, path, rev=None):
+        """
+        Retrieve a Node (directory or file) from the repository at the
+        given path. If the rev parameter is specified, the version of the
+        node at that revision is returned, otherwise the latest version
+        of the node is returned.
+        """
+        raise NotImplementedError
+
+    def get_oldest_rev(self):
+        """
+        Return the oldest revision stored in the repository.
+        """
+        raise NotImplementedError
+    oldest_rev = property(lambda x: x.get_oldest_rev())
+
+    def get_youngest_rev(self):
+        """
+        Return the youngest revision in the repository.
+        """
+        raise NotImplementedError
+    youngest_rev = property(lambda x: x.get_youngest_rev())
+
+    def previous_rev(self, rev):
+        """
+        Return the revision immediately preceding the specified revision.
+        """
+        raise NotImplementedError
+
+    def next_rev(self, rev):
+        """
+        Return the revision immediately following the specified revision.
+        """
         raise NotImplementedError
 
 
 class Node(object):
+    """
+    Represents a directory or file in the repository.
+    """
 
     DIRECTORY = "dir"
     FILE = "file"
@@ -47,15 +92,35 @@ class Node(object):
         self.kind = kind
 
     def get_content(self):
+        """
+        Return a stream for reading the content of the node. This method
+        will return None for directories. The returned object should provide
+        a read([len]) function.
+        """
         raise NotImplementedError
 
     def get_entries(self):
+        """
+        Generator that yields the immediate child entries of a directory, in no
+        particular order. If the node is a file, this method returns None.
+        """
         raise NotImplementedError
 
     def get_history(self):
+        """
+        Generator that yields (path, rev) tuples, one for each revision in which
+        the node was changed. This generator will follow copies and moves of a
+        node (if the underlying version control system supports that), which
+        will be indicated by the first element of the tuple (i.e. the path)
+        changing.
+        """
         raise NotImplementedError
 
     def get_properties(self):
+        """
+        Returns a dictionary containing the properties (meta-data) of the node.
+        The set of properties depends on the version control system.
+        """
         raise NotImplementedError
 
     def get_content_length(self):
@@ -79,17 +144,15 @@ class Node(object):
 
 
 class Changeset(object):
+    """
+    Represents a set of changes of a repository.
+    """
 
     ADD = 'add'
     COPY = 'copy'
     DELETE = 'delete'
     EDIT = 'edit'
     MOVE = 'move'
-
-    rev = None
-    message = None
-    author = None
-    date = None
 
     def __init__(self, rev, message, author, date):
         self.rev = rev
@@ -101,16 +164,25 @@ class Changeset(object):
         """
         Generator that produces a (path, kind, change, base_rev, base_path)
         tuple for every change in the changeset, where change can be one of
-        ADD, COPY, DELETE, EDIT or MOVE.
+        Changeset.ADD, Changeset.COPY, Changeset.DELETE, Changeset.EDIT or
+        Changeset.MOVE, and kind is one of Node.FILE or Node.DIRECTORY.
         """
         raise NotImplementedError
 
 
 class PermissionDenied(Exception):
+    """
+    Exception raised by an authorizer if the user has insufficient permissions
+    to view a specific part of the repository.
+    """
     pass
 
 
 class Authorizer(object):
+    """
+    Base class for authorizers that are responsible to granting or denying
+    access to view certain parts of a repository.
+    """
 
     def assert_permission(self, path):
         if not self.has_permission(path):
