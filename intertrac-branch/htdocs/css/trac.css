@@ -241,6 +241,7 @@ label.disabled { color: #d7d7d7 }
 a.missing:link, a.missing:visited { background: #fafaf0; color: #998 }
 a.missing:hover { color: #000; }
 a.closed:link, a.closed:visited { text-decoration: line-through }
+a.intertrac:link,a.intertrac:visited { color: #00b }
 
 dl.wiki dt { font-weight: bold }
 dl.compact dt { float: left; padding-right: .5em }

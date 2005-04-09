@@ -29,6 +29,9 @@ import urllib
 import util
 import Mimeview
 
+from trac.Module import modules
+
+
 __all__ = ['Formatter', 'OneLinerFormatter', 'wiki_to_html', 'wiki_to_oneliner']
 
 
@@ -117,6 +120,8 @@ class CommonFormatter:
     """This class contains the patterns common to both Formatter and
     OneLinerFormatter"""
 
+    _wiki_modules = "|".join([k for k, v in modules.items() if v[2]])
+    
     _rules = [r"(?P<bold>''')",
               r"(?P<italic>'')",
               r"(?P<underline>__)",
@@ -125,10 +130,14 @@ class CommonFormatter:
               r"(?P<superscript>\^)",
               r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
               r"(?P<htmlescapeentity>!?&#\d+;)",
+              # InterTrac support:
+              r"(?P<it_tickethref>!?#((?P<it_ticket>[a-zA-z]+)\d+))",
+              r"(?P<it_changesethref>!?(\[(?P<it_changeset>[a-zA-z]+)\d+\]))",
+              r"(?P<it_modulehref>!?((?P<it_modulename>%s):(?P<it_module>[a-zA-z]+):(?P<it_moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)]))))" % _wiki_modules,
               r"(?P<tickethref>!?#\d+)",
               r"(?P<changesethref>!?(\[\d+\]|\br\d+\b))",
               r"(?P<reporthref>!?\{\d+\})",
-              r"(?P<modulehref>!?((?P<modulename>bug|ticket|browser|source|repos|report|query|changeset|wiki|milestone|search):(?P<moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)]))))",
+              r"(?P<modulehref>!?((?P<modulename>%s):(?P<moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)]))))" % _wiki_modules,
               r"(?P<wikihref>!?(^|(?<=[^A-Za-z]))[A-Z][a-z]+(?:[A-Z][a-z]*[a-z/])+(?:#[A-Za-z0-9]+)?(?=\Z|\s|[.,;:!?\)}\]]))",
               r"(?P<fancylink>!?\[(?P<fancyurl>([a-z]+:[^ ]+)) (?P<linkname>.*?)\])"]
 
@@ -200,6 +209,24 @@ class CommonFormatter:
         # the tickethref regexp
         return match
 
+    # InterTrac support:
+    def _it_tickethref_formatter(self, match, fullmatch):
+        intertrac = fullmatch.group('it_ticket')
+        id = match[1+len(intertrac):]
+        return self._make_intertrac_link(intertrac, 'ticket', id, '#'+id)
+         
+    def _it_changesethref_formatter(self, match, fullmatch):
+        intertrac = fullmatch.group('it_changeset')
+        id = match[1+len(intertrac):-1]
+        return self._make_intertrac_link(intertrac, 'changeset', id, '[%s]' % id)
+
+    def _it_modulehref_formatter(self, match, fullmatch):
+        it_modulename = fullmatch.group('it_modulename')
+        it_module = fullmatch.group('it_module')
+        it_moduleargs = fullmatch.group('it_moduleargs')
+        return self._make_intertrac_link(it_module, it_modulename, it_moduleargs,
+                                         '%s:%s:%s' % (it_modulename, it_module, it_moduleargs))
+
     def _tickethref_formatter(self, match, fullmatch):
         return self._make_ticket_link(match[1:], match)
 
@@ -226,6 +253,20 @@ class CommonFormatter:
         link = fullmatch.group('fancyurl')
         text = fullmatch.group('linkname')
         return self._make_module_link(link, text)
+
+    # InterTrac support:
+    def _make_intertrac_link(self, intertrac, module, id, display_id):
+        href = self.env.get_config('intertrac', intertrac.upper() + '.trac')
+        if href:
+            title = self.env.get_config('intertrac', intertrac.upper() + '.title')
+            _class = 'intertrac'
+        else:
+            title = "Unknown intertrac key '%s'" % intertrac
+            _class = 'missing'
+            href = self._local # FIXME: should stay on the current page
+        return '<a class="%s" title="%s" href="%s/%s/%s">%s</a>' % (
+            _class, title, href, module, id, display_id)
+
 
     def _make_module_link(self, link, text):
         sep = link.find(':')
@@ -379,10 +420,13 @@ class Formatter(CommonFormatter):
 
     hdf = None
 
-    # RE patterns used by other patterna
+    # RE patterns used by other patterns
     _helper_patterns = ('idepth', 'ldepth', 'hdepth', 'fancyurl',
                         'linkname', 'macroname', 'macroargs', 'inline',
-                        'modulename', 'moduleargs')
+                        'modulename', 'moduleargs',
+                        # InterTrac support:
+                        'it_ticket', 'it_changeset',
+                        'it_modulename', 'it_module', 'it_moduleargs')
 
     # Forbid "dangerous" HTML tags and attributes
     _htmlproc_disallow_rule = re.compile('(?i)<(script|noscript|embed|object|'
