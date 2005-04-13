@@ -120,7 +120,27 @@ class CommonFormatter:
     """This class contains the patterns common to both Formatter and
     OneLinerFormatter"""
 
-    _wiki_modules = "|".join([k for k, v in modules.items() if v[2]])
+    # regexp fragments for Trac objects:
+    _page_name = ("(^|(?<=[^A-Za-z]))" # start of string or positive lookbehind is not a letter
+                  "[A-Z]"              # first letter must be a capitalized letter,
+                  "[a-z]+"             #  followed by some lower case
+                  "(?:[A-Z][a-z]*[a-z/])+" # ... followed by one or more wiki page 'component'
+                  "(?:#[A-Za-z0-9]+)?" # optional reference to a section anchor
+                  "(?=\Z|\s|[.,;:!?\)}\]])" # lookahed for something indicating the end of the name
+                  )
+    _ticket_id = "\d+"
+    _changeset_id = "\d+"
+    _report_id = "\d+"
+
+    _wiki_ref_modules = "|".join([k for k, v in modules.items() if v[2]])
+    _module_args = "(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)])"
+
+    # regexp fragments for InterTrac support:
+    _project_name = "[a-zA-Z0-9-_]+"
+    _project_key = "[a-zA-Z]{,3}" # allow at most 3 letters for a project shorthand
+    # Note: the end of _project_key should be differentiable
+    #       from the start of _ticket_id and _changeset_id
+
     
     _rules = [r"(?P<bold>''')",
               r"(?P<italic>'')",
@@ -130,16 +150,21 @@ class CommonFormatter:
               r"(?P<superscript>\^)",
               r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
               r"(?P<htmlescapeentity>!?&#\d+;)",
-              # InterTrac support:
-              r"(?P<it_tickethref>!?#((?P<it_ticket>[a-zA-z]+)\d+))",
-              r"(?P<it_changesethref>!?(\[(?P<it_changeset>[a-zA-z]+)\d+\]))",
-              r"(?P<it_modulehref>!?((?P<it_modulename>%s):(?P<it_module>[a-zA-z]+):(?P<it_moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)]))))" % _wiki_modules,
-              r"(?P<tickethref>!?#\d+)",
-              r"(?P<changesethref>!?(\[\d+\]|\br\d+\b))",
-              r"(?P<reporthref>!?\{\d+\})",
-              r"(?P<modulehref>!?((?P<modulename>%s):(?P<moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)]))))" % _wiki_modules,
-              r"(?P<wikihref>!?(^|(?<=[^A-Za-z]))[A-Z][a-z]+(?:[A-Z][a-z]*[a-z/])+(?:#[A-Za-z0-9]+)?(?=\Z|\s|[.,;:!?\)}\]]))",
-              r"(?P<fancylink>!?\[(?P<fancyurl>([a-z]+:[^ ]+)) (?P<linkname>.*?)\])"]
+              # Trac Objects links:
+              r"(?P<wikihref>!?%s)" % _page_name,
+              r"(?P<tickethref>!?(?:%s:)?#%s)" % (_project_name, _ticket_id),
+              r"(?P<changesethref>!?(?:%s:)?\[%s\]|\br%s\b)" % (_project_name, _changeset_id, _changeset_id),
+              r"(?P<reporthref>!?(?:%s:)?\{%s\})" % (_project_name, _report_id),
+              # Shorthand InterTrac links:
+              r"(?P<it_tickethref>!?#((?P<it_ticket>%s)%s))" % (_project_key, _ticket_id),
+              r"(?P<it_changesethref>!?(\[(?P<it_changeset>%s)%s\]))" % (_project_key, _changeset_id),
+              r"(?P<it_reporthref>!?(\{(?P<it_report>%s)%s\}))" % (_project_key, _report_id),
+              # Generic links:
+              r"(?P<modulehref>!?((?P<it_module>%s:)?(?P<modulename>%s):(?P<moduleargs>%s)))" \
+              % (_project_name, _wiki_ref_modules, _module_args),
+              r"(?P<fancylink>!?\[(?P<it_fancy>%s:)?(?P<fancyurl>([a-z]+:[^ ]+)) (?P<linkname>.*?)\])" \
+              % (_project_name),
+              ]
 
     _open_tags = []
     env = None
@@ -209,63 +234,106 @@ class CommonFormatter:
         # the tickethref regexp
         return match
 
-    # InterTrac support:
-    def _it_tickethref_formatter(self, match, fullmatch):
-        intertrac = fullmatch.group('it_ticket')
-        id = match[1+len(intertrac):]
-        return self._make_intertrac_link(intertrac, 'ticket', id, '#'+id)
-         
-    def _it_changesethref_formatter(self, match, fullmatch):
-        intertrac = fullmatch.group('it_changeset')
-        id = match[1+len(intertrac):-1]
-        return self._make_intertrac_link(intertrac, 'changeset', id, '[%s]' % id)
-
-    def _it_modulehref_formatter(self, match, fullmatch):
-        it_modulename = fullmatch.group('it_modulename')
-        it_module = fullmatch.group('it_module')
-        it_moduleargs = fullmatch.group('it_moduleargs')
-        return self._make_intertrac_link(it_module, it_modulename, it_moduleargs,
-                                         '%s:%s:%s' % (it_modulename, it_module, it_moduleargs))
-
-    def _tickethref_formatter(self, match, fullmatch):
-        return self._make_ticket_link(match[1:], match)
-
-    def _changesethref_formatter(self, match, fullmatch):
-        if match[0] == 'r':
-            rev = match[1:]
-        else:
-            rev = match[1:-1]
-        return self._make_changeset_link(rev, match)
-
-    def _reporthref_formatter(self, match, fullmatch):
-        return self._make_report_link(match[1:-1], match)
-
-    def _modulehref_formatter(self, match, fullmatch):
-        return self._make_module_link(match, match)
+    # Trac Objects links:
 
     def _wikihref_formatter(self, match, fullmatch):
         return self._make_wiki_link(match, match)
 
+    def _tickethref_formatter(self, match, fullmatch):
+        sep = match.find(':')
+        if sep == -1: #  #id
+            return self._make_ticket_link(match[1:], match)
+        else:         #  project:#id
+            intertrac = match[:sep]
+            id = match[sep+2:]
+            return self._intertrac_link(intertrac, 'ticket', id, '#'+id, match)
+
+    def _changesethref_formatter(self, match, fullmatch):
+        if match[0] == 'r':
+            return self._make_changeset_link(match[1:], match)
+        else:
+            sep = match.find(':')
+            if sep == -1: # [id]
+                return self._make_changeset_link(match[1:-1], match)
+            else:         # project:[id]
+                intertrac = match[:sep]
+                id = match[sep+2:-1]
+                return self._intertrac_link(intertrac, 'changeset', id, '[%s]'%id, match)
+
+    def _reporthref_formatter(self, match, fullmatch):
+        sep = match.find(':')
+        if sep == -1: # {id}
+            return self._make_report_link(match[1:-1], match)
+        else:
+            intertrac = match[:sep]
+            id = match[sep+2:-1]
+            return self._intertrac_link(intertrac, 'report', id, '{%s}'%id, match)
+
+    # Shorthand InterTrac links:
+
+    def _it_tickethref_formatter(self, match, fullmatch):
+        intertrac = fullmatch.group('it_ticket')
+        id = match[1+len(intertrac):]
+        return self._intertrac_link(intertrac, 'ticket', id, '#'+id, match)
+         
+    def _it_changesethref_formatter(self, match, fullmatch):
+        intertrac = fullmatch.group('it_changeset')
+        id = match[1+len(intertrac):-1]
+        return self._intertrac_link(intertrac, 'changeset', id, '[%s]'%id, match)
+
+    def _it_reporthref_formatter(self, match, fullmatch):
+        intertrac = fullmatch.group('it_report')
+        id = match[1+len(intertrac):-1]
+        return self._intertrac_link(intertrac, 'report', id, '{%s}'%id, match)
+
+    # Generic links:
+    
     def _url_formatter(self, match, fullmatch):
         return self._make_ext_link(match, match)
 
+    def _modulehref_formatter(self, match, fullmatch):
+        it_module = fullmatch.group('it_module')
+        modulename = fullmatch.group('modulename')
+        moduleargs = fullmatch.group('moduleargs')
+        if it_module:
+            return self._intertrac_link(it_module[:-1], modulename, moduleargs,
+                                             '%s:%s' % (modulename, moduleargs), match)
+        else:
+            return self._make_module_link(match, match)
+
     def _fancylink_formatter(self, match, fullmatch):
+        it_fancy = fullmatch.group('it_fancy')
         link = fullmatch.group('fancyurl')
         text = fullmatch.group('linkname')
-        return self._make_module_link(link, text)
+        if it_fancy:
+            sep = link.index(':')
+            modulename = link[:sep]
+            moduleargs = link[sep+1:]
+            return self._intertrac_link(it_fancy[:-1], modulename, moduleargs, link, text)
+        else:
+            return self._make_module_link(link, text)
 
     # InterTrac support:
-    def _make_intertrac_link(self, intertrac, module, id, display_id):
-        href = self.env.get_config('intertrac', intertrac.upper() + '.trac')
+    def _intertrac_link(self, intertrac, module, id, target, text):
+        # first, check if it is a project key
+        intertrac = self.env.get_config('intertrac', intertrac.upper() + '.key', intertrac)
+        # check if the project name is the one of a sibling environment:
+        if self.env.siblings.has_key(intertrac):
+            intertrac_env = self.env.siblings[intertrac]
+            intertrac_fmt = OneLinerFormatter(intertrac_env, intertrac_env.get_db_cnx(), 1)
+            return re.sub(intertrac_fmt._compiled_rules, intertrac_fmt.replace, target).replace(target, text)
+        # otherwise, rely on project names that were configured
+        href = self.env.get_config('intertrac', intertrac.upper() + '.url')
         if href:
-            title = self.env.get_config('intertrac', intertrac.upper() + '.title')
+            title = '%s %s in %s' % (module, id,
+                                     self.env.get_config('intertrac', intertrac.upper() + '.title'))
             _class = 'intertrac'
         else:
             title = "Unknown intertrac key '%s'" % intertrac
             _class = 'missing'
             href = self._local # FIXME: should stay on the current page
         return '<a class="%s" title="%s" href="%s/%s/%s">%s</a>' % (
-            _class, title, href, module, id, display_id)
+            _class, title, href, module, id, text)
 
 
     def _make_module_link(self, link, text):
@@ -425,8 +493,7 @@ class Formatter(CommonFormatter):
                         'linkname', 'macroname', 'macroargs', 'inline',
                         'modulename', 'moduleargs',
                         # InterTrac support:
-                        'it_ticket', 'it_changeset',
-                        'it_modulename', 'it_module', 'it_moduleargs')
+                        'it_ticket', 'it_changeset', 'it_report', 'it_fancy', 'it_module')
 
     # Forbid "dangerous" HTML tags and attributes
     _htmlproc_disallow_rule = re.compile('(?i)<(script|noscript|embed|object|'

@@ -46,6 +46,7 @@ class Environment:
     """
     def __init__(self, path, create=0):
         self.path = path
+        self.siblings = {}
         if create:
             self.create()
         self.verify()
