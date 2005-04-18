@@ -91,7 +91,8 @@ Copyright &copy; 2003-2005 <a href="http://www.edgewall.com/">Edgewall Software<
     def match_request(self, req):
         match = re.match(r'/about(?:_trac)?(?:/(.*))?$', req.path_info)
         if match:
-            req.args['page'] = match.group(1) or None
+            if match.group(1):
+                req.args['page'] = match.group(1)
             return 1
 
     def process_request(self, req):
