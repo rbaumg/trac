@@ -21,7 +21,7 @@
 
 from __future__ import generators
 
-from trac import db, db_default, Logging, Mimeview, util
+from trac import db, db_default, Mimeview, util
 from trac.config import Configuration
 from trac.core import ComponentManager
 
@@ -55,14 +55,46 @@ class Environment(ComponentManager):
             self.create()
         self.verify()
         self.load_config()
+
         try: # Use binary I/O on Windows
             import msvcrt
             msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
             msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
         except ImportError:
             pass
+
         self.setup_log()
+        self.load_components()
         self.setup_mimeviewer()
+
+    def load_components(self):
+        for section in self.config.sections():
+            loaded_modules = []
+            for name,value in self.config.options(section):
+                if name == 'module':
+                    path = self.config.get(section, 'path')
+                    self.log.debug('Loading component module %s from %s'
+                                   % (value, path))
+                    try:
+                        self.load_component(value, path)
+                        loaded.append(value)
+                    except ImportError, e:
+                        self.log.error('Component module %s not found (%s)'
+                                       % (value, e))
+            for module in db_default.default_components:
+                if not module in loaded_modules:
+                    self.load_component(module)
+
+    def load_component(self, name, path=None):
+        try:
+            return sys.modules[name]
+        except KeyError:
+            import imp
+            parts = name.split('.')
+            for part in parts:
+                fd, path, desc = imp.find_module(part, path and [path] or None)
+                if part == parts[-1]:
+                    imp.load_module(name, fd, path, desc)
 
     def component_activated(self, component):
         self.log.debug('Component %s activated' % component.__class__.__name__)
@@ -183,12 +215,13 @@ class Environment(ComponentManager):
         return os.path.join(self.path, 'log')
 
     def setup_log(self):
+        from trac.log import logger_factory
         logtype = self.config.get('logging', 'log_type')
         loglevel = self.config.get('logging', 'log_level')
         logfile = self.config.get('logging', 'log_file')
         logfile = os.path.join(self.get_log_dir(), logfile)
         logid = self.path # Env-path provides process-unique ID
-        self.log = Logging.logger_factory(logtype, logfile, loglevel, logid)
+        self.log = logger_factory(logtype, logfile, loglevel, logid)
 
     def setup_mimeviewer(self):
         self.mimeview = Mimeview.Mimeview(self)

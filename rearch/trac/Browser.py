@@ -75,9 +75,8 @@ class BrowserModule(Component):
             return 1
 
     def process_request(self, req):
-        rev = req.args.get('rev')
-        self.log.debug("Rev: '%s' %s" % (rev, type(rev)))
         path = req.args.get('path', '/')
+        rev = req.args.get('rev')
 
         req.hdf['title'] = path
         req.hdf['browser'] = {'path': path, 'log_href': self.env.href.log(path)}

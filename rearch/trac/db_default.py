@@ -444,4 +444,10 @@ default_config = \
   ('notification', 'always_notify_reporter', 'false'),
   ('notification', 'smtp_from', 'trac@localhost'),
   ('notification', 'smtp_replyto', 'trac@localhost'),
-  ('timeline', 'changeset_show_files', '0'))
+  ('timeline', 'changeset_show_files', '0'),
+)
+
+default_components = ('trac.About', 'trac.attachment', 'trac.Browser',
+                      'trac.Changeset', 'trac.Query', 'trac.Report',
+                      'trac.Roadmap', 'trac.Search', 'trac.Settings',
+                      'trac.Ticket', 'trac.Timeline', 'trac.Wiki')

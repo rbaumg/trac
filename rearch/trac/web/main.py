@@ -339,13 +339,6 @@ def dispatch_request(path_info, req, env):
             req.session = Session(env, db, req, newsession)
 
             try:
-                # FIXME: This needs to be replaced by a configurable component
-                #        loader
-                import trac.About, trac.attachment, trac.Browser, \
-                       trac.Changeset, trac.Milestone, trac.Query, \
-                       trac.Report, trac.Roadmap, trac.Search, trac.Settings, \
-                       trac.Ticket, trac.Timeline, trac.Wiki
-
                 dispatcher = RequestDispatcher(env)
                 dispatcher.dispatch(req)
             finally:
