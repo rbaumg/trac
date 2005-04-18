@@ -39,7 +39,7 @@ class Source(TracObj):
     type = 'source'
 
     def __init__(self, env, id):
-        TracObj.__init__(self, env, id.strip('/'))
+        TracObj.__init__(self, env, id == '/' and id or id.strip('/'))
 
 
 def _get_changes(env, db, repos, revs):

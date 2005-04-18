@@ -125,7 +125,6 @@ class CommonFormatter:
               r"(?P<subscript>,,)",
               r"(?P<superscript>\^)",
               r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
-              r"(?P<relation>!?(?:&lt;|<){2}(?P<relname>[a-z-]+?)(?:&gt;|>){2})",
               r"(?P<htmlescapeentity>!?&#\d+;)",
               r"(?P<tickethref>!?#\d+)",
               r"(?P<changesethref>!?(\[\d+\]|\br\d+\b))",
@@ -198,10 +197,6 @@ class CommonFormatter:
     def _inlinecode_formatter(self, match, fullmatch):
         return '<tt>%s</tt>' % fullmatch.group('inline')
 
-    def _relation_formatter(self, match, fullmatch):
-        self.relname = fullmatch.group('relname')
-        return '<span class="relation">%s</span>' % self.relname
-
     def _htmlescapeentity_formatter(self, match, fullmatch):
         #dummy function that match html escape entities in the format:
         # &#[0-9]+;
@@ -262,9 +257,8 @@ class CommonFormatter:
         """
         if self.xref:
             from trac.Xref import object_factory
-            self.xref.insert_xref(self.db, self.relname, object_factory(self.env, type, id),
+            self.xref.insert_xref(self.db, '', object_factory(self.env, type, id),
                                   self.facet, self.context)
-            self.relname = ''
 
     def _make_wiki_link(self, page, text):
         anchor = ''
@@ -381,7 +375,6 @@ class XRefFormatter(CommonFormatter):
         rules = self._compiled_rules
 
         for line in text.splitlines():
-            self.relname = ''
             # Handle code block
             if self.in_code_block or line.strip() == '{{{':
                 self.handle_code_block(line)
@@ -455,7 +448,7 @@ class Formatter(CommonFormatter):
 
     # RE patterns used by other patterns
     _helper_patterns = ('idepth', 'ldepth', 'hdepth', 'fancyurl',
-                        'linkname', 'macroname', 'macroargs', 'inline', 'relname',
+                        'linkname', 'macroname', 'macroargs', 'inline',
                         'modulename', 'moduleargs')
 
     # Forbid "dangerous" HTML tags and attributes
