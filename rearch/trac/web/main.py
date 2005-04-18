@@ -170,10 +170,15 @@ class RequestDispatcher(Component):
 
     def dispatch(self, req):
         chosen_handler = None
-        for handler in self.handlers:
-            if handler.match_request(req):
-                chosen_handler = handler
-                break
+
+        if not req.path_info or req.path_info == '/':
+            default_handler = self.config.get('trac', 'default_handler')
+            chosen_handler = self.env[default_handler]
+        else:
+            for handler in self.handlers:
+                if handler.match_request(req):
+                    chosen_handler = handler
+                    break
         if not chosen_handler:
             # FIXME: Should raise '404 Not Found'
             raise TracError, 'No handler matched request to %s' % req.path_info
