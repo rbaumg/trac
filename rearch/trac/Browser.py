@@ -20,7 +20,7 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from trac import perm, util
-from trac.Module import Module
+from trac.core import *
 from trac.web.main import add_link
 from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 
@@ -29,7 +29,8 @@ import time
 CHUNK_SIZE = 4096
 DISP_MAX_FILE_SIZE = 256 * 1024
 
-def _get_changes(env, db, repos, revs):
+def _get_changes(env, repos, revs):
+    db = env.get_db_cnx()
     changes = {}
     for rev in filter(lambda x: x in revs, revs):
         changeset = repos.get_changeset(rev)
@@ -58,10 +59,24 @@ def _get_path_links(href, path, rev):
     return links
 
 
-class BrowserModule(Module):
+class BrowserModule(Component):
 
-    def render(self, req):
+    _extends = ['RequestDispatcher.handlers']
+
+    def match_request(self, req):
+        import re
+        match = re.match(r'/(browser|file)(?:(/.*))?', req.path_info)
+        if match:
+            req.args['path'] = match.group(2)
+            if match.group(1) == 'file':
+                # FIXME: This should be a permanent redirect
+                req.redirect(self.env.href.browser(req.args.get('path'),
+                                                   rev=req.args.get('rev') or None))
+            return 1
+
+    def process_request(self, req):
         rev = req.args.get('rev')
+        self.log.debug("Rev: '%s' %s" % (rev, type(rev)))
         path = req.args.get('path', '/')
 
         req.hdf['title'] = path
@@ -83,7 +98,7 @@ class BrowserModule(Module):
             self.render_file(req, repos, node, rev)
 
     def render_directory(self, req, repos, node, rev=None):
-        self.perm.assert_permission(perm.BROWSER_VIEW)
+        req.perm.assert_permission(perm.BROWSER_VIEW)
 
         order = req.args.get('order', 'name').lower()
         req.hdf['browser.order'] = order
@@ -104,8 +119,7 @@ class BrowserModule(Module):
                 'log_href': self.env.href.log(entry.path, rev=rev),
                 'browser_href': self.env.href.browser(entry.path, rev=rev)
             })
-        changes = _get_changes(self.env, self.db, repos,
-                               [i['rev'] for i in info])
+        changes = _get_changes(self.env, repos, [i['rev'] for i in info])
 
         def cmp_func(a, b):
             dir_cmp = (a['is_dir'] and -1 or 0) + (b['is_dir'] and 1 or 0)
@@ -126,8 +140,9 @@ class BrowserModule(Module):
         req.display('browser.cs')
 
     def render_file(self, req, repos, node, rev=None):
-        self.perm.assert_permission(perm.FILE_VIEW)
+        req.perm.assert_permission(perm.FILE_VIEW)
 
+        db = self.env.get_db_cnx()
         changeset = repos.get_changeset(node.rev)
         req.hdf['file'] = {
             'rev': node.rev,
@@ -136,7 +151,7 @@ class BrowserModule(Module):
             'age': util.pretty_timedelta(changeset.date),
             'author': changeset.author or 'anonymous',
             'message': wiki_to_html(util.wiki_escape_newline(changeset.message),
-                                    req.hdf, self.env, self.db)
+                                    req.hdf, self.env, db)
         }
 
         mime_type = node.content_type
@@ -188,29 +203,22 @@ class BrowserModule(Module):
             req.display('browser.cs')
 
 
-class FileModule(Module):
-    """
-    Legacy module that redirects to the browser for URI backwards compatibility.
-    """
+class LogModule(Component):
 
-    def render(self, req):
-        path = req.args.get('path', '/')
-        rev = req.args.get('rev')
-        # FIXME: This should be a permanent redirect
-        req.redirect(self.env.href.browser(path, rev))
+    _extends = ['RequestDispatcher.handlers']
 
+    def match_request(self, req):
+        import re
+        match = re.match(r'/log(?:(/.*))?', req.path_info)
+        if match:
+            req.args['path'] = match.group(1)
+            return 1
 
-class LogModule(Module):
-    template_name = 'log.cs'
-    template_rss_name = 'log_rss.cs'
-
-    def render(self, req):
-        self.perm.assert_permission(perm.LOG_VIEW)
+    def process_request(self, req):
+        req.perm.assert_permission(perm.LOG_VIEW)
 
         path = req.args.get('path', '/')
         rev = req.args.get('rev')
-
-#       self.authzperm.assert_permission(self.path)
 
         req.hdf['title'] = path + ' (log)'
         req.hdf['log.path'] = path
@@ -241,7 +249,7 @@ class LogModule(Module):
                 previous_path = old_path
             info.append(item)
         req.hdf['log.items'] = info
-        req.hdf['log.changes'] = _get_changes(self.env, self.db, repos,
+        req.hdf['log.changes'] = _get_changes(self.env, repos,
                                               [i['rev'] for i in info])
 
         rss_href = self.env.href.log(path, rev=rev, format='rss')

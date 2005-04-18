@@ -20,8 +20,8 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from trac import perm
+from trac.core import *
 from trac.util import enum, escape, shorten_line
-from trac.Module import Module
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web.main import add_link
 from trac.WikiFormatter import wiki_to_oneliner, wiki_to_html
@@ -31,14 +31,17 @@ import time
 AVAILABLE_FILTERS = ('ticket', 'changeset', 'wiki', 'milestone')
 
 
-class Timeline(Module):
+class TimelineModule(Component):
 
-    def get_info(self, req, start, stop, maxrows, filters=AVAILABLE_FILTERS):
+    _extends = ['RequestDispatcher.handlers']
+
+    def get_info(self, req, db, start, stop, maxrows,
+                 filters=AVAILABLE_FILTERS):
         perm_map = {'ticket': perm.TICKET_VIEW, 'changeset': perm.CHANGESET_VIEW,
                     'wiki': perm.WIKI_VIEW, 'milestone': perm.MILESTONE_VIEW}
         filters = list(filters) # copy list so we can make modifications
         for k,v in perm_map.items():
-            if k in filters and not self.perm.has_permission(v):
+            if k in filters and not req.perm.has_permission(v):
                 filters.remove(k)
         if not filters:
             return []
@@ -81,7 +84,8 @@ class Timeline(Module):
             sql += ' LIMIT %d'
             params += (maxrows,)
 
-        cursor = self.db.cursor()
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
         cursor.execute(sql, params)
 
         # Make the data more HDF-friendly
@@ -104,8 +108,11 @@ class Timeline(Module):
             info.append(item)
         return info
 
-    def render(self, req):
-        self.perm.assert_permission(perm.TIMELINE_VIEW)
+    def match_request(self, req):
+        return req.path_info == '/timeline'
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.TIMELINE_VIEW)
 
         # Kludge: needed to force new check-ins to show up in the timeline
         repos = self.env.get_repository()
@@ -141,10 +148,11 @@ class Timeline(Module):
         req.hdf['title'] = 'Timeline'
         format = req.args.get('format')
 
-        events = self.get_info(req, start, stop, maxrows, filters)
+        db = self.env.get_db_cnx()
+        events = self.get_info(req, db, start, stop, maxrows, filters)
         for idx, event in enum(events):
             render_func = getattr(self, '_render_%s' % event['type'])
-            event = render_func(req, event)
+            event = render_func(req, db, event)
             if not event:
                 continue
 
@@ -172,7 +180,7 @@ class Timeline(Module):
         perm_map = {'ticket': perm.TICKET_VIEW, 'changeset': perm.CHANGESET_VIEW,
                     'wiki': perm.WIKI_VIEW, 'milestone': perm.MILESTONE_VIEW}
         for idx,fltr in enum([f for f in AVAILABLE_FILTERS
-                              if self.perm.has_permission(perm_map[f])]):
+                              if req.perm.has_permission(perm_map[f])]):
             req.hdf['timeline.filters.%d' % idx] = {
                 'name': fltr, 'label': filter_labels[fltr],
                 'enabled': int(fltr in filters)
@@ -183,7 +191,7 @@ class Timeline(Module):
     def display_rss(self, req):
         req.display('timeline_rss.cs', 'application/rss+xml')
 
-    def _render_changeset(self, req, item):
+    def _render_changeset(self, req, db, item):
         absurls = req.args.get('format') == 'rss'
         href = self.env.href
         if absurls:
@@ -195,11 +203,10 @@ class Timeline(Module):
         item['href'] = escape(href.changeset(item['idata']))
         if req.args.get('format') == 'rss':
             item['message'] = escape(wiki_to_html(item['message'], req.hdf,
-                                                  self.env, self.db,
-                                                  absurls=absurls))
+                                                  self.env, db, absurls=absurls))
         else:
-            item['message'] = wiki_to_oneliner(item['message'], self.env,
-                                               self.db, absurls=absurls)
+            item['message'] = wiki_to_oneliner(item['message'], self.env, db,
+                                               absurls=absurls)
 
         try:
             show_files = int(self.config.get('timeline', 'changeset_show_files'))
@@ -209,7 +216,7 @@ class Timeline(Module):
             show_files = 0
 
         if show_files:
-            cursor = self.db.cursor()
+            cursor = db.cursor()
             cursor.execute("SELECT path,change FROM node_change WHERE rev=%s",
                            (item['idata']))
             files = []
@@ -226,7 +233,7 @@ class Timeline(Module):
 
         return item
 
-    def _render_ticket(self, req, item):
+    def _render_ticket(self, req, db, item):
         absurls = req.args.get('format') == 'rss'
         href = self.env.href
         if absurls:
@@ -235,17 +242,17 @@ class Timeline(Module):
         item['href'] = escape(href.ticket(item['idata']))
         if req.args.get('format') == 'rss':
             item['message'] = escape(wiki_to_html(item['message'],
-                                                  req.hdf, self.env,
-                                                  self.db, absurls=absurls))
+                                                  req.hdf, self.env, db,
+                                                  absurls=absurls))
         else:
             item['message'] = wiki_to_oneliner(shorten_line(item['message']),
-                                               self.env, self.db, absurls=absurls)
+                                               self.env, db, absurls=absurls)
         return item
     _render_reopenedticket = _render_ticket
     _render_newticket = _render_ticket
     _render_closedticket = _render_ticket
 
-    def _render_milestone(self, req, item):
+    def _render_milestone(self, req, db, item):
         absurls = req.args.get('format') == 'rss'
         href = self.env.href
         if absurls:
@@ -254,7 +261,7 @@ class Timeline(Module):
         item['href'] = escape(href.milestone(item['tdata']))
         return item
 
-    def _render_wiki(self, req, item):
+    def _render_wiki(self, req, db, item):
         absurls = req.args.get('format') == 'rss'
         href = self.env.href
         if absurls:
@@ -262,7 +269,7 @@ class Timeline(Module):
 
         item['href'] = escape(href.wiki(item['tdata']))
         item['message'] = wiki_to_oneliner(shorten_line(item['message']),
-                                           self.env, self.db, absurls=absurls)
+                                           self.env, db, absurls=absurls)
         if req.args.get('format') == 'rss':
             item['message'] = escape(item['message'])
         return item

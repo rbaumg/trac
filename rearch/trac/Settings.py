@@ -19,15 +19,20 @@
 #
 # Author: Daniel Lundin <daniel@edgewall.com>
 
+from trac.core import *
 from trac.util import TracError
-from trac.Module import Module
 
 
-class Settings(Module):
+class SettingsModule(Component):
+
+    _extends = ['RequestDispatcher.handlers']
 
     _form_fields = ['newsid','name', 'email']
 
-    def render(self, req):
+    def match_request(self, req):
+        return req.path_info == '/settings'
+
+    def process_request(self, req):
         action = req.args.get('action')
         if action == 'save':
             self.save_settings(req)

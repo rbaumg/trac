@@ -23,6 +23,7 @@ from __future__ import generators
 
 from trac import db, db_default, Logging, Mimeview, util
 from trac.config import Configuration
+from trac.core import ComponentManager
 
 import os
 import shutil
@@ -33,7 +34,8 @@ import unicodedata
 
 db_version = db_default.db_version
 
-class Environment:
+
+class Environment(ComponentManager):
     """
     Trac stores project information in a Trac environment.
 
@@ -44,7 +46,10 @@ class Environment:
      * Project specific templates and wiki macros.
      * wiki and ticket attachments.
     """
+    __cnx_pool = None
+
     def __init__(self, path, create=0):
+        ComponentManager.__init__(self)
         self.path = path
         if create:
             self.create()
@@ -59,6 +64,12 @@ class Environment:
         self.setup_log()
         self.setup_mimeviewer()
 
+    def component_activated(self, component):
+        self.log.debug('Component %s activated' % component.__class__.__name__)
+        component.env = self
+        component.config = self.config
+        component.log = self.log
+
     def verify(self):
         """Verifies that self.path is a compatible trac environment"""
         fd = open(os.path.join(self.path, 'VERSION'), 'r')
@@ -66,7 +77,9 @@ class Environment:
         fd.close()
 
     def get_db_cnx(self):
-        return db.get_cnx(self)
+        if not self.__cnx_pool:
+            self.__cnx_pool = db.get_cnx_pool(self)
+        return self.__cnx_pool.get_cnx()
 
     def get_repository(self, authname=None):
         from trac.versioncontrol.cache import CachedRepository
@@ -183,31 +196,33 @@ class Environment:
     def get_attachments_dir(self):
         return os.path.join(self.path, 'attachments')
 
-    def get_attachments(self, cnx, type, id):
-        cursor = cnx.cursor()
+    def get_attachments(self, type, id):
+        db = self.get_db_cnx()
+        cursor = db.cursor()
         cursor.execute('SELECT filename,description,type,size,time,author,ipnr '
                        'FROM attachment '
                        'WHERE type=%s AND id=%s ORDER BY time', (type, id))
         return cursor.fetchall()
-    
-    def get_attachments_hdf(self, cnx, type, id, hdf, prefix):
+
+    def get_attachments_hdf(self, type, id, hdf, prefix):
         from Wiki import wiki_to_oneliner
-        files = self.get_attachments(cnx, type, id)
+        db = self.get_db_cnx()
+        attachments = self.get_attachments(type, id)
         idx = 0
-        for file in files:
+        for filename, description, type, size, t, author, ipnr in attachments:
             hdf['%s.%d' % (prefix, idx)] = {
-                'name': file['filename'],
-                'descr': wiki_to_oneliner(file['description'], self, cnx),
-                'author': util.escape(file['author']),
-                'ipnr': file['ipnr'],
-                'size': util.pretty_size(file['size']),
-                'time': time.strftime('%c', time.localtime(file['time'])),
-                'href': self.href.attachment(type, id, file['filename'])
+                'name': filename,
+                'descr': wiki_to_oneliner(description, self, db),
+                'author': util.escape(author),
+                'ipnr': ipnr,
+                'size': util.pretty_size(size),
+                'time': time.strftime('%c', time.localtime(t)),
+                'href': self.href.attachment(type, id, filename)
             }
             idx += 1
 
-    def create_attachment(self, cnx, type, id, attachment,
-                          description, author, ipnr):
+    def create_attachment(self, type, id, attachment, description, author,
+                          ipnr):
         # Maximum attachment size (in bytes)
         max_size = int(self.config.get('attachment', 'max_size'))
         if hasattr(attachment.file, 'fileno'):
@@ -236,17 +251,21 @@ class Environment:
         path, fd = util.create_unique_file(os.path.join(dir, filename))
         filename = os.path.basename(path)
         filename = urllib.unquote(filename)
-        cursor = cnx.cursor()
+
+        db = self.get_db_cnx()
+        cursor = db.cursor()
         cursor.execute('INSERT INTO attachment VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
                        (type, id, filename, length, int(time.time()),
                        description, author, ipnr))
         shutil.copyfileobj(attachment.file, fd)
         self.log.info('New attachment: %s/%s/%s by %s', type, id, filename, author)
-        cnx.commit()
+        db.commit()
+
         return filename
 
-    def delete_attachment(self, cnx, type, id, filename):
-        cursor = cnx.cursor()
+    def delete_attachment(self, type, id, filename):
+        db = self.get_db_cnx()
+        cursor = db.cursor()
         cursor.execute('DELETE FROM attachment WHERE type=%s AND id=%s AND '
                        'filename=%s', (type, id, filename))
 
@@ -265,7 +284,7 @@ class Environment:
                 raise util.TracError, 'Attachment not found'
 
         self.log.info('Attachment removed: %s/%s/%s', type, id, filename)
-        cnx.commit()
+        db.commit()
 
     def get_known_users(self, cnx=None):
         """

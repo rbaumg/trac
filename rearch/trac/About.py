@@ -20,10 +20,14 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
-from trac import perm
-from trac.Module import Module
+import re
 
-class About(Module):
+from trac import perm
+from trac.core import *
+
+class AboutModule(Component):
+
+    _extends = ['RequestDispatcher.handlers']
 
     about_cs = """
 <?cs include "header.cs"?>
@@ -84,17 +88,22 @@ Copyright &copy; 2003-2005 <a href="http://www.edgewall.com/">Edgewall Software<
 <?cs include "footer.cs"?>
 """ # about_cs
 
-    def render(self, req):
+    def match_request(self, req):
+        match = re.match(r'/about(?:_trac)?(?:/(.*))?$', req.path_info)
+        if match:
+            req.args['page'] = match.group(1) or None
+            return 1
+
+    def process_request(self, req):
         page = req.args.get('page', 'default')
         req.hdf['title'] = 'About Trac'
-        if page[0:7] == 'config':
-            self.perm.assert_permission(perm.CONFIG_VIEW)
+        if page == 'config':
+            req.perm.assert_permission(perm.CONFIG_VIEW)
             req.hdf['about.page'] = 'config'
             # Export the config table to hdf
-            config = self.env.config
             sections = []
-            for section in config.sections():
-                for name,value in config.options(section):
+            for section in self.config.sections():
+                for name,value in self.config.options(section):
                     sections.append({'section': section, 'name': name,
                                      'value': value})
             req.hdf['about.config'] = sections

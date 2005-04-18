@@ -20,7 +20,7 @@
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
 from trac import perm
-from trac.Module import Module
+from trac.core import *
 from trac.Ticket import get_custom_fields, Ticket
 from trac.web.main import add_link
 from trac.WikiFormatter import wiki_to_html
@@ -97,10 +97,12 @@ def calc_ticket_stats(tickets):
     }
 
 
-class Milestone(Module):
+class MilestoneModule(Component):
 
-    def save_milestone(self, req, id):
-        self.perm.assert_permission(perm.MILESTONE_MODIFY)
+    _extends = ['RequestDispatcher.handlers']
+
+    def save_milestone(self, req, db, id):
+        req.perm.assert_permission(perm.MILESTONE_MODIFY)
         if req.args.has_key('save'):
             name = req.args.get('name', '')
             if not name:
@@ -141,24 +143,24 @@ class Milestone(Module):
                             'Invalid Date Format')
         return seconds
 
-    def create_milestone(self, req, name, due=0, completed=0, description=''):
-        self.perm.assert_permission(perm.MILESTONE_CREATE)
+    def create_milestone(self, req, db, name, due=0, completed=0, description=''):
+        req.perm.assert_permission(perm.MILESTONE_CREATE)
         if not name:
             raise TracError('You must provide a name for the milestone.',
                             'Required Field Missing')
-        cursor = self.db.cursor()
+        cursor = db.cursor()
         self.log.debug("Creating new milestone '%s'" % name)
         cursor.execute("INSERT INTO milestone (name,due,completed,description) "
                        "VALUES (%s,%s,%s,%s)",
                        (name, due, completed, description))
-        self.db.commit()
+        db.commit()
         req.redirect(self.env.href.milestone(name))
 
-    def delete_milestone(self, req, id):
-        self.perm.assert_permission(perm.MILESTONE_DELETE)
-        self.get_milestone(req, id) # check whether the milestone exists
+    def delete_milestone(self, req, db, id):
+        req.perm.assert_permission(perm.MILESTONE_DELETE)
+        self.get_milestone(req, db, id) # check whether the milestone exists
         if req.args.has_key('delete'):
-            cursor = self.db.cursor()
+            cursor = db.cursor()
             if req.args.has_key('retarget'):
                 target = req.args.get('target')
                 if target:
@@ -174,14 +176,14 @@ class Milestone(Module):
                                    "WHERE milestone=%s", (id,))
             self.log.info('Deleting milestone %s' % id)
             cursor.execute("DELETE FROM milestone WHERE name=%s", (id,))
-            self.db.commit()
+            db.commit()
             req.redirect(self.env.href.roadmap())
         else:
             req.redirect(self.env.href.milestone(id))
 
-    def update_milestone(self, req, id, name, due, completed, description):
-        self.perm.assert_permission(perm.MILESTONE_MODIFY)
-        cursor = self.db.cursor()
+    def update_milestone(self, req, db, id, name, due, completed, description):
+        req.perm.assert_permission(perm.MILESTONE_MODIFY)
+        cursor = db.cursor()
         self.log.info("Updating milestone '%s'" % id)
         if req.args.has_key('save'):
             self.log.info('Updating milestone field of all tickets '
@@ -191,13 +193,13 @@ class Milestone(Module):
             cursor.execute("UPDATE milestone SET name=%s,due=%s,"
                            "completed=%s,description=%s WHERE name=%s",
                            (name, due, completed, description, id))
-            self.db.commit()
+            db.commit()
             req.redirect(self.env.href.milestone(name))
         else:
             req.redirect(self.env.href.milestone(id))
 
-    def get_groups(self, by='component'):
-        cursor = self.db.cursor ()
+    def get_groups(self, db, by='component'):
+        cursor = db.cursor()
         groups = []
         if by in ['status', 'resolution', 'severity', 'priority']:
             cursor.execute("SELECT name FROM enum WHERE type = %s "
@@ -221,8 +223,8 @@ class Milestone(Module):
             groups.append(row['name'] or '')
         return groups
 
-    def get_milestone(self, req, name):
-        cursor = self.db.cursor()
+    def get_milestone(self, req, db, name):
+        cursor = db.cursor()
         cursor.execute("SELECT name, due, completed, description "
                        "FROM milestone WHERE name = %s", (name,))
         row = cursor.fetchone()
@@ -235,7 +237,7 @@ class Milestone(Module):
         if description:
             milestone['description_source'] = description
             milestone['description'] = wiki_to_html(description, req.hdf,
-                                                    self.env, self.db)
+                                                    self.env, db)
         due = row['due'] and int(row['due'])
         if due > 0:
             milestone['due'] = due
@@ -250,38 +252,47 @@ class Milestone(Module):
             milestone['completed_delta'] = pretty_timedelta(completed)
         return milestone
 
-    def render(self, req):
-        self.perm.assert_permission(perm.MILESTONE_VIEW)
+    def match_request(self, req):
+        import re, urllib
+        match = re.match(r'/milestone(?:/([^\?]+))?(?:/(.*)/?)?', req.path_info)
+        if match:
+            if match.group(1):
+                req.args['id'] = urllib.unquote(match.group(1))
+            return 1
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.MILESTONE_VIEW)
 
         add_link(req, 'up', self.env.href.roadmap(), 'Roadmap')
 
         action = req.args.get('action', 'view')
         id = req.args.get('id')
 
+        db = self.env.get_db_cnx()
         if action == 'new':
-            self.perm.assert_permission(perm.MILESTONE_CREATE)
-            self.render_editor(req)
+            req.perm.assert_permission(perm.MILESTONE_CREATE)
+            self.render_editor(req, db)
         elif action == 'edit':
-            self.perm.assert_permission(perm.MILESTONE_MODIFY)
-            self.render_editor(req, id)
+            req.perm.assert_permission(perm.MILESTONE_MODIFY)
+            self.render_editor(req, db, id)
         elif action == 'delete':
-            self.perm.assert_permission(perm.MILESTONE_DELETE)
-            self.render_confirm(req, id)
+            req.perm.assert_permission(perm.MILESTONE_DELETE)
+            self.render_confirm(req, db, id)
         elif action == 'commit_changes':
-            self.save_milestone(req, id)
+            self.save_milestone(req, db, id)
         elif action == 'confirm_delete':
-            self.delete_milestone(req, id)
+            self.delete_milestone(req, db, id)
         else:
-            self.render_view(req, id)
+            self.render_view(req, db, id)
         req.display('milestone.cs')
 
-    def render_confirm(self, req, id):
-        milestone = self.get_milestone(req, id)
+    def render_confirm(self, req, db, id):
+        milestone = self.get_milestone(req, db, id)
         req.hdf['title'] = 'Milestone %s' % milestone['name']
         req.hdf['milestone.mode'] = 'delete'
         req.hdf['milestone'] = milestone
 
-        cursor = self.db.cursor()
+        cursor = db.cursor()
         cursor.execute("SELECT name FROM milestone "
                        "WHERE name != '' ORDER BY name")
         milestone_no = 0
@@ -293,13 +304,13 @@ class Milestone(Module):
             milestone_no += 1
         cursor.close()
 
-    def render_editor(self, req, id=None):
+    def render_editor(self, req, db, id=None):
         if not id:
-            milestone = { 'name': '', 'date': '', 'description': '' }
+            milestone = {'name': '', 'date': '', 'description': ''}
             req.hdf['title'] = 'New Milestone'
             req.hdf['milestone.mode'] = 'new'
         else:
-            milestone = self.get_milestone(req, id)
+            milestone = self.get_milestone(req, db, id)
             req.hdf['title'] = 'Milestone %s' % milestone['name']
             req.hdf['milestone.mode'] = 'edit'
         req.hdf['milestone'] = milestone
@@ -308,8 +319,8 @@ class Milestone(Module):
         req.hdf['milestone.datetime_now'] = time.strftime('%x %X',
                                                           time.localtime(time.time()))
 
-    def render_view(self, req, id):
-        milestone = self.get_milestone(req, id)
+    def render_view(self, req, db, id):
+        milestone = self.get_milestone(req, db, id)
         req.hdf['title'] = 'Milestone %s' % milestone['name']
         req.hdf['milestone.mode'] = 'view'
 
@@ -332,13 +343,13 @@ class Milestone(Module):
         by = req.args.get('by', 'component')
         req.hdf['milestone.stats.grouped_by'] = by
 
-        tickets = get_tickets_for_milestone(self.env, self.db, id, by)
+        tickets = get_tickets_for_milestone(self.env, db, id, by)
         stats = calc_ticket_stats(tickets)
         req.hdf['milestone.stats'] = stats
         queries = get_query_links(self.env, milestone['name'])
         req.hdf['milestone.queries'] = queries
 
-        groups = self.get_groups(by)
+        groups = self.get_groups(db, by)
         group_no = 0
         max_percent_total = 0
         for group in groups:

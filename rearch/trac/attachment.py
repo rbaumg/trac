@@ -20,27 +20,29 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 import os
+import re
 import urllib
 
 from trac import perm, util
-from trac.Module import Module
+from trac.core import *
 from trac.web.main import add_link
 
 
-class AttachmentModule(Module):
+class AttachmentModule(Component):
+
+    _extends = ['RequestDispatcher.handlers']
 
     CHUNK_SIZE = 4096
     DISP_MAX_FILE_SIZE = 256 * 1024
 
-    def get_parent_link(self, parent_type, parent_id):
-        if parent_type == 'ticket':
-            return ('Ticket #' + parent_id, self.env.href.ticket(parent_id))
-        elif parent_type == 'wiki':
-            return (parent_id, self.env.href.wiki(parent_id))
-        else:
-            return (None, None)
+    def match_request(self, req):
+        match = re.match(r'^/attachment/(ticket|wiki)(?:/(.*))?$', req.path_info)
+        if match:
+            req.args['type'] = match.group(1)
+            req.args['path'] = match.group(2)
+            return 1
 
-    def render(self, req):
+    def process_request(self, req):
         parent_type = req.args.get('type')
         path = req.args.get('path')
         if not parent_type or not path:
@@ -62,9 +64,17 @@ class AttachmentModule(Module):
             else:
                 self.render_view(req, parent_type, parent_id, filename)
 
+    def get_parent_link(self, parent_type, parent_id):
+        if parent_type == 'ticket':
+            return ('Ticket #' + parent_id, self.env.href.ticket(parent_id))
+        elif parent_type == 'wiki':
+            return (parent_id, self.env.href.wiki(parent_id))
+        else:
+            return (None, None)
+
     def render_form(self, req, parent_type, parent_id):
         perm_map = {'ticket': perm.TICKET_APPEND, 'wiki': perm.WIKI_MODIFY}
-        self.perm.assert_permission(perm_map[parent_type])
+        req.perm.assert_permission(perm_map[parent_type])
 
         text, link = self.get_parent_link(parent_type, parent_id)
         req.hdf['attachment'] = {
@@ -80,7 +90,7 @@ class AttachmentModule(Module):
 
     def save_attachment(self, req, parent_type, parent_id):
         perm_map = {'ticket': perm.TICKET_APPEND, 'wiki': perm.WIKI_MODIFY}
-        self.perm.assert_permission(perm_map[parent_type])
+        req.perm.assert_permission(perm_map[parent_type])
 
         if req.args.has_key('cancel'):
             req.redirect(self.get_parent_link(parent_type, parent_id)[1])
@@ -91,7 +101,7 @@ class AttachmentModule(Module):
         description = req.args.get('description')
         author = req.args.get('author')
 
-        filename = self.env.create_attachment(self.db, parent_type, parent_id,
+        filename = self.env.create_attachment(parent_type, parent_id,
                                               attachment, description, author,
                                               req.remote_addr)
 
@@ -101,7 +111,7 @@ class AttachmentModule(Module):
 
     def delete_attachment(self, req, parent_type, parent_id, filename):
         perm_map = {'ticket': perm.TICKET_ADMIN, 'wiki': perm.WIKI_DELETE}
-        self.perm.assert_permission(perm_map[parent_type])
+        req.perm.assert_permission(perm_map[parent_type])
 
         self.env.delete_attachment(self.db, parent_type, parent_id, filename)
         text, link = self.get_parent_link(parent_type, parent_id)
@@ -111,7 +121,7 @@ class AttachmentModule(Module):
 
     def render_view(self, req, parent_type, parent_id, filename):
         perm_map = {'ticket': perm.TICKET_VIEW, 'wiki': perm.WIKI_VIEW}
-        self.perm.assert_permission(perm_map[parent_type])
+        req.perm.assert_permission(perm_map[parent_type])
 
         filename = os.path.basename(filename)
         path = os.path.join(self.env.get_attachments_dir(), parent_type,
@@ -162,7 +172,7 @@ class AttachmentModule(Module):
         }
 
         perm_map = {'ticket': perm.TICKET_ADMIN, 'wiki': perm.WIKI_DELETE}
-        if self.perm.has_permission(perm_map[parent_type]):
+        if req.perm.has_permission(perm_map[parent_type]):
             req.hdf['attachment.can_delete'] = 1
 
         self.log.debug("Rendering preview of file %s with mime-type %s"

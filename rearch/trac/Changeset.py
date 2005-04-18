@@ -20,7 +20,7 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from trac import perm
-from trac.Module import Module
+from trac.core import *
 from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
 from trac.web.main import add_link
@@ -31,10 +31,18 @@ import util
 import re
 
 
-class ChangesetModule(Module):
+class ChangesetModule(Component):
 
-    def render(self, req):
-        self.perm.assert_permission(perm.CHANGESET_VIEW)
+    _extends = ['RequestDispatcher.handlers']
+
+    def match_request(self, req):
+        match = re.match(r'/changeset/([0-9]+)$', req.path_info)
+        if match:
+            req.args['rev'] = match.group(1)
+            return 1
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.CHANGESET_VIEW)
 
         add_link(req, 'alternate', '?format=diff', 'Unified Diff',
                  'text/plain', 'diff')
@@ -62,13 +70,14 @@ class ChangesetModule(Module):
     def render_html(self, req, repos, chgset, diff_options):
         """HTML version"""
 
+        db = self.env.get_db_cnx()
         req.hdf['title'] = '[%s]' % chgset.rev
         req.hdf['changeset'] = {
             'revision': chgset.rev,
             'time': time.asctime(time.localtime(chgset.date)),
             'author': util.escape(chgset.author or 'anonymous'),
             'message': wiki_to_html(util.wiki_escape_newline(chgset.message or '--'),
-                                    req.hdf, self.env, self.db)
+                                    req.hdf, self.env, db)
         }
 
         oldest_rev = repos.oldest_rev

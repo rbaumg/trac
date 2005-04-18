@@ -20,7 +20,7 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from trac import perm
-from trac.Module import Module
+from trac.core import *
 from trac.util import TracError, escape, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web.main import add_link
@@ -30,7 +30,9 @@ import time
 import string
 
 
-class Search(Module):
+class SearchModule(Component):
+
+    _extends = ['RequestDispatcher.handlers']
 
     RESULTS_PER_PAGE = 10
 
@@ -78,11 +80,11 @@ class Search(Module):
         keywords = query.split(' ')
 
         if changeset:
-            changeset = self.perm.has_permission(perm.CHANGESET_VIEW)
+            changeset = req.perm.has_permission(perm.CHANGESET_VIEW)
         if tickets:
-            tickets = self.perm.has_permission(perm.TICKET_VIEW)
+            tickets = req.perm.has_permission(perm.TICKET_VIEW)
         if wiki:
-            wiki = self.perm.has_permission(perm.WIKI_VIEW)
+            wiki = req.perm.has_permission(perm.WIKI_VIEW)
 
         if changeset == tickets == wiki == 0:
             return ([], 0)
@@ -135,7 +137,8 @@ class Search(Module):
                                 'Query must be at least 3 characters long.',
                                 'Search Error')
 
-        cursor = self.db.cursor ()
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
 
         q = []
         if changeset:
@@ -210,8 +213,11 @@ class Search(Module):
             info.append(item)
         return info, more
 
-    def render(self, req):
-        self.perm.assert_permission(perm.SEARCH_VIEW)
+    def match_request(self, req):
+        return req.path_info == '/search'
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.SEARCH_VIEW)
         self.authzperm = SubversionAuthorizer(self.env, req.authname)
 
         req.hdf['title'] = 'Search'

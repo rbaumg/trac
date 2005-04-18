@@ -20,8 +20,8 @@
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
 from trac import Milestone, perm, __version__
+from trac.core import *
 from trac.util import pretty_timedelta, CRLF, TracError
-from trac.Module import Module
 from trac.Ticket import Ticket
 from trac.web.main import add_link
 from trac.WikiFormatter import wiki_to_html
@@ -30,10 +30,15 @@ import re
 from time import localtime, strftime, time
 
 
-class Roadmap(Module):
+class RoadmapModule(Component):
 
-    def render(self, req):
-        self.perm.assert_permission(perm.ROADMAP_VIEW)
+    _extends = ['RequestDispatcher.handlers']
+
+    def match_request(self, req):
+        return req.path_info == '/roadmap'
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.ROADMAP_VIEW)
         req.hdf['title'] = 'Roadmap'
 
         show = req.args.get('show')
@@ -56,7 +61,8 @@ class Roadmap(Module):
                                         format='ics')
         add_link(req, 'alternate', icshref, 'iCalendar', 'text/calendar', 'ics')
 
-        cursor = self.db.cursor()
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
         cursor.execute(query)
         milestones = []
         while 1:
@@ -73,7 +79,7 @@ class Roadmap(Module):
             if description:
                 milestone['description'] = wiki_to_html(description,
                                                         req.hdf,
-                                                        self.env, self.db)
+                                                        self.env, db)
                 milestone['description_text'] = description
             if milestone['due'] > 0:
                 milestone['due_date'] = strftime('%x', localtime(milestone['due']))
@@ -89,7 +95,7 @@ class Roadmap(Module):
 
         milestone_no = 0
         for milestone in milestones:
-            tickets = Milestone.get_tickets_for_milestone(self.env, self.db,
+            tickets = Milestone.get_tickets_for_milestone(self.env, db,
                                                           milestone['name'],
                                                           'owner')
             stats = Milestone.calc_ticket_stats(tickets)
@@ -100,11 +106,11 @@ class Roadmap(Module):
             milestone_no += 1
 
         if req.args.get('format') == 'ics':
-            self.render_ics(req, milestones)
+            self.render_ics(req, db, milestones)
         else:
             req.display('roadmap.cs')
 
-    def render_ics(self, req, milestones):
+    def render_ics(self, req, db, milestones):
         req.send_response(200)
         req.send_header('Content-Type', 'text/plain;charset=utf-8')
         req.end_headers()
@@ -163,7 +169,7 @@ class Roadmap(Module):
                 write_prop('END', 'VEVENT')
             for ticket in [ticket for ticket in milestone['tickets']
                           if ticket['owner'] == user]:
-                ticket = Ticket(self.db, ticket['id'])
+                ticket = Ticket(db, ticket['id'])
                 write_prop('BEGIN', 'VTODO')
                 if milestone.has_key('date'):
                     write_prop('RELATED-TO', uid)

@@ -20,7 +20,7 @@
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
 from trac import perm
-from trac.Module import Module
+from trac.core import *
 from trac.Ticket import get_custom_fields, insert_custom_fields, Ticket
 from trac.web.main import add_link
 from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
@@ -289,7 +289,9 @@ class Query(object):
         return "".join(sql)
 
 
-class QueryModule(Module):
+class QueryModule(Component):
+
+    _extends = ['RequestDispatcher.handlers']
 
     def _get_constraints(self, req):
         constraints = {}
@@ -340,11 +342,11 @@ class QueryModule(Module):
 
         return constraints
 
-    def _get_ticket_properties(self):
+    def _get_ticket_properties(self, db):
         # FIXME: This should be in the ticket module
         properties = []
 
-        cursor = self.db.cursor()
+        cursor = db.cursor()
         def rows_to_list(sql):
             list = []
             cursor.execute(sql)
@@ -420,8 +422,11 @@ class QueryModule(Module):
         ]
         return modes
 
-    def render(self, req):
-        self.perm.assert_permission(perm.TICKET_VIEW)
+    def match_request(self, req):
+        return req.path_info == '/query'
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.TICKET_VIEW)
 
         constraints = self._get_constraints(req)
         if not constraints and not req.args.has_key('order'):
@@ -480,7 +485,9 @@ class QueryModule(Module):
     def display_html(self, req, query):
         req.hdf['title'] = 'Custom Query'
 
-        req.hdf['ticket.properties'] = self._get_ticket_properties()
+        db = self.env.get_db_cnx()
+
+        req.hdf['ticket.properties'] = self._get_ticket_properties(db)
         req.hdf['query.modes'] = self._get_constraint_modes()
 
         # For clients without JavaScript, we add a new constraint here if
@@ -522,7 +529,7 @@ class QueryModule(Module):
         if query.verbose:
             req.hdf['query.verbose'] = 1
 
-        tickets = query.execute(self.db)
+        tickets = query.execute(db)
 
         # The most recent query is stored in the user session
         orig_list = rest_list = None
@@ -545,7 +552,7 @@ class QueryModule(Module):
                 rest_list.remove(tid)
             for rest_id in rest_list:
                 ticket = {}
-                ticket.update(Ticket(self.db, int(rest_id)).data)
+                ticket.update(Ticket(db, int(rest_id)).data)
                 ticket['removed'] = 1
                 tickets.insert(orig_list.index(rest_id), ticket)
 
@@ -560,7 +567,7 @@ class QueryModule(Module):
             ticket['time'] = strftime('%c', localtime(ticket['time']))
             if ticket.has_key('description'):
                 ticket['description'] = wiki_to_oneliner(ticket['description'] or '',
-                                                         self.env, self.db)
+                                                         self.env, db)
 
         req.session['query_tickets'] = ' '.join([str(t['id']) for t in tickets])
 
@@ -577,7 +584,7 @@ class QueryModule(Module):
         cols = query.get_columns()
         req.write(sep.join([col for col in cols]) + CRLF)
 
-        results = query.execute(self.db)
+        results = query.execute(self.env.get_db_cnx())
         for result in results:
             req.write(sep.join([str(result[col]).replace(sep, '_')
                                                 .replace('\n', ' ')
@@ -586,13 +593,14 @@ class QueryModule(Module):
 
     def display_rss(self, req, query):
         query.verbose = 1
-        results = query.execute(self.db)
+        db = self.env.get_db_cnx()
+        results = query.execute(db)
         for result in results:
             if result['reporter'].find('@') == -1:
                 result['reporter'] = ''
             if result['description']:
                 result['description'] = escape(wiki_to_html(result['description'] or '',
-                                                            None, self.env, self.db, 1))
+                                                            None, self.env, db, 1))
             if result['time']:
                 result['time'] = strftime('%a, %d %b %Y %H:%M:%S GMT',
                                           gmtime(result['time']))

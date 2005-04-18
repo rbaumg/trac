@@ -19,6 +19,7 @@
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
+from trac.core import *
 from trac.perm import PermissionCache, PermissionError
 from trac.util import escape, href_join, TracError, TRUE
 from trac.web.auth import Authenticator
@@ -53,6 +54,7 @@ class Request(object):
     args = None
     hdf = None
     authname = None
+    perm = None
     session = None
     _headers = None # additional headers to send
 
@@ -135,6 +137,52 @@ class Request(object):
         raise NotImplementedError
 
 
+class IRequestHandler(Interface):
+
+    def match_request(req):
+        """
+        Return whether the handler wants to process the given request.
+        """
+
+    def process_request(req):
+        """
+        Process the request.
+        """
+
+
+class RequestDispatcher(Component):
+
+    handlers = ExtensionPoint(IRequestHandler)
+
+    legacy_module_map = {
+        'AboutModule': 'about',
+        'BrowserModule': 'browser', 'LogModule': 'browser',
+        'ChangesetModule': 'changeset',
+        'AttachmentModule': 'attachment',
+        'QueryModule': 'query', 'ReportModule': 'report',
+        'RoadmapModule': 'roadmap', 'MilestoneModule': 'milestone',
+        'SearchModule': 'search',
+        'SettingsModule': 'settings',
+        'TicketModule': 'ticket', 'NewticketModule': 'ticket',
+        'TimelineModule': 'timeline',
+        'WikiModule': 'wiki'
+    }
+
+    def dispatch(self, req):
+        chosen_handler = None
+        for handler in self.handlers:
+            if handler.match_request(req):
+                chosen_handler = handler
+                break
+        if not chosen_handler:
+            # FIXME: Should raise '404 Not Found'
+            raise TracError, 'No handler matched request to %s' % req.path_info
+
+        name = chosen_handler.__class__.__name__
+        req.hdf['trac.active_module'] = self.legacy_module_map[name]
+        chosen_handler.process_request(req)
+
+
 def add_link(req, rel, href, title=None, type=None, class_name=None):
     link = {'href': escape(href)}
     if title: link['title'] = escape(title)
@@ -205,6 +253,8 @@ def populate_hdf(hdf, env, req=None):
         hdf['base_host'] = req.base_url[:req.base_url.rfind(req.cgi_location)]
         hdf['cgi_location'] = req.cgi_location
         hdf['trac.authname'] = escape(req.authname)
+        for action in req.perm.permissions():
+            req.hdf['trac.acl.' + action] = 1
 
         add_link(req, 'start', env.href.wiki())
         add_link(req, 'search', env.href.search())
@@ -243,6 +293,7 @@ def dispatch_request(path_info, req, env):
     if not base_url:
         base_url = absolute_url(req)
     req.base_url = base_url
+    req.path_info = path_info
 
     env.href = Href(req.cgi_location)
     env.abs_href = Href(req.base_url)
@@ -276,6 +327,7 @@ def dispatch_request(path_info, req, env):
                         referer = None
                     req.redirect(referer or env.href.wiki())
             req.authname = authenticator.authname
+            req.perm = PermissionCache(db, req.authname)
 
             from trac.web.clearsilver import HDFWrapper
             req.hdf = HDFWrapper(loadpaths=[env.get_templates_dir(),
@@ -287,19 +339,15 @@ def dispatch_request(path_info, req, env):
             req.session = Session(env, db, req, newsession)
 
             try:
-                # Load the selected module
-                from trac.Module import module_factory, parse_path_info
-                parse_path_info(req.args, path_info)
-                module = module_factory(req.args.get('mode', 'wiki'))
-                module.env = env
-                module.config = env.config
-                module.log = env.log
-                module.db = db
-                module.perm = PermissionCache(module.db, req.authname)
-                req.hdf['trac.active_module'] = module._name
-                for action in module.perm.permissions():
-                    req.hdf['trac.acl.' + action] = 1
-                module.render(req)
+                # FIXME: This needs to be replaced by a configurable component
+                #        loader
+                import trac.About, trac.attachment, trac.Browser, \
+                       trac.Changeset, trac.Milestone, trac.Query, \
+                       trac.Report, trac.Roadmap, trac.Search, trac.Settings, \
+                       trac.Ticket, trac.Timeline, trac.Wiki
+
+                dispatcher = RequestDispatcher(env)
+                dispatcher.dispatch(req)
             finally:
                 # Give the session a chance to persist changes
                 req.session.save()
