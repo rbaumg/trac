@@ -90,7 +90,7 @@ class ComponentMeta(type):
 
         ComponentMeta._components[name] = new_class
         for class_name, xtnpt_name in [ref.split('.')
-                                       for ref in d.get('_extends', [])]:
+                                       for ref in d.get('__extends__', [])]:
             xtnpt = (class_name, xtnpt_name)
             if not xtnpt in ComponentMeta._extension_points:
                 ComponentMeta._extension_points[xtnpt] = []

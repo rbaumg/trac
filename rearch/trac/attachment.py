@@ -30,7 +30,7 @@ from trac.web.main import add_link
 
 class AttachmentModule(Component):
 
-    _extends = ['RequestDispatcher.handlers']
+    __extends__ = ['RequestDispatcher.handlers']
 
     CHUNK_SIZE = 4096
     DISP_MAX_FILE_SIZE = 256 * 1024

@@ -291,7 +291,7 @@ class Query(object):
 
 class QueryModule(Component):
 
-    _extends = ['RequestDispatcher.handlers']
+    __extends__ = ['RequestDispatcher.handlers']
 
     def _get_constraints(self, req):
         constraints = {}

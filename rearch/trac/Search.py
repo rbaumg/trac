@@ -32,7 +32,7 @@ import string
 
 class SearchModule(Component):
 
-    _extends = ['RequestDispatcher.handlers']
+    __extends__ = ['RequestDispatcher.handlers']
 
     RESULTS_PER_PAGE = 10
 
