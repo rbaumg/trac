@@ -27,7 +27,7 @@ from trac.core import *
 
 class AboutModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     about_cs = """
 <?cs include "header.cs"?>

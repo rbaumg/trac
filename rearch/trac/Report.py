@@ -70,7 +70,7 @@ class ColumnSorter:
 
 class ReportModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def sql_sub_vars(self, req, sql, args):
         m = re.search(dynvars_re, sql)

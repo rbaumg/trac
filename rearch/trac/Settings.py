@@ -25,7 +25,7 @@ from trac.util import TracError
 
 class SettingsModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     _form_fields = ['newsid','name', 'email']
 

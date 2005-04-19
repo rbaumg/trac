@@ -33,7 +33,7 @@ AVAILABLE_FILTERS = ('ticket', 'changeset', 'wiki', 'milestone')
 
 class TimelineModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def get_info(self, req, db, start, stop, maxrows,
                  filters=AVAILABLE_FILTERS):

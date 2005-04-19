@@ -25,7 +25,7 @@ from __future__ import generators
 
 from trac.util import TracError
 
-__all__ = ['Component', 'ExtensionPoint', 'Interface', 'TracError']
+__all__ = ['Component', 'extends', 'ExtensionPoint', 'Interface', 'TracError']
 
 
 class Interface(object):
@@ -90,7 +90,7 @@ class ComponentMeta(type):
 
         ComponentMeta._components[name] = new_class
         for class_name, xtnpt_name in [ref.split('.')
-                                       for ref in d.get('__extends__', [])]:
+                                       for ref in d.get('__extends', [])]:
             xtnpt = (class_name, xtnpt_name)
             if not xtnpt in ComponentMeta._extension_points:
                 ComponentMeta._extension_points[xtnpt] = []
@@ -99,12 +99,31 @@ class ComponentMeta(type):
         return new_class
 
 
+def extends(*xtnpts):
+    """
+    Can be used in the class definiton of `Component` subclasses to declare
+    the extension points that are extended.
+    """
+
+    import sys
+
+    frame = sys._getframe(1)
+    locals = frame.f_locals
+
+    if locals is frame.f_globals or '__module__' not in frame.f_locals:
+        raise TracError, 'extends() can only be used in a class definition'
+
+    if '__extends' in locals:
+        raise TracError, 'extends() can only be used once in a class definition'
+
+    locals['__extends'] = xtnpts
+
+
 class Component(object):
     """
-    Base class for components. Every component must have an _id attribute that
-    is a string that uniquely identifies the component. In addition, every
-    component can declare what extension points it provides, as well as what
-    extension points of other components it extends.
+    Base class for components. Every component can declare what extension points
+    it provides, as well as what extension points of other components it
+    extends.
     """
     __metaclass__ = ComponentMeta
     __slots__ = ['compmgr']

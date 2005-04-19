@@ -33,7 +33,7 @@ import re
 
 class ChangesetModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def match_request(self, req):
         match = re.match(r'/changeset/([0-9]+)$', req.path_info)

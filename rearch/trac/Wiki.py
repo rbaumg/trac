@@ -120,7 +120,7 @@ class WikiPage:
 
 class WikiModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def match_request(self, req):
         match = re.match(r'^/wiki(?:/(.*))?', req.path_info)

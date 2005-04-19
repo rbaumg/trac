@@ -279,7 +279,7 @@ def insert_custom_fields(env, hdf, vals = {}):
 
 class NewticketModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def create_ticket(self, req, db):
         if not req.args.get('summary'):
@@ -395,7 +395,7 @@ def available_actions(ticket, perm_):
 
 class TicketModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def save_changes(self, req, db, id):
         if req.perm.has_permission(perm.TICKET_CHGPROP):

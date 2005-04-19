@@ -61,7 +61,7 @@ def _get_path_links(href, path, rev):
 
 class BrowserModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def match_request(self, req):
         import re
@@ -204,7 +204,7 @@ class BrowserModule(Component):
 
 class LogModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def match_request(self, req):
         import re

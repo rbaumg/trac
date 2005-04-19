@@ -85,7 +85,7 @@ class ComponentTestCase(unittest.TestCase):
         class ComponentA(Component):
             tests = ExtensionPoint(ITest)
         class ComponentB(Component):
-            __extends__ = ['ComponentA.tests']
+            extends('ComponentA.tests')
             def test(self): return 'x'
         tests = ComponentA(self.compmgr).tests
         self.assertEquals('x', tests.next().test())
@@ -95,10 +95,10 @@ class ComponentTestCase(unittest.TestCase):
         class ComponentA(Component):
             tests = ExtensionPoint(ITest)
         class ComponentB(Component):
-            __extends__ = ['ComponentA.tests']
+            extends('ComponentA.tests')
             def test(self): return 'x'
         class ComponentC(Component):
-            __extends__ = ['ComponentA.tests']
+            extends('ComponentA.tests')
             def test(self): return 'y'
         tests = ComponentA(self.compmgr).tests
         self.assertEquals('x', tests.next().test())
@@ -111,7 +111,7 @@ class ComponentTestCase(unittest.TestCase):
         class ConcreteComponent(BaseComponent):
             pass
         class ExtendingComponent(Component):
-            __extends__ = ['BaseComponent.tests']
+            extends('BaseComponent.tests')
             def test(self): return 'x'
         tests = ConcreteComponent(self.compmgr).tests
         self.assertEquals('x', tests.next().test())

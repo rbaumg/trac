@@ -99,7 +99,7 @@ def calc_ticket_stats(tickets):
 
 class MilestoneModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def save_milestone(self, req, db, id):
         req.perm.assert_permission(perm.MILESTONE_MODIFY)

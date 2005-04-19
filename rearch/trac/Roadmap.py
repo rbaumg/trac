@@ -32,7 +32,7 @@ from time import localtime, strftime, time
 
 class RoadmapModule(Component):
 
-    __extends__ = ['RequestDispatcher.handlers']
+    extends('RequestDispatcher.handlers')
 
     def match_request(self, req):
         return req.path_info == '/roadmap'
