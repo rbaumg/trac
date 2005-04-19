@@ -97,7 +97,6 @@ class Environment(ComponentManager):
                     imp.load_module(name, fd, path, desc)
 
     def component_activated(self, component):
-        self.log.debug('Component %s activated' % component.__class__.__name__)
         component.env = self
         component.config = self.config
         component.log = self.log

@@ -156,14 +156,15 @@ class RequestDispatcher(Component):
 
     legacy_module_map = {
         'AboutModule': 'about',
+        'AttachmentModule': 'attachment',
         'BrowserModule': 'browser', 'LogModule': 'browser',
         'ChangesetModule': 'changeset',
-        'AttachmentModule': 'attachment',
+        'NewticketModule': 'newticket',
         'QueryModule': 'query', 'ReportModule': 'report',
         'RoadmapModule': 'roadmap', 'MilestoneModule': 'milestone',
         'SearchModule': 'search',
         'SettingsModule': 'settings',
-        'TicketModule': 'ticket', 'NewticketModule': 'ticket',
+        'TicketModule': 'ticket',
         'TimelineModule': 'timeline',
         'WikiModule': 'wiki'
     }

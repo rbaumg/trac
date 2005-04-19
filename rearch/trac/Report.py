@@ -175,6 +175,7 @@ class ReportModule(Component):
         req.hdf['report.mode'] = 'delete'
         req.hdf['report.id'] = id
         req.hdf['report.title'] = row['title']
+        req.hdf['report.href'] = self.env.href.report(id)
 
     def render_report_editor(self, req, db, id, action='commit', copy=0):
         req.perm.assert_permission(perm.REPORT_MODIFY)
@@ -198,8 +199,10 @@ class ReportModule(Component):
 
         if action == 'commit':
             req.hdf['title'] = 'Edit Report {%d} %s' % (id, row['title'])
+            req.hdf['report.href'] = self.env.href.report(id)
         else:
             req.hdf['title'] = 'Create New Report'
+            req.hdf['report.href'] = self.env.href.report()
         req.hdf['report.mode'] = 'editor'
         req.hdf['report.title'] = title
         req.hdf['report.id'] = id
@@ -233,6 +236,7 @@ class ReportModule(Component):
         """
         if req.perm.has_permission(perm.REPORT_CREATE):
             req.hdf['report.create_href'] = self.env.href.report(None, action='new')
+        req.hdf['report.href'] = self.env.href.report(id)
 
         if id != -1:
             if req.perm.has_permission(perm.REPORT_MODIFY):

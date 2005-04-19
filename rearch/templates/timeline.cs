@@ -6,7 +6,7 @@
 <div id="content" class="timeline">
 <h1>Timeline</h1>
 
-<form id="prefs" action="">
+<form id="prefs" method="get" action="<?cs var:trac.href.timeline ?>">
  <div>
   <label>View changes from <input type="text" size="10" name="from" value="<?cs
     var:timeline.from ?>" /></label> and

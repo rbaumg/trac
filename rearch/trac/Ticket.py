@@ -315,10 +315,10 @@ class NewticketModule(Component):
     def process_request(self, req):
         req.perm.assert_permission(perm.TICKET_CREATE)
 
-        if req.args.has_key('create'):
-            self.create_ticket(req)
-
         db = self.env.get_db_cnx()
+
+        if req.args.has_key('create'):
+            self.create_ticket(req, db)
 
         ticket = Ticket()
         ticket.populate(req.args)
@@ -452,6 +452,7 @@ class TicketModule(Component):
         """Insert ticket data into the hdf"""
         req.hdf['ticket'] = dict(zip(ticket.keys(),
                                  map(lambda x: util.escape(x), ticket.values())))
+        req.hdf['ticket.href'] = self.env.href.ticket(id)
 
         util.sql_to_hdf(db, "SELECT name FROM component ORDER BY name",
                         req.hdf, 'ticket.components')

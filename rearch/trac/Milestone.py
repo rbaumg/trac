@@ -119,9 +119,11 @@ class MilestoneModule(Component):
                     completed = self.parse_date(completed_str)
             description = req.args.get('description', '')
             if not id:
-                self.create_milestone(req, name, due, completed, description)
+                self.create_milestone(req, db, name, due, completed,
+                                      description)
             else:
-                self.update_milestone(req, id, name, due, completed, description)
+                self.update_milestone(req, db, id, name, due, completed,
+                                      description)
         elif id:
             req.redirect(self.env.href.milestone(id))
         else:
@@ -289,8 +291,9 @@ class MilestoneModule(Component):
     def render_confirm(self, req, db, id):
         milestone = self.get_milestone(req, db, id)
         req.hdf['title'] = 'Milestone %s' % milestone['name']
-        req.hdf['milestone.mode'] = 'delete'
         req.hdf['milestone'] = milestone
+        req.hdf['milestone.mode'] = 'delete'
+        req.hdf['milestone.href'] = self.env.href.milestone(id)
 
         cursor = db.cursor()
         cursor.execute("SELECT name FROM milestone "
@@ -314,6 +317,7 @@ class MilestoneModule(Component):
             req.hdf['title'] = 'Milestone %s' % milestone['name']
             req.hdf['milestone.mode'] = 'edit'
         req.hdf['milestone'] = milestone
+        req.hdf['milestone.href'] = self.env.href.milestone(id)
         req.hdf['milestone.date_hint'] = get_date_format_hint()
         req.hdf['milestone.datetime_hint'] = get_datetime_format_hint()
         req.hdf['milestone.datetime_now'] = time.strftime('%x %X',
