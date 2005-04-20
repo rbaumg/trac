@@ -55,6 +55,7 @@ class ComponentMeta(type):
     registration.
     """
 
+    _components = []
     _registry = {}
 
     def __new__(cls, name, bases, d):
@@ -70,6 +71,10 @@ class ComponentMeta(type):
         new_class = type.__new__(cls, name, bases, d)
         new_class._extension_points = xtnpts
 
+        if name == 'Component':
+            # Don't put the Component base class in the registry
+            return new_class
+
         # Allow components to have a no-argument initializer so that
         # they don't need to worry about accepting the component manager
         # as argument and invoking the super-class initializer
@@ -80,7 +85,8 @@ class ComponentMeta(type):
                     init(self)
         setattr(new_class, '__init__', maybe_init)
 
-        for interface in d.get('__implements', []):
+        ComponentMeta._components.append(new_class)
+        for interface in d.get('_implements', []):
             if not interface in ComponentMeta._registry:
                 ComponentMeta._registry[interface] = []
             ComponentMeta._registry[interface].append(new_class)
@@ -101,10 +107,10 @@ def implements(*interfaces):
     # Some sanity checks
     assert locals is not frame.f_globals and '__module__' in frame.f_locals, \
            'implements() can only be used in a class definition'
-    assert not '__implements' in locals, \
+    assert not '_implements' in locals, \
            'implements() can only be used once in a class definition'
 
-    locals['__implements'] = interfaces
+    locals['_implements'] = interfaces
 
 
 class Component(object):
@@ -147,6 +153,8 @@ class ComponentManager(object):
     def __getitem__(self, cls):
         component = self.components.get(cls)
         if not component:
+            if cls not in ComponentMeta._components:
+                raise TracError, 'Component "%s" not registered' % cls.__name__
             try:
                 component = cls(self)
             except TypeError, e:

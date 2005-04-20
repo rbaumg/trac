@@ -45,11 +45,16 @@ class ComponentTestCase(unittest.TestCase):
         from trac.core import ComponentMeta
         ComponentMeta._registry = self.old_registry
 
+    def test_base_class_not_registered(self):
+        from trac.core import ComponentMeta
+        assert Component not in ComponentMeta._components
+        self.assertRaises(TracError, self.compmgr.__getitem__, Component)
+
     def test_unregistered_component(self):
         class NoComponent(object): pass
         self.assertRaises(TracError, self.compmgr.__getitem__, NoComponent)
 
-    def test__component_registration(self):
+    def test_component_registration(self):
         class ComponentA(Component):
             pass
         assert self.compmgr[ComponentA]
