@@ -21,8 +21,6 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
 
-from __future__ import generators
-
 from trac.util import TracError
 
 __all__ = ['Component', 'ExtensionPoint', 'implements', 'Interface',
@@ -130,9 +128,7 @@ class Component(object):
         xtnpt = self._extension_points.get(name)
         if xtnpt:
             extensions = ComponentMeta._registry.get(xtnpt.interface, [])
-            for extension in extensions:
-                yield self.compmgr[extension]
-            return
+            return [self.compmgr[extension] for extension in extensions]
         raise AttributeError, name
 
 

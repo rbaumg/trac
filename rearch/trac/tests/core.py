@@ -88,10 +88,32 @@ class ComponentTestCase(unittest.TestCase):
         except AssertionError:
             pass
 
+    def test_attribute_access(self):
+        class ComponentA(Component):
+            pass
+        comp = ComponentA(self.compmgr)
+        try:
+            comp.foo
+            self.fail('Expected AttributeError')
+        except AttributeError:
+            pass
+
+    def test_nonconforming_extender(self):
+        class ComponentA(Component):
+            tests = ExtensionPoint(ITest)
+        class ComponentB(Component):
+            implements(ITest)
+        tests = iter(ComponentA(self.compmgr).tests)
+        try:
+            tests.next().test()
+            self.fail('Expected AttributeError')
+        except AttributeError:
+            pass
+
     def test_extension_point_with_no_extension(self):
         class ComponentA(Component):
             tests = ExtensionPoint(ITest)
-        tests = ComponentA(self.compmgr).tests
+        tests = iter(ComponentA(self.compmgr).tests)
         self.assertRaises(StopIteration, tests.next)
 
     def test_extension_point_with_one_extension(self):
@@ -100,7 +122,7 @@ class ComponentTestCase(unittest.TestCase):
         class ComponentB(Component):
             implements(ITest)
             def test(self): return 'x'
-        tests = ComponentA(self.compmgr).tests
+        tests = iter(ComponentA(self.compmgr).tests)
         self.assertEquals('x', tests.next().test())
         self.assertRaises(StopIteration, tests.next)
 
@@ -113,7 +135,7 @@ class ComponentTestCase(unittest.TestCase):
         class ComponentC(Component):
             implements(ITest)
             def test(self): return 'y'
-        tests = ComponentA(self.compmgr).tests
+        tests = iter(ComponentA(self.compmgr).tests)
         self.assertEquals('x', tests.next().test())
         self.assertEquals('y', tests.next().test())
         self.assertRaises(StopIteration, tests.next)
@@ -126,7 +148,7 @@ class ComponentTestCase(unittest.TestCase):
         class ExtendingComponent(Component):
             implements(ITest)
             def test(self): return 'x'
-        tests = ConcreteComponent(self.compmgr).tests
+        tests = iter(ConcreteComponent(self.compmgr).tests)
         self.assertEquals('x', tests.next().test())
         self.assertRaises(StopIteration, tests.next)
 
