@@ -23,6 +23,7 @@ from trac import perm, util
 from trac.core import *
 from trac.Notify import TicketNotifyEmail
 from trac.web.chrome import add_link
+from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_html
 
 import re
@@ -279,7 +280,7 @@ def insert_custom_fields(env, hdf, vals = {}):
 
 class NewticketModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     # IRequestHandler methods
 
@@ -399,7 +400,7 @@ def available_actions(ticket, perm_):
 
 class TicketModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     # IRequestHandler methods
 

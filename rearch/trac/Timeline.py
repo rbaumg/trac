@@ -24,6 +24,7 @@ from trac.core import *
 from trac.util import enum, escape, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web.chrome import add_link
+from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_oneliner, wiki_to_html
 
 import time
@@ -33,7 +34,7 @@ AVAILABLE_FILTERS = ('ticket', 'changeset', 'wiki', 'milestone')
 
 class TimelineModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     # IRequestHandler methods
 

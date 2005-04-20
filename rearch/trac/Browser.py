@@ -22,6 +22,7 @@
 from trac import perm, util
 from trac.core import *
 from trac.web.chrome import add_link
+from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 
 import time
@@ -61,7 +62,7 @@ def _get_path_links(href, path, rev):
 
 class BrowserModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     # IRequestHandler methods
 
@@ -208,7 +209,7 @@ class BrowserModule(Component):
 
 class LogModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     # IRequestHandler methods
 

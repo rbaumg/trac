@@ -24,6 +24,7 @@ from trac.core import *
 from trac.util import enum, escape, TracError, get_reporter_id
 from trac.versioncontrol.diff import get_diff_options, hdf_diff
 from trac.web.chrome import add_link
+from trac.web.main import IRequestHandler
 from trac.WikiFormatter import *
 
 import os
@@ -120,7 +121,7 @@ class WikiPage:
 
 class WikiModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     # IRequestHandler methods
 

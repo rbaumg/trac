@@ -25,12 +25,13 @@ from __future__ import generators
 
 from trac.util import TracError
 
-__all__ = ['Component', 'extends', 'ExtensionPoint', 'Interface', 'TracError']
+__all__ = ['Component', 'ExtensionPoint', 'implements', 'Interface',
+           'TracError']
 
 
 class Interface(object):
     """
-    Dummy base class for interfaces. Should use PyProtocols in the future.
+    Dummy base class for interfaces. Might use PyProtocols in the future.
     """
     __slots__ = []
 
@@ -41,15 +42,13 @@ class ExtensionPoint(object):
     to hold the protocol/interface required.
     """
 
-    __slots__ = ['interface', 'declaring_class']
+    __slots__ = ['interface']
 
     def __init__(self, interface):
         self.interface = interface
-        self.declaring_class = None
 
     def __str__(self):
-        return '<ExtensionPoint %s declared by %s>' \
-               % (self.interface.__name__, self.declaring_class)
+        return '<ExtensionPoint %s>' % self.interface.__name__
 
 
 class ComponentMeta(type):
@@ -58,65 +57,56 @@ class ComponentMeta(type):
     registration.
     """
 
-    _components = {}
-    _extension_points = {}
+    _registry = {}
 
     def __new__(cls, name, bases, d):
         xtnpts = {}
-        declared_here = []
         for base in [b for b in bases
                      if hasattr(b, '_extension_points')]:
             xtnpts.update(base._extension_points)
         for key, value in d.items():
             if isinstance(value, ExtensionPoint):
                 xtnpts[key] = value
-                declared_here.append(value)
                 del d[key]
 
         new_class = type.__new__(cls, name, bases, d)
-        for xtnpt in declared_here:
-            xtnpt.declaring_class = name
         new_class._extension_points = xtnpts
 
         # Allow components to have a no-argument initializer so that
         # they don't need to worry about accepting the component manager
         # as argument and invoking the super-class initializer
-        def maybe_init(self, compmgr, init=d.get('__init__'), class_name=name):
-            if not class_name in compmgr.components:
-                compmgr.components[class_name] = self
+        def maybe_init(self, compmgr, init=d.get('__init__'), cls=new_class):
+            if not cls in compmgr.components:
+                compmgr.components[cls] = self
                 if init:
                     init(self)
         setattr(new_class, '__init__', maybe_init)
 
-        ComponentMeta._components[name] = new_class
-        for class_name, xtnpt_name in [ref.split('.')
-                                       for ref in d.get('__extends', [])]:
-            xtnpt = (class_name, xtnpt_name)
-            if not xtnpt in ComponentMeta._extension_points:
-                ComponentMeta._extension_points[xtnpt] = []
-            ComponentMeta._extension_points[xtnpt].append(name)
+        for interface in d.get('__implements', []):
+            if not interface in ComponentMeta._registry:
+                ComponentMeta._registry[interface] = []
+            ComponentMeta._registry[interface].append(new_class)
 
         return new_class
 
 
-def extends(*xtnpts):
+def implements(*interfaces):
     """
     Can be used in the class definiton of `Component` subclasses to declare
     the extension points that are extended.
     """
-
     import sys
 
     frame = sys._getframe(1)
     locals = frame.f_locals
 
-    if locals is frame.f_globals or '__module__' not in frame.f_locals:
-        raise TracError, 'extends() can only be used in a class definition'
+    # Some sanity checks
+    assert locals is not frame.f_globals and '__module__' in frame.f_locals, \
+           'implements() can only be used in a class definition'
+    assert not '__implements' in locals, \
+           'implements() can only be used once in a class definition'
 
-    if '__extends' in locals:
-        raise TracError, 'extends() can only be used once in a class definition'
-
-    locals['__extends'] = xtnpts
+    locals['__implements'] = interfaces
 
 
 class Component(object):
@@ -129,18 +119,17 @@ class Component(object):
     __slots__ = ['compmgr']
 
     def __new__(cls, compmgr):
-        if not cls.__name__ in compmgr.components:
+        if not cls in compmgr.components:
             self = object.__new__(cls)
             self.compmgr = compmgr
             compmgr.component_activated(self)
             return self
-        return compmgr[cls.__name__]
+        return compmgr[cls]
 
     def __getattr__(self, name):
         xtnpt = self._extension_points.get(name)
         if xtnpt:
-            key = (xtnpt.declaring_class, name)
-            extensions = ComponentMeta._extension_points.get(key, [])
+            extensions = ComponentMeta._registry.get(xtnpt.interface, [])
             for extension in extensions:
                 yield self.compmgr[extension]
             return
@@ -156,20 +145,17 @@ class ComponentManager(object):
     def __init__(self):
         self.components = {}
 
-    def __contains__(self, class_name):
-        return class_name in self.components
+    def __contains__(self, cls):
+        return cls in self.components
 
-    def __getitem__(self, class_name):
-        component = self.components.get(class_name)
+    def __getitem__(self, cls):
+        component = self.components.get(cls)
         if not component:
             try:
-                component = ComponentMeta._components[class_name](self)
-            except KeyError, e:
-                raise TracError, 'Component "%s" not registered (%s)' \
-                                 % (class_name, e)
+                component = cls(self)
             except TypeError, e:
                 raise TracError, 'Unable to instantiate component "%s" (%s)' \
-                                 % (class_name, e)
+                                 % (cls.__name__, e)
         return component
 
     def component_activated(self, component):

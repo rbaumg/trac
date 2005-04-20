@@ -37,25 +37,22 @@ class ComponentTestCase(unittest.TestCase):
 
         # Make sure we have no external components hanging around in the
         # component registry
-        self.old_components = ComponentMeta._components
-        ComponentMeta._components = {}
-        self.old_extension_points = ComponentMeta._extension_points
-        ComponentMeta._extension_points = {}
+        self.old_registry = ComponentMeta._registry
+        ComponentMeta._registry = {}
 
     def tearDown(self):
         # Restore the original component registry
         from trac.core import ComponentMeta
-        ComponentMeta._components = self.old_components
-        ComponentMeta._extension_points = self.old_extension_points
+        ComponentMeta._registry = self.old_registry
 
     def test_unregistered_component(self):
-        # FIXME: this is bogus
-        self.assertRaises(TracError, self.compmgr.__getitem__, 'nada')
+        class NoComponent(object): pass
+        self.assertRaises(TracError, self.compmgr.__getitem__, NoComponent)
 
     def test__component_registration(self):
         class ComponentA(Component):
             pass
-        assert self.compmgr['ComponentA']
+        assert self.compmgr[ComponentA]
         assert ComponentA(self.compmgr)
 
     def test_component_identity(self):
@@ -64,7 +61,7 @@ class ComponentTestCase(unittest.TestCase):
         c1 = ComponentA(self.compmgr)
         c2 = ComponentA(self.compmgr)
         assert c1 is c2, 'Expected same component instance'
-        c2 = self.compmgr['ComponentA']
+        c2 = self.compmgr[ComponentA]
         assert c1 is c2, 'Expected same component instance'
 
     def test_component_initializer(self):
@@ -74,6 +71,22 @@ class ComponentTestCase(unittest.TestCase):
         self.assertEqual('test', ComponentA(self.compmgr).data)
         ComponentA(self.compmgr).data = 'newtest'
         self.assertEqual('newtest', ComponentA(self.compmgr).data)
+
+    def test_implements_called_outside_classdef(self):
+        try:
+            implements()
+            self.fail('Expected AssertionError')
+        except AssertionError:
+            pass
+
+    def test_implements_called_twice(self):
+        try:
+            class ComponentA(Component):
+                implements()
+                implements()
+            self.fail('Expected AssertionError')
+        except AssertionError:
+            pass
 
     def test_extension_point_with_no_extension(self):
         class ComponentA(Component):
@@ -85,7 +98,7 @@ class ComponentTestCase(unittest.TestCase):
         class ComponentA(Component):
             tests = ExtensionPoint(ITest)
         class ComponentB(Component):
-            extends('ComponentA.tests')
+            implements(ITest)
             def test(self): return 'x'
         tests = ComponentA(self.compmgr).tests
         self.assertEquals('x', tests.next().test())
@@ -95,10 +108,10 @@ class ComponentTestCase(unittest.TestCase):
         class ComponentA(Component):
             tests = ExtensionPoint(ITest)
         class ComponentB(Component):
-            extends('ComponentA.tests')
+            implements(ITest)
             def test(self): return 'x'
         class ComponentC(Component):
-            extends('ComponentA.tests')
+            implements(ITest)
             def test(self): return 'y'
         tests = ComponentA(self.compmgr).tests
         self.assertEquals('x', tests.next().test())
@@ -111,7 +124,7 @@ class ComponentTestCase(unittest.TestCase):
         class ConcreteComponent(BaseComponent):
             pass
         class ExtendingComponent(Component):
-            extends('BaseComponent.tests')
+            implements(ITest)
             def test(self): return 'x'
         tests = ConcreteComponent(self.compmgr).tests
         self.assertEquals('x', tests.next().test())

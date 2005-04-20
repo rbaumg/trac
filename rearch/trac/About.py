@@ -24,10 +24,11 @@ import re
 
 from trac import perm
 from trac.core import *
+from trac.web.main import IRequestHandler
 
 class AboutModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     about_cs = """
 <?cs include "header.cs"?>

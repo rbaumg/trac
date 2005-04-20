@@ -23,6 +23,7 @@ from trac import perm
 from trac.core import *
 from trac.Ticket import get_custom_fields, Ticket
 from trac.web.chrome import add_link
+from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_html
 from trac.util import *
 
@@ -99,7 +100,7 @@ def calc_ticket_stats(tickets):
 
 class MilestoneModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     # IRequestHandler methods
 

@@ -26,11 +26,12 @@ import urllib
 from trac import perm, util
 from trac.core import *
 from trac.web.chrome import add_link
+from trac.web.main import IRequestHandler
 
 
 class AttachmentModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     CHUNK_SIZE = 4096
     DISP_MAX_FILE_SIZE = 256 * 1024

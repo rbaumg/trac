@@ -24,6 +24,7 @@ from trac.core import *
 from trac.util import TracError, escape, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web.chrome import add_link
+from trac.web.main import IRequestHandler
 
 import re
 import time
@@ -32,7 +33,7 @@ import string
 
 class SearchModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     RESULTS_PER_PAGE = 10
 

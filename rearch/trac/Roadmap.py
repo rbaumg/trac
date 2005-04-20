@@ -24,6 +24,7 @@ from trac.core import *
 from trac.util import escape, pretty_timedelta, CRLF
 from trac.Ticket import Ticket
 from trac.web.chrome import add_link
+from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_html
 
 import re
@@ -32,7 +33,7 @@ from time import localtime, strftime, time
 
 class RoadmapModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     # IRequestHandler methods
 

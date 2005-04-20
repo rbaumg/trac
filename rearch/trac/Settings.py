@@ -21,11 +21,11 @@
 
 from trac.core import *
 from trac.util import TracError
-
+from trac.web.main import IRequestHandler
 
 class SettingsModule(Component):
 
-    extends('RequestDispatcher.handlers')
+    implements(IRequestHandler)
 
     _form_fields = ['newsid','name', 'email']
 

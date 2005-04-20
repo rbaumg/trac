@@ -170,24 +170,24 @@ class RequestDispatcher(Component):
     }
 
     def dispatch(self, req):
-        chosen_handler = None
-
-        if not req.path_info or req.path_info == '/':
-            default_handler = self.config.get('trac', 'default_handler')
-            chosen_handler = self.env[default_handler]
-        else:
-            for handler in self.handlers:
-                if handler.match_request(req):
-                    chosen_handler = handler
-                    break
-        if not chosen_handler:
-            # FIXME: Should return '404 Not Found' to the client
-            raise TracError, 'No handler matched request to %s' % req.path_info
-
         from trac.web.clearsilver import HDFWrapper
         req.hdf = HDFWrapper(loadpaths=[self.env.get_templates_dir(),
                                         self.config.get('trac', 'templates_dir')])
         populate_hdf(req.hdf, self.env, req)
+
+        # Select the component that should handle the request
+        chosen_handler = None
+        default_handler = None
+        if not req.path_info or req.path_info == '/':
+            default_handler = self.config.get('trac', 'default_handler')
+        for handler in self.handlers:
+            if handler.match_request(req) or \
+               handler.__class__.__name__ == default_handler:
+                chosen_handler = handler
+                break
+        if not chosen_handler:
+            # FIXME: Should return '404 Not Found' to the client
+            raise TracError, 'No handler matched request to %s' % req.path_info
 
         from trac.web.chrome import Chrome
         chrome = Chrome(self.env)
