@@ -23,7 +23,7 @@ from trac import perm
 from trac.core import *
 from trac.util import enum, escape, TracError, get_reporter_id
 from trac.versioncontrol.diff import get_diff_options, hdf_diff
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 from trac.WikiFormatter import *
 
 import os
@@ -122,6 +122,8 @@ class WikiModule(Component):
 
     extends('RequestDispatcher.handlers')
 
+    # IRequestHandler methods
+
     def match_request(self, req):
         match = re.match(r'^/wiki(?:/(.*))?', req.path_info)
         if match:
@@ -165,6 +167,8 @@ class WikiModule(Component):
             self.render_txt(req)
         else:
             req.display('wiki.cs')
+
+    # Internal methods
 
     def render_txt(self, req):
         req.send_response(200)

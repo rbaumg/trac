@@ -21,7 +21,7 @@
 
 from trac import perm, util
 from trac.core import *
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 from trac.WikiFormatter import wiki_to_html
 
 import re
@@ -71,6 +71,64 @@ class ColumnSorter:
 class ReportModule(Component):
 
     extends('RequestDispatcher.handlers')
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        match = re.match(r'/report(?:/([0-9]+))?', req.path_info)
+        if match:
+            if match.group(1):
+                req.args['id'] = match.group(1)
+            return 1
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.REPORT_VIEW)
+
+        # did the user ask for any special report?
+        id = int(req.args.get('id', -1))
+        action = req.args.get('action', 'list')
+
+        db = self.env.get_db_cnx()
+
+        if action == 'create':
+            if req.args.has_key('cancel'):
+                action = 'list'
+            else:
+                self.create_report(req, db, req.args.get('title', ''),
+                                   req.args.get('description', ''),
+                                   req.args.get('sql', ''))
+
+        if id != -1 or action == 'new':
+            add_link(req, 'up', self.env.href.report(), 'Available Reports')
+
+        if action == 'delete':
+            self.render_confirm_delete(req, db, id)
+        elif action == 'commit':
+            self.commit_changes(req, db, id)
+        elif action == 'confirm_delete':
+            self.delete_report(req, db, id)
+        elif action == 'new':
+            self.render_report_editor(req, db, -1, 'create')
+        elif action == 'copy':
+            self.render_report_editor(req, db, id, 'create', 1)
+        elif action == 'edit':
+            self.render_report_editor(req, db, id, 'commit')
+        elif action == 'list':
+            self.render_report_list(req, db, id)
+
+        format = req.args.get('format')
+        if format == 'rss':
+            self.render_rss(req, db)
+        elif format == 'csv':
+            self.render_csv(req, db)
+        elif format == 'tab':
+            self.render_csv(req, db, '\t')
+        elif format == 'sql':
+            self.render_sql(req, db)
+        else:
+            req.display('report.cs')
+
+    # Internal methods
 
     def sql_sub_vars(self, req, sql, args):
         m = re.search(dynvars_re, sql)
@@ -320,7 +378,6 @@ class ReportModule(Component):
                     req.hdf[k] = 1
                 self.rows.sort(sorter.sort)
 
-
         # Convert the rows and cells to HDF-format
         row_idx = 0
         for row in self.rows:
@@ -389,60 +446,6 @@ class ReportModule(Component):
         report_args['USER'] = req.authname
 
         return report_args
-
-    def match_request(self, req):
-        match = re.match(r'/report(?:/([0-9]+))?', req.path_info)
-        if match:
-            if match.group(1):
-                req.args['id'] = match.group(1)
-            return 1
-
-    def process_request(self, req):
-        req.perm.assert_permission(perm.REPORT_VIEW)
-
-        # did the user ask for any special report?
-        id = int(req.args.get('id', -1))
-        action = req.args.get('action', 'list')
-
-        db = self.env.get_db_cnx()
-
-        if action == 'create':
-            if req.args.has_key('cancel'):
-                action = 'list'
-            else:
-                self.create_report(req, db, req.args.get('title', ''),
-                                   req.args.get('description', ''),
-                                   req.args.get('sql', ''))
-
-        if id != -1 or action == 'new':
-            add_link(req, 'up', self.env.href.report(), 'Available Reports')
-
-        if action == 'delete':
-            self.render_confirm_delete(req, db, id)
-        elif action == 'commit':
-            self.commit_changes(req, db, id)
-        elif action == 'confirm_delete':
-            self.delete_report(req, db, id)
-        elif action == 'new':
-            self.render_report_editor(req, db, -1, 'create')
-        elif action == 'copy':
-            self.render_report_editor(req, db, id, 'create', 1)
-        elif action == 'edit':
-            self.render_report_editor(req, db, id, 'commit')
-        elif action == 'list':
-            self.render_report_list(req, db, id)
-
-        format = req.args.get('format')
-        if format == 'rss':
-            self.render_rss(req, db)
-        elif format == 'csv':
-            self.render_csv(req, db)
-        elif format == 'tab':
-            self.render_csv(req, db, '\t')
-        elif format == 'sql':
-            self.render_sql(req, db)
-        else:
-            req.display('report.cs')
 
     def render_rss(self, req, db):
         item = req.hdf.getObj('report.items')

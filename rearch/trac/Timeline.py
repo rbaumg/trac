@@ -23,7 +23,7 @@ from trac import perm
 from trac.core import *
 from trac.util import enum, escape, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 from trac.WikiFormatter import wiki_to_oneliner, wiki_to_html
 
 import time
@@ -34,6 +34,70 @@ AVAILABLE_FILTERS = ('ticket', 'changeset', 'wiki', 'milestone')
 class TimelineModule(Component):
 
     extends('RequestDispatcher.handlers')
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        return req.path_info == '/timeline'
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.TIMELINE_VIEW)
+
+        # Kludge: needed to force new check-ins to show up in the timeline
+        repos = self.env.get_repository()
+        repos.sync()
+        self.authzperm = repos.authz
+        repos.close()
+
+        # Parse the from date and adjust the timestamp to the last second of
+        # the day
+        t = time.localtime()
+        if req.args.has_key('from'):
+            try:
+                t = time.strptime(req.args.get('from'), '%x')
+            except:
+                pass
+        fromdate = time.mktime((t[0], t[1], t[2], 23, 59, 59, t[6], t[7], t[8]))
+
+        try:
+            daysback = max(0, int(req.args.get('daysback', '')))
+        except ValueError:
+            daysback = 30
+        req.hdf['timeline.from'] = time.strftime('%x', time.localtime(fromdate))
+        req.hdf['timeline.daysback'] = daysback
+
+        stop = fromdate
+        start = stop - (daysback + 1) * 86400
+        maxrows = int(req.args.get('max', 0))
+
+        filters = [k for k in AVAILABLE_FILTERS if k in req.args.keys()]
+        if not filters:
+            filters = AVAILABLE_FILTERS[:]
+
+        req.hdf['title'] = 'Timeline'
+        format = req.args.get('format')
+
+        db = self.env.get_db_cnx()
+        events = self.get_info(req, db, start, stop, maxrows, filters)
+        for idx, event in enum(events):
+            render_func = getattr(self, '_render_%s' % event['type'])
+            event = render_func(req, db, event)
+            if not event:
+                continue
+
+            if format == 'rss':
+                # For RSS, author must be an email address
+                if event['author'].find('@') != -1:
+                    event['author.email'] = event['author']
+
+            req.hdf['timeline.items.%d' % idx] = event
+
+        if format == 'rss':
+            self.display_rss(req)
+        else:
+            self.display_html(req, filters)
+
+    # Internal methods
 
     def get_info(self, req, db, start, stop, maxrows,
                  filters=AVAILABLE_FILTERS):
@@ -107,66 +171,6 @@ class TimelineModule(Component):
             }
             info.append(item)
         return info
-
-    def match_request(self, req):
-        return req.path_info == '/timeline'
-
-    def process_request(self, req):
-        req.perm.assert_permission(perm.TIMELINE_VIEW)
-
-        # Kludge: needed to force new check-ins to show up in the timeline
-        repos = self.env.get_repository()
-        repos.sync()
-        self.authzperm = repos.authz
-        repos.close()
-
-        # Parse the from date and adjust the timestamp to the last second of
-        # the day
-        t = time.localtime()
-        if req.args.has_key('from'):
-            try:
-                t = time.strptime(req.args.get('from'), '%x')
-            except:
-                pass
-        fromdate = time.mktime((t[0], t[1], t[2], 23, 59, 59, t[6], t[7], t[8]))
-
-        try:
-            daysback = max(0, int(req.args.get('daysback', '')))
-        except ValueError:
-            daysback = 30
-        req.hdf['timeline.from'] = time.strftime('%x', time.localtime(fromdate))
-        req.hdf['timeline.daysback'] = daysback
-
-        stop = fromdate
-        start = stop - (daysback + 1) * 86400
-        maxrows = int(req.args.get('max', 0))
-
-        filters = [k for k in AVAILABLE_FILTERS if k in req.args.keys()]
-        if not filters:
-            filters = AVAILABLE_FILTERS[:]
-
-        req.hdf['title'] = 'Timeline'
-        format = req.args.get('format')
-
-        db = self.env.get_db_cnx()
-        events = self.get_info(req, db, start, stop, maxrows, filters)
-        for idx, event in enum(events):
-            render_func = getattr(self, '_render_%s' % event['type'])
-            event = render_func(req, db, event)
-            if not event:
-                continue
-
-            if format == 'rss':
-                # For RSS, author must be an email address
-                if event['author'].find('@') != -1:
-                    event['author.email'] = event['author']
-
-            req.hdf['timeline.items.%d' % idx] = event
-
-        if format == 'rss':
-            self.display_rss(req)
-        else:
-            self.display_html(req, filters)
 
     def display_html(self, req, filters):
         rss_href = self.env.href.timeline([(x,'on') for x in filters],

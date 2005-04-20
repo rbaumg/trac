@@ -411,6 +411,8 @@ default_config = \
   ('trac', 'default_charset', 'iso-8859-15'),
   ('trac', 'default_handler', 'WikiModule'),
   ('trac', 'check_auth_ip', 'true'),
+  ('trac', 'metanav', 'login,logout,settings,help,about'),
+  ('trac', 'mainnav', 'wiki,timeline,roadmap,browser,tickets,newticket,search'),
   ('logging', 'log_type', 'none'),
   ('logging', 'log_file', 'trac.log'),
   ('logging', 'log_level', 'DEBUG'),

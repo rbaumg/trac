@@ -22,7 +22,7 @@
 from trac import perm
 from trac.core import *
 from trac.Ticket import get_custom_fields, Ticket
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 from trac.WikiFormatter import wiki_to_html
 from trac.util import *
 
@@ -100,6 +100,44 @@ def calc_ticket_stats(tickets):
 class MilestoneModule(Component):
 
     extends('RequestDispatcher.handlers')
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        import re, urllib
+        match = re.match(r'/milestone(?:/([^\?]+))?(?:/(.*)/?)?', req.path_info)
+        if match:
+            if match.group(1):
+                req.args['id'] = urllib.unquote(match.group(1))
+            return 1
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.MILESTONE_VIEW)
+
+        add_link(req, 'up', self.env.href.roadmap(), 'Roadmap')
+
+        action = req.args.get('action', 'view')
+        id = req.args.get('id')
+
+        db = self.env.get_db_cnx()
+        if action == 'new':
+            req.perm.assert_permission(perm.MILESTONE_CREATE)
+            self.render_editor(req, db)
+        elif action == 'edit':
+            req.perm.assert_permission(perm.MILESTONE_MODIFY)
+            self.render_editor(req, db, id)
+        elif action == 'delete':
+            req.perm.assert_permission(perm.MILESTONE_DELETE)
+            self.render_confirm(req, db, id)
+        elif action == 'commit_changes':
+            self.save_milestone(req, db, id)
+        elif action == 'confirm_delete':
+            self.delete_milestone(req, db, id)
+        else:
+            self.render_view(req, db, id)
+        req.display('milestone.cs')
+
+    # Internal methods
 
     def save_milestone(self, req, db, id):
         req.perm.assert_permission(perm.MILESTONE_MODIFY)
@@ -253,40 +291,6 @@ class MilestoneModule(Component):
             milestone['completed_date'] = time.strftime('%x %X', time.localtime(completed))
             milestone['completed_delta'] = pretty_timedelta(completed)
         return milestone
-
-    def match_request(self, req):
-        import re, urllib
-        match = re.match(r'/milestone(?:/([^\?]+))?(?:/(.*)/?)?', req.path_info)
-        if match:
-            if match.group(1):
-                req.args['id'] = urllib.unquote(match.group(1))
-            return 1
-
-    def process_request(self, req):
-        req.perm.assert_permission(perm.MILESTONE_VIEW)
-
-        add_link(req, 'up', self.env.href.roadmap(), 'Roadmap')
-
-        action = req.args.get('action', 'view')
-        id = req.args.get('id')
-
-        db = self.env.get_db_cnx()
-        if action == 'new':
-            req.perm.assert_permission(perm.MILESTONE_CREATE)
-            self.render_editor(req, db)
-        elif action == 'edit':
-            req.perm.assert_permission(perm.MILESTONE_MODIFY)
-            self.render_editor(req, db, id)
-        elif action == 'delete':
-            req.perm.assert_permission(perm.MILESTONE_DELETE)
-            self.render_confirm(req, db, id)
-        elif action == 'commit_changes':
-            self.save_milestone(req, db, id)
-        elif action == 'confirm_delete':
-            self.delete_milestone(req, db, id)
-        else:
-            self.render_view(req, db, id)
-        req.display('milestone.cs')
 
     def render_confirm(self, req, db, id):
         milestone = self.get_milestone(req, db, id)

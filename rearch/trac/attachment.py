@@ -25,7 +25,7 @@ import urllib
 
 from trac import perm, util
 from trac.core import *
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 
 
 class AttachmentModule(Component):
@@ -34,6 +34,8 @@ class AttachmentModule(Component):
 
     CHUNK_SIZE = 4096
     DISP_MAX_FILE_SIZE = 256 * 1024
+
+    # IReqestHandler methods
 
     def match_request(self, req):
         match = re.match(r'^/attachment/(ticket|wiki)(?:/(.*))?$', req.path_info)
@@ -63,6 +65,8 @@ class AttachmentModule(Component):
                 self.delete_attachment(req, parent_type, parent_id, filename)
             else:
                 self.render_view(req, parent_type, parent_id, filename)
+
+    # Internal methods
 
     def get_parent_link(self, parent_type, parent_id):
         if parent_type == 'ticket':

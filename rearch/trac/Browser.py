@@ -21,7 +21,7 @@
 
 from trac import perm, util
 from trac.core import *
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 
 import time
@@ -63,6 +63,8 @@ class BrowserModule(Component):
 
     extends('RequestDispatcher.handlers')
 
+    # IRequestHandler methods
+
     def match_request(self, req):
         import re
         match = re.match(r'/(browser|file)(?:(/.*))?', req.path_info)
@@ -95,6 +97,8 @@ class BrowserModule(Component):
             self.render_directory(req, repos, node, rev)
         else:
             self.render_file(req, repos, node, rev)
+
+    # Internal methods
 
     def render_directory(self, req, repos, node, rev=None):
         req.perm.assert_permission(perm.BROWSER_VIEW)
@@ -205,6 +209,8 @@ class BrowserModule(Component):
 class LogModule(Component):
 
     extends('RequestDispatcher.handlers')
+
+    # IRequestHandler methods
 
     def match_request(self, req):
         import re

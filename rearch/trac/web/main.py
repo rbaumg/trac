@@ -181,23 +181,22 @@ class RequestDispatcher(Component):
                     chosen_handler = handler
                     break
         if not chosen_handler:
-            # FIXME: Should raise '404 Not Found'
+            # FIXME: Should return '404 Not Found' to the client
             raise TracError, 'No handler matched request to %s' % req.path_info
+
+        from trac.web.clearsilver import HDFWrapper
+        req.hdf = HDFWrapper(loadpaths=[self.env.get_templates_dir(),
+                                        self.config.get('trac', 'templates_dir')])
+        populate_hdf(req.hdf, self.env, req)
+
+        from trac.web.chrome import Chrome
+        chrome = Chrome(self.env)
+        chrome.populate_hdf(req)
 
         name = chosen_handler.__class__.__name__
         req.hdf['trac.active_module'] = self.legacy_module_map[name]
         chosen_handler.process_request(req)
 
-
-def add_link(req, rel, href, title=None, type=None, class_name=None):
-    link = {'href': escape(href)}
-    if title: link['title'] = escape(title)
-    if type: link['type'] = type
-    if class_name: link['class'] = class_name
-    idx = 0
-    while req.hdf.get('links.%s.%d.href' % (rel, idx)):
-        idx += 1
-    req.hdf['links.%s.%d' % (rel, idx)] = link
 
 def populate_hdf(hdf, env, req=None):
     from trac import __version__
@@ -236,24 +235,6 @@ def populate_hdf(hdf, env, req=None):
         'url': env.config.get('project', 'url')
     }
 
-    htdocs_location = env.config.get('trac', 'htdocs_location')
-    if htdocs_location[-1] != '/':
-        htdocs_location += '/'
-    hdf['htdocs_location'] = htdocs_location
-
-    src = env.config.get('header_logo', 'src')
-    src_abs = re.match(r'https?://', src) != None
-    if not src[0] == '/' and not src_abs:
-        src = htdocs_location + src
-    hdf['header_logo'] = {
-        'link': env.config.get('header_logo', 'link'),
-        'alt': escape(env.config.get('header_logo', 'alt')),
-        'src': src,
-        'src_abs': src_abs,
-        'width': env.config.get('header_logo', 'width'),
-        'height': env.config.get('header_logo', 'height')
-    }
-
     if req:
         hdf['base_url'] = req.base_url
         hdf['base_host'] = req.base_url[:req.base_url.rfind(req.cgi_location)]
@@ -261,17 +242,6 @@ def populate_hdf(hdf, env, req=None):
         hdf['trac.authname'] = escape(req.authname)
         for action in req.perm.permissions():
             req.hdf['trac.acl.' + action] = 1
-
-        add_link(req, 'start', env.href.wiki())
-        add_link(req, 'search', env.href.search())
-        add_link(req, 'help', env.href.wiki('TracGuide'))
-        icon = env.config.get('project', 'icon')
-        if icon:
-            if not icon[0] == '/' and icon.find('://') < 0:
-                icon = htdocs_location + icon
-            mimetype = env.mimeview.get_mimetype(icon)
-            add_link(req, 'icon', icon, type=mimetype)
-            add_link(req, 'shortcut icon', icon, type=mimetype)
 
 def absolute_url(req, path=None):
     host = req.get_header('Host')
@@ -334,12 +304,6 @@ def dispatch_request(path_info, req, env):
                     req.redirect(referer or env.href.wiki())
             req.authname = authenticator.authname
             req.perm = PermissionCache(db, req.authname)
-
-            from trac.web.clearsilver import HDFWrapper
-            req.hdf = HDFWrapper(loadpaths=[env.get_templates_dir(),
-                                            env.config.get('trac', 'templates_dir')])
-            populate_hdf(req.hdf, env, req)
-            req.hdf['HTTP.PathInfo'] = path_info
 
             newsession = req.args.has_key('newsession')
             req.session = Session(env, db, req, newsession)

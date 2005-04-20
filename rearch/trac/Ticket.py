@@ -22,7 +22,7 @@
 from trac import perm, util
 from trac.core import *
 from trac.Notify import TicketNotifyEmail
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 from trac.WikiFormatter import wiki_to_html
 
 import re
@@ -281,33 +281,7 @@ class NewticketModule(Component):
 
     extends('RequestDispatcher.handlers')
 
-    def create_ticket(self, req, db):
-        if not req.args.get('summary'):
-            raise util.TracError('Tickets must contain a summary.')
-
-        ticket = Ticket()
-        ticket.populate(req.args)
-        ticket.setdefault('reporter', req.authname)
-
-        # The owner field defaults to the component owner
-        cursor = db.cursor()
-        if ticket.get('component') and ticket.get('owner', '') == '':
-            cursor.execute('SELECT owner FROM component '
-                           'WHERE name=%s', ticket['component'])
-            owner = cursor.fetchone()[0]
-            ticket['owner'] = owner
-
-        tktid = ticket.insert(db)
-
-        # Notify
-        try:
-            tn = TicketNotifyEmail(self.env)
-            tn.notify(ticket, newticket=1)
-        except Exception, e:
-            self.log.exception("Failure sending notification on creation of "
-                               "ticket #%d: %s" % (tktid, e))
-
-        req.redirect(self.env.href.ticket(tktid))
+    # IRequestHandler methods
 
     def match_request(self, req):
         return req.path_info == '/newticket'
@@ -371,6 +345,36 @@ class NewticketModule(Component):
 
         req.display('newticket.cs')
 
+    # Internal methods
+
+    def create_ticket(self, req, db):
+        if not req.args.get('summary'):
+            raise util.TracError('Tickets must contain a summary.')
+
+        ticket = Ticket()
+        ticket.populate(req.args)
+        ticket.setdefault('reporter', req.authname)
+
+        # The owner field defaults to the component owner
+        cursor = db.cursor()
+        if ticket.get('component') and ticket.get('owner', '') == '':
+            cursor.execute('SELECT owner FROM component '
+                           'WHERE name=%s', ticket['component'])
+            owner = cursor.fetchone()[0]
+            ticket['owner'] = owner
+
+        tktid = ticket.insert(db)
+
+        # Notify
+        try:
+            tn = TicketNotifyEmail(self.env)
+            tn.notify(ticket, newticket=1)
+        except Exception, e:
+            self.log.exception("Failure sending notification on creation of "
+                               "ticket #%d: %s" % (tktid, e))
+
+        req.redirect(self.env.href.ticket(tktid))
+
 
 def available_actions(ticket, perm_):
     """ Returns the actions that can be performed on the ticket"""
@@ -396,6 +400,73 @@ def available_actions(ticket, perm_):
 class TicketModule(Component):
 
     extends('RequestDispatcher.handlers')
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        match = re.match(r'/ticket/([0-9]+)?', req.path_info)
+        if match:
+            req.args['id'] = match.group(1)
+            return 1
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.TICKET_VIEW)
+
+        action = req.args.get('action', 'view')
+        preview = req.args.has_key('preview')
+
+        if not req.args.has_key('id'):
+            req.redirect(self.env.href.wiki())
+
+        db = self.env.get_db_cnx()
+        id = int(req.args.get('id'))
+
+        if not preview \
+           and action in ('leave', 'accept', 'reopen', 'resolve', 'reassign'):
+            self.save_changes(req, db, id)
+
+        ticket = Ticket(db, id)
+        reporter_id = util.get_reporter_id(req)
+
+        if preview:
+            # Use user supplied values
+            ticket.populate(req.args)
+            req.hdf['ticket.action'] = action
+            req.hdf['ticket.reassign_owner'] = req.args.get('reassign_owner') \
+                                               or req.authname
+            req.hdf['ticket.resolve_resolution'] = req.args.get('resolve_resolution')
+            reporter_id = req.args.get('author')
+            comment = req.args.get('comment')
+            if comment:
+                req.hdf['ticket.comment'] = util.escape(comment)
+                # Wiki format a preview of comment
+                req.hdf['ticket.comment_preview'] = wiki_to_html(comment,
+                                                                 req.hdf,
+                                                                 self.env, db)
+        else:
+            req.hdf['ticket.reassign_owner'] = req.authname
+
+        self.insert_ticket_data(req, db, id, ticket, reporter_id)
+
+        # If the ticket is being shown in the context of a query, add
+        # links to help navigate in the query result set
+        if 'query_tickets' in req.session:
+            tickets = req.session['query_tickets'].split()
+            if str(id) in tickets:
+                idx = int(tickets.index(str(id)))
+                if idx > 0:
+                    add_link(req, 'first', self.env.href.ticket(tickets[0]),
+                             'Ticket #%s' % tickets[0])
+                    add_link(req, 'prev', self.env.href.ticket(tickets[idx - 1]),
+                             'Ticket #%s' % tickets[idx - 1])
+                if idx < len(tickets) - 1:
+                    add_link(req, 'next', self.env.href.ticket(tickets[idx + 1]),
+                             'Ticket #%s' % tickets[idx + 1])
+                    add_link(req, 'last', self.env.href.ticket(tickets[-1]),
+                             'Ticket #%s' % tickets[-1])
+                add_link(req, 'up', req.session['query_href'])
+
+        req.display('ticket.cs')
 
     def save_changes(self, req, db, id):
         if req.perm.has_permission(perm.TICKET_CHGPROP):
@@ -533,68 +604,3 @@ class TicketModule(Component):
         # Add the possible actions to hdf
         for action in available_actions(ticket, req.perm):
             req.hdf['ticket.actions.' + action] = '1'
-
-    def match_request(self, req):
-        match = re.match(r'/ticket/([0-9]+)?', req.path_info)
-        if match:
-            req.args['id'] = match.group(1)
-            return 1
-
-    def process_request(self, req):
-        req.perm.assert_permission(perm.TICKET_VIEW)
-
-        action = req.args.get('action', 'view')
-        preview = req.args.has_key('preview')
-
-        if not req.args.has_key('id'):
-            req.redirect(self.env.href.wiki())
-
-        db = self.env.get_db_cnx()
-        id = int(req.args.get('id'))
-
-        if not preview \
-           and action in ('leave', 'accept', 'reopen', 'resolve', 'reassign'):
-            self.save_changes(req, db, id)
-
-        ticket = Ticket(db, id)
-        reporter_id = util.get_reporter_id(req)
-
-        if preview:
-            # Use user supplied values
-            ticket.populate(req.args)
-            req.hdf['ticket.action'] = action
-            req.hdf['ticket.reassign_owner'] = req.args.get('reassign_owner') \
-                                               or req.authname
-            req.hdf['ticket.resolve_resolution'] = req.args.get('resolve_resolution')
-            reporter_id = req.args.get('author')
-            comment = req.args.get('comment')
-            if comment:
-                req.hdf['ticket.comment'] = util.escape(comment)
-                # Wiki format a preview of comment
-                req.hdf['ticket.comment_preview'] = wiki_to_html(comment,
-                                                                 req.hdf,
-                                                                 self.env, db)
-        else:
-            req.hdf['ticket.reassign_owner'] = req.authname
-
-        self.insert_ticket_data(req, db, id, ticket, reporter_id)
-
-        # If the ticket is being shown in the context of a query, add
-        # links to help navigate in the query result set
-        if 'query_tickets' in req.session:
-            tickets = req.session['query_tickets'].split()
-            if str(id) in tickets:
-                idx = int(tickets.index(str(id)))
-                if idx > 0:
-                    add_link(req, 'first', self.env.href.ticket(tickets[0]),
-                             'Ticket #%s' % tickets[0])
-                    add_link(req, 'prev', self.env.href.ticket(tickets[idx - 1]),
-                             'Ticket #%s' % tickets[idx - 1])
-                if idx < len(tickets) - 1:
-                    add_link(req, 'next', self.env.href.ticket(tickets[idx + 1]),
-                             'Ticket #%s' % tickets[idx + 1])
-                    add_link(req, 'last', self.env.href.ticket(tickets[-1]),
-                             'Ticket #%s' % tickets[-1])
-                add_link(req, 'up', req.session['query_href'])
-
-        req.display('ticket.cs')

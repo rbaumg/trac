@@ -29,6 +29,8 @@ class SettingsModule(Component):
 
     _form_fields = ['newsid','name', 'email']
 
+    # IRequestHandler methods
+
     def match_request(self, req):
         return req.path_info == '/settings'
 
@@ -48,6 +50,8 @@ class SettingsModule(Component):
         if req.session.sid:
             req.hdf['settings.session_id'] = req.session.sid
         req.display('settings.cs')
+
+    # Internal methods
 
     def save_settings(self, req):
         for field in self._form_fields:

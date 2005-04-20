@@ -21,9 +21,9 @@
 
 from trac import Milestone, perm, __version__
 from trac.core import *
-from trac.util import pretty_timedelta, CRLF, TracError
+from trac.util import escape, pretty_timedelta, CRLF
 from trac.Ticket import Ticket
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 from trac.WikiFormatter import wiki_to_html
 
 import re
@@ -33,6 +33,8 @@ from time import localtime, strftime, time
 class RoadmapModule(Component):
 
     extends('RequestDispatcher.handlers')
+
+    # IRequestHandler methods
 
     def match_request(self, req):
         return req.path_info == '/roadmap'
@@ -109,6 +111,8 @@ class RoadmapModule(Component):
             self.render_ics(req, db, milestones)
         else:
             req.display('roadmap.cs')
+
+    # Internal methods
 
     def render_ics(self, req, db, milestones):
         req.send_response(200)

@@ -23,7 +23,7 @@ from trac import perm
 from trac.core import *
 from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 from trac.WikiFormatter import wiki_to_html
 
 import time
@@ -34,6 +34,8 @@ import re
 class ChangesetModule(Component):
 
     extends('RequestDispatcher.handlers')
+
+    # IRequestHandler methods
 
     def match_request(self, req):
         match = re.match(r'/changeset/([0-9]+)$', req.path_info)
@@ -66,6 +68,8 @@ class ChangesetModule(Component):
             self.render_zip(req, repos, chgset)
         else:
             self.render_html(req, repos, chgset, diff_options)
+
+    # Internal methods
 
     def render_html(self, req, repos, chgset, diff_options):
         """HTML version"""

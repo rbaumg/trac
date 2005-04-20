@@ -88,6 +88,8 @@ Copyright &copy; 2003-2005 <a href="http://www.edgewall.com/">Edgewall Software<
 <?cs include "footer.cs"?>
 """ # about_cs
 
+    # IRequestHandler methods
+
     def match_request(self, req):
         match = re.match(r'/about(?:_trac)?(?:/(.*))?$', req.path_info)
         if match:

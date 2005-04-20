@@ -23,7 +23,7 @@ from trac import perm
 from trac.core import *
 from trac.util import TracError, escape, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
-from trac.web.main import add_link
+from trac.web.chrome import add_link
 
 import re
 import time
@@ -35,6 +35,61 @@ class SearchModule(Component):
     extends('RequestDispatcher.handlers')
 
     RESULTS_PER_PAGE = 10
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        return req.path_info == '/search'
+
+    def process_request(self, req):
+        req.perm.assert_permission(perm.SEARCH_VIEW)
+        self.authzperm = SubversionAuthorizer(self.env, req.authname)
+
+        req.hdf['title'] = 'Search'
+        req.hdf['search'] = {
+            'ticket': 'checked',
+            'changeset': 'checked',
+            'wiki': 'checked',
+            'results_per_page': self.RESULTS_PER_PAGE
+        }
+
+        if req.args.has_key('q'):
+            query = req.args.get('q')
+            req.hdf['title'] = 'Search Results'
+            req.hdf['search.q'] = query.replace('"', "&#34;")
+            tickets = req.args.has_key('ticket')
+            changesets = req.args.has_key('changeset')
+            wiki = req.args.has_key('wiki')
+
+            # If no search options chosen, choose all
+            if not (tickets or changesets or wiki):
+                tickets = changesets = wiki = 1
+            if not tickets:
+                req.hdf['search.ticket'] = ''
+            if not changesets:
+                req.hdf['search.changeset'] = ''
+            if not wiki:
+                req.hdf['search.wiki'] = ''
+
+            page = int(req.args.get('page', '0'))
+            req.hdf['search.result_page'] = page
+            info, more = self.perform_query(req, query, changesets, tickets,
+                                            wiki, page)
+            req.hdf['search.result'] = info
+
+            params = [('q', query)]
+            if tickets: params.append(('ticket', 'on'))
+            if changesets: params.append(('changeset', 'on'))
+            if wiki: params.append(('wiki', 'on'))
+            if page:
+                add_link(req, 'first', self.env.href.search(params, page=0))
+                add_link(req, 'prev', self.env.href.search(params, page=page - 1))
+            if more:
+                add_link(req, 'next', self.env.href.search(params, page=page + 1))
+
+        req.display('search.cs')
+
+    # Internal methods
 
     def query_to_sql(self, q, name):
         self.log.debug("Query: %s" % q)
@@ -212,54 +267,3 @@ class SearchModule(Component):
             item['message'] = escape(self.shorten_result(msg, keywords))
             info.append(item)
         return info, more
-
-    def match_request(self, req):
-        return req.path_info == '/search'
-
-    def process_request(self, req):
-        req.perm.assert_permission(perm.SEARCH_VIEW)
-        self.authzperm = SubversionAuthorizer(self.env, req.authname)
-
-        req.hdf['title'] = 'Search'
-        req.hdf['search'] = {
-            'ticket': 'checked',
-            'changeset': 'checked',
-            'wiki': 'checked',
-            'results_per_page': self.RESULTS_PER_PAGE
-        }
-
-        if req.args.has_key('q'):
-            query = req.args.get('q')
-            req.hdf['title'] = 'Search Results'
-            req.hdf['search.q'] = query.replace('"', "&#34;")
-            tickets = req.args.has_key('ticket')
-            changesets = req.args.has_key('changeset')
-            wiki = req.args.has_key('wiki')
-
-            # If no search options chosen, choose all
-            if not (tickets or changesets or wiki):
-                tickets = changesets = wiki = 1
-            if not tickets:
-                req.hdf['search.ticket'] = ''
-            if not changesets:
-                req.hdf['search.changeset'] = ''
-            if not wiki:
-                req.hdf['search.wiki'] = ''
-
-            page = int(req.args.get('page', '0'))
-            req.hdf['search.result_page'] = page
-            info, more = self.perform_query(req, query, changesets, tickets,
-                                            wiki, page)
-            req.hdf['search.result'] = info
-
-            params = [('q', query)]
-            if tickets: params.append(('ticket', 'on'))
-            if changesets: params.append(('changeset', 'on'))
-            if wiki: params.append(('wiki', 'on'))
-            if page:
-                add_link(req, 'first', self.env.href.search(params, page=0))
-                add_link(req, 'prev', self.env.href.search(params, page=page - 1))
-            if more:
-                add_link(req, 'next', self.env.href.search(params, page=page + 1))
-
-        req.display('search.cs')
