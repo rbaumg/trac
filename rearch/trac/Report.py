@@ -120,6 +120,7 @@ class ReportModule(Component):
         format = req.args.get('format')
         if format == 'rss':
             self.render_rss(req, db)
+            return 'report_rss.cs', 'application/rss+xml'
         elif format == 'csv':
             self.render_csv(req, db)
         elif format == 'tab':
@@ -127,7 +128,7 @@ class ReportModule(Component):
         elif format == 'sql':
             self.render_sql(req, db)
         else:
-            req.display('report.cs')
+            return 'report.cs', None
 
     # Internal methods
 
@@ -457,7 +458,6 @@ class ReportModule(Component):
                 summary = req.hdf.get(nodename, '')
                 req.hdf[nodename] = util.escape(summary)
                 item = item.next()
-        req.display('report_rss.cs', 'application/rss+xml')
 
     def render_csv(self, req, db, sep=','):
         req.send_response(200)

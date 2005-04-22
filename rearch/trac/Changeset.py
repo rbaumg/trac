@@ -69,6 +69,7 @@ class ChangesetModule(Component):
             self.render_zip(req, repos, chgset)
         else:
             self.render_html(req, repos, chgset, diff_options)
+            return 'changeset.cs', None
 
     # Internal methods
 
@@ -160,8 +161,6 @@ class ChangesetModule(Component):
                                    ignore_case='-i' in diff_options,
                                    ignore_space_changes='-b' in diff_options)
                 req.hdf['changeset.changes.%d.diff' % idx] = changes
-
-        req.display('changeset.cs')
 
     def render_diff(self, req, repos, chgset, diff_options):
         """Raw Unified Diff version"""

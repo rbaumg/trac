@@ -95,13 +95,15 @@ class BrowserModule(Component):
         node = repos.get_node(path, rev)
         if node.isdir:
             req.hdf['browser.is_dir'] = 1
-            self.render_directory(req, repos, node, rev)
+            self._render_directory(req, repos, node, rev)
         else:
-            self.render_file(req, repos, node, rev)
+            self._render_file(req, repos, node, rev)
+
+        return 'browser.cs', None
 
     # Internal methods
 
-    def render_directory(self, req, repos, node, rev=None):
+    def _render_directory(self, req, repos, node, rev=None):
         req.perm.assert_permission(perm.BROWSER_VIEW)
 
         order = req.args.get('order', 'name').lower()
@@ -141,9 +143,8 @@ class BrowserModule(Component):
 
         req.hdf['browser.items'] = info
         req.hdf['browser.changes'] = changes
-        req.display('browser.cs')
 
-    def render_file(self, req, repos, node, rev=None):
+    def _render_file(self, req, repos, node, rev=None):
         req.perm.assert_permission(perm.FILE_VIEW)
 
         db = self.env.get_db_cnx()
@@ -204,8 +205,6 @@ class BrowserModule(Component):
             req.hdf['file.raw_href'] = raw_href
             add_link(req, 'alternate', raw_href, 'Original Format', mime_type)
 
-            req.display('browser.cs')
-
 
 class LogModule(Component):
 
@@ -258,11 +257,10 @@ class LogModule(Component):
         req.hdf['log.changes'] = _get_changes(self.env, repos,
                                               [i['rev'] for i in info])
 
+        if req.args.get('format') == 'rss':
+            return 'log_rss.cs', 'application/rss+xml'
+
         rss_href = self.env.href.log(path, rev=rev, format='rss')
         add_link(req, 'alternate', rss_href, 'RSS Feed', 'application/rss+xml',
                  'rss')
-
-        if req.args.get('format') == 'rss':
-            req.display('log_rss.cs', 'application/rss+xml')
-        else:
-            req.display('log.cs')
+        return 'log.cs', None

@@ -110,8 +110,9 @@ class RoadmapModule(Component):
 
         if req.args.get('format') == 'ics':
             self.render_ics(req, db, milestones)
-        else:
-            req.display('roadmap.cs')
+            return
+
+        return 'roadmap.cs', None
 
     # Internal methods
 

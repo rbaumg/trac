@@ -49,7 +49,8 @@ class SettingsModule(Component):
         req.hdf['settings'] = req.session
         if req.session.sid:
             req.hdf['settings.session_id'] = req.session.sid
-        req.display('settings.cs')
+
+        return 'settings.cs', None
 
     # Internal methods
 

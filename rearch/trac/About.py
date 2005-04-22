@@ -149,7 +149,7 @@ It provides an interface to the Subversion revision control systems, integrated 
             self.__render_plugins(req)
 
         template = req.hdf.parse(self.about_cs)
-        req.display(template)
+        return template, None
 
     def __render_config(self, req):
         req.perm.assert_permission(perm.CONFIG_VIEW)

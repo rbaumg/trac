@@ -56,6 +56,7 @@ class AttachmentModule(Component):
         action = req.args.get('action', 'view')
         if action == 'new':
             self.render_form(req, parent_type, path)
+            return 'attachment.cs', None
         elif action == 'save':
             self.save_attachment(req, parent_type, path)
         else:
@@ -66,6 +67,7 @@ class AttachmentModule(Component):
                 self.delete_attachment(req, parent_type, parent_id, filename)
             else:
                 self.render_view(req, parent_type, parent_id, filename)
+                return 'attachment.cs', None
 
     # Internal methods
 
@@ -90,8 +92,6 @@ class AttachmentModule(Component):
             'parent_href': link,
             'author': util.get_reporter_id(req)
         }
-
-        req.display('attachment.cs')
 
     def save_attachment(self, req, parent_type, parent_id):
         perm_map = {'ticket': perm.TICKET_APPEND, 'wiki': perm.WIKI_MODIFY}
@@ -197,8 +197,6 @@ class AttachmentModule(Component):
             vdata = self.env.mimeview.display(data, filename=filename,
                                               mimetype=mime_type)
         req.hdf['attachment.preview'] = vdata
-
-        req.display('attachment.cs')
 
     def render_view_raw(self, req, fd, mime_type, charset, length,
                         last_modified):

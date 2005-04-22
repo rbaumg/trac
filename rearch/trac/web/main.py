@@ -146,7 +146,14 @@ class IRequestHandler(Interface):
 
     def process_request(req):
         """
-        Process the request.
+        Process the request. Should return a (template_name, content_type)
+        tuple, where `template` is the ClearSilver template to use (either
+        a `neo_cs.CS` object, or the file name of the template), and
+        `content_type` is the MIME type of the content. If `content_type` is
+        `None`, "text/html" is assumed.
+
+        Note that if template processing should not occur, this method can
+        simply send the response itself and not return anything.
         """
 
 
@@ -189,13 +196,21 @@ class RequestDispatcher(Component):
             # FIXME: Should return '404 Not Found' to the client
             raise TracError, 'No handler matched request to %s' % req.path_info
 
+        # Kludge
+        name = chosen_handler.__class__.__name__
+        req.hdf['trac.active_module'] = self.legacy_module_map[name]
+
         from trac.web.chrome import Chrome
         chrome = Chrome(self.env)
         chrome.populate_hdf(req)
 
-        name = chosen_handler.__class__.__name__
-        req.hdf['trac.active_module'] = self.legacy_module_map[name]
-        chosen_handler.process_request(req)
+        resp = chosen_handler.process_request(req)
+        if resp:
+            template, content_type = resp
+            if not content_type:
+                content_type = 'text/html'
+
+            req.display(template, content_type or 'text/html')
 
 
 def populate_hdf(hdf, env, req=None):

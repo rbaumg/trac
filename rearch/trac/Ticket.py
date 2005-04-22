@@ -344,7 +344,7 @@ class NewticketModule(Component):
 
         insert_custom_fields(self.env, req.hdf, ticket)
 
-        req.display('newticket.cs')
+        return 'newticket.cs', None
 
     # Internal methods
 
@@ -467,7 +467,7 @@ class TicketModule(Component):
                              'Ticket #%s' % tickets[-1])
                 add_link(req, 'up', req.session['query_href'])
 
-        req.display('ticket.cs')
+        return 'ticket.cs', None
 
     def save_changes(self, req, db, id):
         if req.perm.has_permission(perm.TICKET_CHGPROP):

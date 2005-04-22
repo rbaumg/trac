@@ -79,7 +79,7 @@ class TimelineModule(Component):
         format = req.args.get('format')
 
         db = self.env.get_db_cnx()
-        events = self.get_info(req, db, start, stop, maxrows, filters)
+        events = self._get_info(req, db, start, stop, maxrows, filters)
         for idx, event in enum(events):
             render_func = getattr(self, '_render_%s' % event['type'])
             event = render_func(req, db, event)
@@ -94,13 +94,29 @@ class TimelineModule(Component):
             req.hdf['timeline.items.%d' % idx] = event
 
         if format == 'rss':
-            self.display_rss(req)
-        else:
-            self.display_html(req, filters)
+            return 'timeline_rss.cs', 'application/rss+xml'
+
+        rss_href = self.env.href.timeline([(x,'on') for x in filters],
+                                          daysback=90, max=50, format='rss')
+        add_link(req, 'alternate', rss_href, 'RSS Feed', 'application/rss+xml',
+                 'rss')
+        filter_labels = {'wiki': 'Wiki changes', 'ticket': 'Ticket changes',
+                         'changeset': 'Repository check-ins',
+                         'milestone': 'Milestones'}
+        perm_map = {'ticket': perm.TICKET_VIEW, 'changeset': perm.CHANGESET_VIEW,
+                    'wiki': perm.WIKI_VIEW, 'milestone': perm.MILESTONE_VIEW}
+        for idx,fltr in enum([f for f in AVAILABLE_FILTERS
+                              if req.perm.has_permission(perm_map[f])]):
+            req.hdf['timeline.filters.%d' % idx] = {
+                'name': fltr, 'label': filter_labels[fltr],
+                'enabled': int(fltr in filters)
+            }
+
+        return 'timeline.cs', None
 
     # Internal methods
 
-    def get_info(self, req, db, start, stop, maxrows,
+    def _get_info(self, req, db, start, stop, maxrows,
                  filters=AVAILABLE_FILTERS):
         perm_map = {'ticket': perm.TICKET_VIEW, 'changeset': perm.CHANGESET_VIEW,
                     'wiki': perm.WIKI_VIEW, 'milestone': perm.MILESTONE_VIEW}
@@ -172,29 +188,6 @@ class TimelineModule(Component):
             }
             info.append(item)
         return info
-
-    def display_html(self, req, filters):
-        rss_href = self.env.href.timeline([(x,'on') for x in filters],
-                                          daysback=90, max=50, format='rss')
-        add_link(req, 'alternate', rss_href, 'RSS Feed', 'application/rss+xml',
-                 'rss')
-
-        filter_labels = {'wiki': 'Wiki changes', 'ticket': 'Ticket changes',
-                         'changeset': 'Repository check-ins',
-                         'milestone': 'Milestones'}
-        perm_map = {'ticket': perm.TICKET_VIEW, 'changeset': perm.CHANGESET_VIEW,
-                    'wiki': perm.WIKI_VIEW, 'milestone': perm.MILESTONE_VIEW}
-        for idx,fltr in enum([f for f in AVAILABLE_FILTERS
-                              if req.perm.has_permission(perm_map[f])]):
-            req.hdf['timeline.filters.%d' % idx] = {
-                'name': fltr, 'label': filter_labels[fltr],
-                'enabled': int(fltr in filters)
-            }
-
-        req.display('timeline.cs')
-
-    def display_rss(self, req):
-        req.display('timeline_rss.cs', 'application/rss+xml')
 
     def _render_changeset(self, req, db, item):
         absurls = req.args.get('format') == 'rss'

@@ -33,20 +33,23 @@ def add_link(req, rel, href, title=None, type=None, class_name=None):
     req.hdf['links.%s.%d' % (rel, idx)] = link
 
 
+class INavigationContributor(Interface):
+
+    def get_navigation_items(req):
+        """
+        FIGUREMEOUT
+        """
+
+
 class Chrome(Component):
+    """
+    Responsible for assembling the web site chrome, i.e. everything that
+    is not actual page content.
+    """
+
+    navigation_contributors = ExtensionPoint(INavigationContributor)
 
     def populate_hdf(self, req):
-        req.hdf['project'] = {
-            'name': self.config.get('project', 'name'),
-            'name.encoded': escape(self.config.get('project', 'name')),
-            'descr': self.config.get('project', 'descr'),
-            'footer': self.config.get('project', 'footer',
-                     'Visit the Trac open source project at<br />'
-                     '<a href="http://trac.edgewall.com/">'
-                     'http://trac.edgewall.com/</a>'),
-            'url': self.config.get('project', 'url')
-        }
-
         htdocs_location = self.config.get('trac', 'htdocs_location')
         if htdocs_location[-1] != '/':
             htdocs_location += '/'
@@ -79,3 +82,7 @@ class Chrome(Component):
             mimetype = self.env.mimeview.get_mimetype(icon)
             add_link(req, 'icon', icon, type=mimetype)
             add_link(req, 'shortcut icon', icon, type=mimetype)
+
+        navigation_items = []
+        for contributor in self.navigation_contributors:
+            navigation_items += contributor.get_navigation_items(req)

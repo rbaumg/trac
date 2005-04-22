@@ -135,9 +135,6 @@ class WikiModule(Component):
     def process_request(self, req):
         action = req.args.get('action', 'view')
         pagename = req.args.get('page', 'WikiStart')
-        req.hdf['wiki.action'] = action
-        req.hdf['wiki.page_name'] = escape(pagename)
-        req.hdf['wiki.current_href'] = escape(self.env.href.wiki(pagename))
 
         db = self.env.get_db_cnx()
 
@@ -166,8 +163,13 @@ class WikiModule(Component):
 
         if req.args.get('format') == 'txt':
             self.render_txt(req)
-        else:
-            req.display('wiki.cs')
+            return
+
+        req.hdf['wiki.action'] = action
+        req.hdf['wiki.page_name'] = escape(pagename)
+        req.hdf['wiki.current_href'] = escape(self.env.href.wiki(pagename))
+
+        return 'wiki.cs', None
 
     # Internal methods
 

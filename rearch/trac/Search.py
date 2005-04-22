@@ -88,7 +88,7 @@ class SearchModule(Component):
             if more:
                 add_link(req, 'next', self.env.href.search(params, page=page + 1))
 
-        req.display('search.cs')
+        return 'search.cs', None
 
     # Internal methods
 

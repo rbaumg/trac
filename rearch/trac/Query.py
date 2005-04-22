@@ -348,12 +348,14 @@ class QueryModule(Component):
         format = req.args.get('format')
         if format == 'rss':
             self.display_rss(req, query)
+            return 'query_rss.cs', 'application/rss+xml'
         elif format == 'csv':
             self.display_csv(req, query)
         elif format == 'tab':
             self.display_csv(req, query, '\t')
         else:
             self.display_html(req, query)
+            return 'query.cs', None
 
     # Internal methods
 
@@ -578,7 +580,6 @@ class QueryModule(Component):
         req.hdf['query.results'] = tickets
         req.hdf['session.constraints'] = req.session.get('query_constraints')
         req.hdf['session.tickets'] = req.session.get('query_tickets')
-        req.display('query.cs', 'text/html')
 
     def display_csv(self, req, query, sep=','):
         req.send_response(200)
@@ -609,5 +610,3 @@ class QueryModule(Component):
                 result['time'] = strftime('%a, %d %b %Y %H:%M:%S GMT',
                                           gmtime(result['time']))
         req.hdf['query.results'] = results
-
-        req.display('query_rss.cs', 'application/rss+xml')
