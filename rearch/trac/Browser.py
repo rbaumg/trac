@@ -21,7 +21,7 @@
 
 from trac import perm, util
 from trac.core import *
-from trac.web.chrome import add_link
+from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 
@@ -62,7 +62,15 @@ def _get_path_links(href, path, rev):
 
 class BrowserModule(Component):
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
+
+    # INavigationContributor methods
+
+    def get_navigation_items(self, req):
+        if not req.perm.has_permission(perm.BROWSER_VIEW):
+            return
+        yield 'mainnav', 'browser', '<a href="%s">Browse Source</a>' \
+              % util.escape(self.env.href.browser())
 
     # IRequestHandler methods
 

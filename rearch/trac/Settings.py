@@ -20,14 +20,21 @@
 # Author: Daniel Lundin <daniel@edgewall.com>
 
 from trac.core import *
-from trac.util import TracError
+from trac.util import escape, TracError
+from trac.web.chrome import INavigationContributor
 from trac.web.main import IRequestHandler
 
 class SettingsModule(Component):
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
 
     _form_fields = ['newsid','name', 'email']
+
+    # INavigationContributor methods
+
+    def get_navigation_items(self, req):
+        yield 'metanav', 'settings', '<a href="%s">Settings</a>' \
+              % escape(self.env.href.settings())
 
     # IRequestHandler methods
 

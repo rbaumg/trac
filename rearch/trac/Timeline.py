@@ -23,7 +23,7 @@ from trac import perm
 from trac.core import *
 from trac.util import enum, escape, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
-from trac.web.chrome import add_link
+from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_oneliner, wiki_to_html
 
@@ -34,7 +34,15 @@ AVAILABLE_FILTERS = ('ticket', 'changeset', 'wiki', 'milestone')
 
 class TimelineModule(Component):
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
+
+    # INavigationContributor methods
+
+    def get_navigation_items(self, req):
+        if not req.perm.has_permission(perm.TIMELINE_VIEW):
+            return
+        yield 'mainnav', 'timeline', '<a href="%s" accesskey="2">Timeline</a>' \
+                                     % self.env.href.timeline()
 
     # IRequestHandler methods
 

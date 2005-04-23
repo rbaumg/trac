@@ -23,7 +23,7 @@ from trac import perm
 from trac.core import *
 from trac.util import enum, escape, TracError, get_reporter_id
 from trac.versioncontrol.diff import get_diff_options, hdf_diff
-from trac.web.chrome import add_link
+from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.WikiFormatter import *
 
@@ -121,7 +121,17 @@ class WikiPage:
 
 class WikiModule(Component):
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
+
+    # INavigationContributor methods
+
+    def get_navigation_items(self, req):
+        if not req.perm.has_permission(perm.WIKI_VIEW):
+            return
+        yield 'metanav', 'help', '<a href="%s" accesskey="6">Help/Guide</a>' \
+              % escape(self.env.href.wiki('TracGuide'))
+        yield 'mainnav', 'wiki', '<a href="%s" accesskey="1">Wiki</a>' \
+              % escape(self.env.href.wiki())
 
     # IRequestHandler methods
 

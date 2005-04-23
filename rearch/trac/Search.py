@@ -23,7 +23,7 @@ from trac import perm
 from trac.core import *
 from trac.util import TracError, escape, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
-from trac.web.chrome import add_link
+from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
 
 import re
@@ -33,9 +33,17 @@ import string
 
 class SearchModule(Component):
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
 
     RESULTS_PER_PAGE = 10
+
+    # INavigationContributor methods
+
+    def get_navigation_items(self, req):
+        if not req.perm.has_permission(perm.SEARCH_VIEW):
+            return
+        yield 'mainnav', 'search', '<a href="%s">Search</a>' \
+              % (self.env.href.search())
 
     # IRequestHandler methods
 

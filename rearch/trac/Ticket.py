@@ -22,7 +22,7 @@
 from trac import perm, util
 from trac.core import *
 from trac.Notify import TicketNotifyEmail
-from trac.web.chrome import add_link
+from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_html
 
@@ -280,7 +280,15 @@ def insert_custom_fields(env, hdf, vals = {}):
 
 class NewticketModule(Component):
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
+
+    # INavigationContributor methods
+
+    def get_navigation_items(self, req):
+        if not req.perm.has_permission(perm.TICKET_CREATE):
+            return
+        yield 'mainnav', 'newticket', '<a href="%s">New Ticket</a>' \
+              % (self.env.href.newticket())
 
     # IRequestHandler methods
 

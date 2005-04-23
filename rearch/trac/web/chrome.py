@@ -34,10 +34,15 @@ def add_link(req, rel, href, title=None, type=None, class_name=None):
 
 
 class INavigationContributor(Interface):
+    """
+    Extension point interface for components that contribute items to the
+    navigation.
+    """
 
     def get_navigation_items(req):
         """
-        FIGUREMEOUT
+        Should return an iterable object over the list of navigation items to
+        add, each being a tuple in the form (category, name, text).
         """
 
 
@@ -49,7 +54,11 @@ class Chrome(Component):
 
     navigation_contributors = ExtensionPoint(INavigationContributor)
 
-    def populate_hdf(self, req):
+    def populate_hdf(self, req, handler):
+        """
+        Add chrome-related data to the HDF.
+        """
+
         htdocs_location = self.config.get('trac', 'htdocs_location')
         if htdocs_location[-1] != '/':
             htdocs_location += '/'
@@ -83,6 +92,14 @@ class Chrome(Component):
             add_link(req, 'icon', icon, type=mimetype)
             add_link(req, 'shortcut icon', icon, type=mimetype)
 
-        navigation_items = []
+        # Navigation links
+        navigation = {}
         for contributor in self.navigation_contributors:
-            navigation_items += contributor.get_navigation_items(req)
+            for category, name, text in contributor.get_navigation_items(req):
+                navigation.setdefault(category, {})[name] = text
+        for category, items in navigation.items():
+            items = items.items()
+            order = self.config.get('trac', category).split(',')
+            items.sort(lambda x,y: cmp(order.index(x[0]), order.index(y[0])))
+            for name, text in items:
+                req.hdf['chrome.%s.%s' % (category, name)] = text

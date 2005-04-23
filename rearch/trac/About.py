@@ -24,6 +24,7 @@ import re
 
 from trac import perm
 from trac.core import *
+from trac.web.chrome import INavigationContributor
 from trac.web.main import IRequestHandler
 
 
@@ -32,7 +33,7 @@ class AboutModule(Component):
     Provides various about pages.
     """
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
 
     about_cs = """
 <?cs set:html.stylesheet = 'css/about.css' ?>
@@ -130,6 +131,14 @@ It provides an interface to the Subversion revision control systems, integrated 
 <?cs include "footer.cs"?>
 """ # about_cs
 
+    # INavigationContributor methods
+
+    def get_navigation_items(self, req):
+        yield 'metanav', 'about', '<a href="%s" accesskey="9">About Trac</a>' \
+              % self.env.href.about()
+
+    # IRequestHandler methods
+
     def match_request(self, req):
         match = re.match(r'/about(?:_trac)?(?:/(.*))?$', req.path_info)
         if match:
@@ -150,6 +159,8 @@ It provides an interface to the Subversion revision control systems, integrated 
 
         template = req.hdf.parse(self.about_cs)
         return template, None
+
+    # Internal methods
 
     def __render_config(self, req):
         req.perm.assert_permission(perm.CONFIG_VIEW)

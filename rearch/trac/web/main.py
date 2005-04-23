@@ -202,7 +202,7 @@ class RequestDispatcher(Component):
 
         from trac.web.chrome import Chrome
         chrome = Chrome(self.env)
-        chrome.populate_hdf(req)
+        chrome.populate_hdf(req, chosen_handler)
 
         resp = chosen_handler.process_request(req)
         if resp:

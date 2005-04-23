@@ -23,7 +23,7 @@ from trac import Milestone, perm, __version__
 from trac.core import *
 from trac.util import escape, pretty_timedelta, CRLF
 from trac.Ticket import Ticket
-from trac.web.chrome import add_link
+from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_html
 
@@ -33,7 +33,15 @@ from time import localtime, strftime, time
 
 class RoadmapModule(Component):
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
+
+    # INavigationContributor methods
+
+    def get_navigation_items(self, req):
+        if not req.perm.has_permission(perm.ROADMAP_VIEW):
+            return
+        yield 'mainnav', 'roadmap', '<a href="%s" accesskey="3">Roadmap</a>' \
+                                    % self.env.href.roadmap()
 
     # IRequestHandler methods
 
