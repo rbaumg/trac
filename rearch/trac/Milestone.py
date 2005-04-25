@@ -22,9 +22,10 @@
 from trac import perm
 from trac.core import *
 from trac.Ticket import get_custom_fields, Ticket
+from trac.Timeline import ITimelineEventProvider
 from trac.web.chrome import add_link
 from trac.web.main import IRequestHandler
-from trac.WikiFormatter import wiki_to_html
+from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 from trac.util import *
 
 import time
@@ -100,7 +101,30 @@ def calc_ticket_stats(tickets):
 
 class MilestoneModule(Component):
 
-    implements(IRequestHandler)
+    implements(IRequestHandler, ITimelineEventProvider)
+
+    # ITimelineEventProvider methods
+
+    def get_timeline_filters(self, req):
+        if req.perm.has_permission(perm.MILESTONE_VIEW):
+            yield ('milestone', 'Milestones')
+
+    def get_timeline_events(self, req, start, stop, filters):
+        if 'milestone' in filters:
+            absurls = req.args.get('format') == 'rss' # Kludge
+            db = self.env.get_db_cnx()
+            cursor = db.cursor()
+            cursor.execute("SELECT completed,name,description FROM milestone "
+                           "WHERE completed>=%s AND completed<=%s", start, stop)
+            for completed,name,description in cursor:
+                if absurls:
+                    href = self.env.abs_href.milestone(name)
+                else:
+                    href = self.env.href.milestone(name)
+                title = 'Milestone <em>%s</em> completed' % escape(name)
+                message = wiki_to_oneliner(shorten_line(description),
+                                           self.env, db, absurls=absurls)
+                yield 'milestone', href, title, completed, None, message
 
     # IRequestHandler methods
 

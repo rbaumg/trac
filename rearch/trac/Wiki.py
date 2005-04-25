@@ -21,7 +21,8 @@
 
 from trac import perm
 from trac.core import *
-from trac.util import enum, escape, TracError, get_reporter_id
+from trac.Timeline import ITimelineEventProvider
+from trac.util import enum, escape, get_reporter_id, shorten_line, TracError
 from trac.versioncontrol.diff import get_diff_options, hdf_diff
 from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
@@ -121,7 +122,7 @@ class WikiPage:
 
 class WikiModule(Component):
 
-    implements(INavigationContributor, IRequestHandler)
+    implements(INavigationContributor, IRequestHandler, ITimelineEventProvider)
 
     # INavigationContributor methods
 
@@ -180,6 +181,30 @@ class WikiModule(Component):
         req.hdf['wiki.current_href'] = escape(self.env.href.wiki(pagename))
 
         return 'wiki.cs', None
+
+    # ITimelineEventProvider methods
+
+    def get_timeline_filters(self, req):
+        if req.perm.has_permission(perm.WIKI_VIEW):
+            yield ('wiki', 'Wiki changes')
+
+    def get_timeline_events(self, req, start, stop, filters):
+        absurls = req.args.get('format') == 'rss' # Kludge
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        if 'wiki' in filters:
+            cursor.execute("SELECT time,name,comment,author "
+                           "FROM wiki WHERE time>=%s AND time<=%s", start, stop)
+            for t,name,comment,author in cursor:
+                if absurls:
+                    href = self.env.abs_href.wiki(name)
+                else:
+                    href = self.env.href.wiki(name)
+                title = '<em>%s</em> edited by %s' % (
+                        escape(name), escape(author))
+                comment = wiki_to_oneliner(shorten_line(comment), self.env, db,
+                                           absurls=absurls)
+                yield 'wiki', href, title, t, author, comment
 
     # Internal methods
 

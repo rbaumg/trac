@@ -22,9 +22,10 @@
 from trac import perm, util
 from trac.core import *
 from trac.Notify import TicketNotifyEmail
+from trac.Timeline import ITimelineEventProvider
 from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
-from trac.WikiFormatter import wiki_to_html
+from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 
 import re
 import time
@@ -408,7 +409,7 @@ def available_actions(ticket, perm_):
 
 class TicketModule(Component):
 
-    implements(IRequestHandler)
+    implements(IRequestHandler, ITimelineEventProvider)
 
     # IRequestHandler methods
 
@@ -476,6 +477,63 @@ class TicketModule(Component):
                 add_link(req, 'up', req.session['query_href'])
 
         return 'ticket.cs', None
+
+    # ITimelineEventProvider methods
+
+    def get_timeline_filters(self, req):
+        if req.perm.has_permission(perm.WIKI_VIEW):
+            yield ('ticket', 'Ticket changes')
+
+    def get_timeline_events(self, req, start, stop, filters):
+        if 'ticket' in filters:
+            absurls = req.args.get('format') == 'rss' # Kludge
+            sql = []
+
+            # New tickets
+            sql.append("SELECT time,id,'','new',summary,reporter"
+                       " FROM ticket WHERE time>=%s AND time<=%s")
+
+            # Reopened tickets
+            sql.append("SELECT t1.time,t1.ticket,'','reopened',t2.newvalue,t1.author "
+                       " FROM ticket_change t1"
+                       "   LEFT OUTER JOIN ticket_change t2 ON (t1.time=t2.time"
+                       "     AND t1.ticket=t2.ticket AND t2.field='comment')"
+                       " WHERE t1.field='status' AND t1.newvalue='reopened'"
+                       "   AND t1.time>=%s AND t1.time<=%s")
+
+            # Closed tickets
+            sql.append("SELECT t1.time,t1.ticket,t2.newvalue,'closed',"
+                       "t3.newvalue,t1.author"
+                       " FROM ticket_change t1"
+                       "   INNER JOIN ticket_change t2 ON t1.ticket=t2.ticket"
+                       "     AND t1.time=t2.time"
+                       "   LEFT OUTER JOIN ticket_change t3 ON t1.time=t3.time"
+                       "     AND t1.ticket=t3.ticket AND t3.field='comment'"
+                       " WHERE t1.field='status' AND t1.newvalue='closed'"
+                       "   AND t2.field='resolution'"
+                       "   AND t1.time>=%s AND t1.time<=%s")
+
+            db = self.env.get_db_cnx()
+            cursor = db.cursor()
+            cursor.execute(" UNION ALL ".join(sql), start, stop, start, stop,
+                           start, stop)
+
+            kinds = {'new': 'newticket', 'reopened': 'newticket',
+                     'closed': 'closedticket'}
+            verbs = {'new': 'created', 'reopened': 'reopened',
+                     'closed': 'closed'}
+            for t,id,resolution,type,message,author in cursor:
+                if absurls:
+                    href = self.env.abs_href.ticket(id)
+                else:
+                    href = self.env.href.ticket(id)
+                title = 'Ticket <em>#%s</em> %s by %s' % (
+                        id, verbs[type], util.escape(author))
+                message = wiki_to_oneliner(util.shorten_line(message), self.env,
+                                           db, absurls=absurls)
+                yield kinds[type], href, title, t, author, message
+
+    # Internal methods
 
     def save_changes(self, req, db, id):
         if req.perm.has_permission(perm.TICKET_CHGPROP):

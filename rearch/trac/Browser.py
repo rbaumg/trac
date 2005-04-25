@@ -78,7 +78,7 @@ class BrowserModule(Component):
         import re
         match = re.match(r'/(browser|file)(?:(/.*))?', req.path_info)
         if match:
-            req.args['path'] = match.group(2)
+            req.args['path'] = match.group(2) or '/'
             if match.group(1) == 'file':
                 # FIXME: This should be a permanent redirect
                 req.redirect(self.env.href.browser(req.args.get('path'),

@@ -19,22 +19,22 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
-from trac import perm
+from trac import perm, util
 from trac.core import *
+from trac.Timeline import ITimelineEventProvider
 from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
 from trac.web.chrome import add_link
 from trac.web.main import IRequestHandler
-from trac.WikiFormatter import wiki_to_html
+from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 
 import time
-import util
 import re
 
 
 class ChangesetModule(Component):
 
-    implements(IRequestHandler)
+    implements(IRequestHandler, ITimelineEventProvider)
 
     # IRequestHandler methods
 
@@ -70,6 +70,47 @@ class ChangesetModule(Component):
         else:
             self.render_html(req, repos, chgset, diff_options)
             return 'changeset.cs', None
+
+    # ITimelineEventProvider methods
+
+    def get_timeline_filters(self, req):
+        if req.perm.has_permission(perm.CHANGESET_VIEW):
+            yield ('changeset', 'Repository checkins')
+
+    def get_timeline_events(self, req, start, stop, filters):
+        if 'changeset' in filters:
+            absurls = req.args.get('format') == 'rss' # Kludge
+            show_files = int(self.config.get('timeline',
+                                             'changeset_show_files'))
+            db = self.env.get_db_cnx()
+            repos = self.env.get_repository()
+            rev = repos.youngest_rev
+            while rev:
+                chgset = repos.get_changeset(rev)
+                if chgset.date < start:
+                    return
+                if chgset.date < stop:
+                    if absurls:
+                        href = self.env.abs_href.changeset(chgset.rev)
+                    else:
+                        href = self.env.href.changeset(chgset.rev)
+                    title = 'Changeset <em>[%s]</em> by %s' % (
+                            util.escape(chgset.rev), util.escape(chgset.author))
+                    message = wiki_to_oneliner(util.shorten_line(chgset.message or '--'),
+                                               self.env, db, absurls=absurls)
+                    if show_files:
+                        files = []
+                        for chg in chgset.get_changes():
+                            if show_files > 0 and len(files) >= show_files:
+                                files.append('...')
+                                break
+                            files.append('<span class="%s">%s</span>'
+                                         % (chg[2], util.escape(chg[0])))
+                        message = '<span class="changes">' + ', '.join(files) +\
+                                  '</span>: ' + message
+                    yield 'changeset', href, title, chgset.date, chgset.author,\
+                          message
+                rev = repos.previous_rev(rev)
 
     # Internal methods
 
