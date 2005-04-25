@@ -1,4 +1,4 @@
-from trac import db_default, test, Logging
+from trac import db_default
 from trac.env import Environment
 
 import os
