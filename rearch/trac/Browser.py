@@ -66,6 +66,9 @@ class BrowserModule(Component):
 
     # INavigationContributor methods
 
+    def get_active_navigation_item(self, req):
+        return 'browser'
+
     def get_navigation_items(self, req):
         if not req.perm.has_permission(perm.BROWSER_VIEW):
             return
@@ -216,7 +219,15 @@ class BrowserModule(Component):
 
 class LogModule(Component):
 
-    implements(IRequestHandler)
+    implements(INavigationContributor, IRequestHandler)
+
+    # INavigationContributor methods
+
+    def get_active_navigation_item(self, req):
+        return 'browser'
+
+    def get_navigation_items(self, req):
+        return []
 
     # IRequestHandler methods
 

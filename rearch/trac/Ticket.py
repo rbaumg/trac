@@ -285,6 +285,9 @@ class NewticketModule(Component):
 
     # INavigationContributor methods
 
+    def get_active_navigation_item(self, req):
+        return 'newticket'
+
     def get_navigation_items(self, req):
         if not req.perm.has_permission(perm.TICKET_CREATE):
             return
@@ -409,7 +412,15 @@ def available_actions(ticket, perm_):
 
 class TicketModule(Component):
 
-    implements(IRequestHandler, ITimelineEventProvider)
+    implements(INavigationContributor, IRequestHandler, ITimelineEventProvider)
+
+    # INavigationContributor methods
+
+    def get_active_navigation_item(self, req):
+        return 'tickets'
+
+    def get_navigation_items(self, req):
+        return []
 
     # IRequestHandler methods
 

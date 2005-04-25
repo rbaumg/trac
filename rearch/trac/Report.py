@@ -75,6 +75,9 @@ class ReportModule(Component):
 
     # INavigationContributor methods
 
+    def get_active_navigation_item(self, req):
+        return 'tickets'
+
     def get_navigation_items(self, req):
         if not req.perm.has_permission(perm.REPORT_VIEW):
             return

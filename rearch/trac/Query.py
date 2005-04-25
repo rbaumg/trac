@@ -22,7 +22,7 @@
 from trac import perm
 from trac.core import *
 from trac.Ticket import get_custom_fields, insert_custom_fields, Ticket
-from trac.web.chrome import add_link
+from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.WikiFormatter import wiki_to_html, wiki_to_oneliner
 from trac.util import escape, sql_escape, CRLF
@@ -291,7 +291,15 @@ class Query(object):
 
 class QueryModule(Component):
 
-    implements(IRequestHandler)
+    implements(IRequestHandler, INavigationContributor)
+
+    # INavigationContributor methods
+
+    def get_active_navigation_item(self, req):
+        return 'tickets'
+
+    def get_navigation_items(self, req):
+        return []
 
     # IRequestHandler methods
 

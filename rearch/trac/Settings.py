@@ -32,6 +32,9 @@ class SettingsModule(Component):
 
     # INavigationContributor methods
 
+    def get_active_navigation_item(self, req):
+        return 'settings'
+
     def get_navigation_items(self, req):
         yield 'metanav', 'settings', '<a href="%s">Settings</a>' \
               % escape(self.env.href.settings())

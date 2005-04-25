@@ -37,6 +37,9 @@ class RoadmapModule(Component):
 
     # INavigationContributor methods
 
+    def get_active_navigation_item(self, req):
+        return 'roadmap'
+
     def get_navigation_items(self, req):
         if not req.perm.has_permission(perm.ROADMAP_VIEW):
             return

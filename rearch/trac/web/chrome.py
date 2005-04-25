@@ -39,6 +39,13 @@ class INavigationContributor(Interface):
     navigation.
     """
 
+    def get_active_navigation_item(self, req):
+        """
+        This method is only called for the `IRequestHandler` processing the
+        request. It should return the name of the navigation item that should
+        be highlighted as active/current.
+        """
+
     def get_navigation_items(req):
         """
         Should return an iterable object over the list of navigation items to
@@ -94,12 +101,17 @@ class Chrome(Component):
 
         # Navigation links
         navigation = {}
+        active = None
         for contributor in self.navigation_contributors:
             for category, name, text in contributor.get_navigation_items(req):
                 navigation.setdefault(category, {})[name] = text
+            if contributor is handler:
+                active = contributor.get_active_navigation_item(req)
         for category, items in navigation.items():
             items = items.items()
             order = self.config.get('trac', category).split(',')
             items.sort(lambda x,y: cmp(order.index(x[0]), order.index(y[0])))
             for name, text in items:
                 req.hdf['chrome.%s.%s' % (category, name)] = text
+                if name == active:
+                    req.hdf['chrome.%s.%s.active' % (category, name)] = 1

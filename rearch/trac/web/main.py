@@ -161,21 +161,6 @@ class RequestDispatcher(Component):
 
     handlers = ExtensionPoint(IRequestHandler)
 
-    legacy_module_map = {
-        'AboutModule': 'about',
-        'AttachmentModule': 'attachment',
-        'BrowserModule': 'browser', 'LogModule': 'browser',
-        'ChangesetModule': 'changeset',
-        'NewticketModule': 'newticket',
-        'QueryModule': 'query', 'ReportModule': 'report',
-        'RoadmapModule': 'roadmap', 'MilestoneModule': 'milestone',
-        'SearchModule': 'search',
-        'SettingsModule': 'settings',
-        'TicketModule': 'ticket',
-        'TimelineModule': 'timeline',
-        'WikiModule': 'wiki'
-    }
-
     def dispatch(self, req):
         from trac.web.clearsilver import HDFWrapper
         req.hdf = HDFWrapper(loadpaths=[self.env.get_templates_dir(),
@@ -195,10 +180,6 @@ class RequestDispatcher(Component):
         if not chosen_handler:
             # FIXME: Should return '404 Not Found' to the client
             raise TracError, 'No handler matched request to %s' % req.path_info
-
-        # Kludge
-        name = chosen_handler.__class__.__name__
-        req.hdf['trac.active_module'] = self.legacy_module_map[name]
 
         from trac.web.chrome import Chrome
         chrome = Chrome(self.env)

@@ -25,16 +25,24 @@ import urllib
 
 from trac import perm, util
 from trac.core import *
-from trac.web.chrome import add_link
+from trac.web.chrome import add_link, INavigationContributor
 from trac.web.main import IRequestHandler
 
 
 class AttachmentModule(Component):
 
-    implements(IRequestHandler)
+    implements(IRequestHandler, INavigationContributor)
 
     CHUNK_SIZE = 4096
     DISP_MAX_FILE_SIZE = 256 * 1024
+
+    # INavigationContributor methods
+
+    def get_active_navigation_item(self, req):
+        return req.args.get('type')
+
+    def get_navigation_items(self, req):
+        return []
 
     # IReqestHandler methods
 

@@ -133,6 +133,9 @@ It provides an interface to the Subversion revision control systems, integrated 
 
     # INavigationContributor methods
 
+    def get_active_navigation_item(self, req):
+        return 'about'
+
     def get_navigation_items(self, req):
         yield 'metanav', 'about', '<a href="%s" accesskey="9">About Trac</a>' \
               % self.env.href.about()
@@ -153,16 +156,16 @@ It provides an interface to the Subversion revision control systems, integrated 
             req.hdf['about.config_href'] = self.env.href.about('config')
             req.hdf['about.plugins_href'] = self.env.href.about('plugins')
         if page == 'config':
-            self.__render_config(req)
+            self._render_config(req)
         elif page == 'plugins':
-            self.__render_plugins(req)
+            self._render_plugins(req)
 
         template = req.hdf.parse(self.about_cs)
         return template, None
 
     # Internal methods
 
-    def __render_config(self, req):
+    def _render_config(self, req):
         req.perm.assert_permission(perm.CONFIG_VIEW)
         req.hdf['about.page'] = 'config'
         # Export the config table to hdf
@@ -179,7 +182,7 @@ It provides an interface to the Subversion revision control systems, integrated 
         # We should probably export more info here like:
         # permissions, components...
 
-    def __render_plugins(self, req):
+    def _render_plugins(self, req):
         import sys
         req.hdf['about.page'] = 'plugins'
         from trac.core import ComponentMeta
