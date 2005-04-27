@@ -1,0 +1,335 @@
+Index: intertrac-branch/htdocs/css/trac.css
+===================================================================
+--- intertrac-branch/htdocs/css/trac.css	(revision 1490)
++++ intertrac-branch/htdocs/css/trac.css	(revision 1508)
+@@ -241,6 +241,7 @@
+ a.missing:link, a.missing:visited { background: #fafaf0; color: #998 }
+ a.missing:hover { color: #000; }
+ a.closed:link, a.closed:visited { text-decoration: line-through }
++a.intertrac:link,a.intertrac:visited { color: #00b }
+ 
+ dl.wiki dt { font-weight: bold }
+ dl.compact dt { float: left; padding-right: .5em }
+Index: intertrac-branch/trac/env.py
+===================================================================
+--- intertrac-branch/trac/env.py	(revision 1490)
++++ intertrac-branch/trac/env.py	(revision 1508)
+@@ -46,6 +46,7 @@
+     """
+     def __init__(self, path, create=0):
+         self.path = path
++        self.siblings = {}
+         if create:
+             self.create()
+         self.verify()
+Index: intertrac-branch/trac/Module.py
+===================================================================
+--- intertrac-branch/trac/Module.py	(revision 1490)
++++ intertrac-branch/trac/Module.py	(revision 1508)
+@@ -38,28 +38,30 @@
+ 
+ 
+ modules = {
+-#    name           (module_name,   class_name)
+-    'about'       : ('About',       'About'),
+-    'about_trac'  : ('About',       'About'),
+-    'attachment'  : ('attachment',  'AttachmentModule'),
+-    'browser'     : ('Browser',     'BrowserModule'),
+-    'changeset'   : ('Changeset',   'ChangesetModule'),
+-    'file'        : ('Browser',     'FileModule'),
+-    'log'         : ('Browser',     'LogModule'),
+-    'milestone'   : ('Milestone',   'Milestone'),
+-    'newticket'   : ('Ticket',      'NewticketModule'),
+-    'query'       : ('Query',       'QueryModule'),
+-    'report'      : ('Report',      'Report'),
+-    'roadmap'     : ('Roadmap',     'Roadmap'),
+-    'search'      : ('Search',      'Search'),
+-    'settings'    : ('Settings',    'Settings'),
+-    'ticket'      : ('Ticket',      'TicketModule'),
+-    'timeline'    : ('Timeline',    'Timeline'),
+-    'wiki'        : ('Wiki',        'WikiModule'),
++#    name           (module_name,   class_name,         <module>: wiki syntax)
++    'about'       : ('About',       'About',            0),
++    'about_trac'  : ('About',       'About',            0),
++    'attachment'  : ('attachment',  'AttachmentModule', 0),
++    'browser'     : ('Browser',     'BrowserModule',    1),
++    'source'      : ('Browser',     'BrowserModule',    1),
++    'repos'       : ('Browser',     'BrowserModule',    1),
++    'changeset'   : ('Changeset',   'ChangesetModule',  1),
++    'file'        : ('Browser',     'FileModule',       0),
++    'log'         : ('Browser',     'LogModule',        0),
++    'milestone'   : ('Milestone',   'Milestone',        1),
++    'newticket'   : ('Ticket',      'NewticketModule',  0),
++    'query'       : ('Query',       'QueryModule',      1),
++    'report'      : ('Report',      'Report',           1),
++    'roadmap'     : ('Roadmap',     'Roadmap',          0),
++    'search'      : ('Search',      'Search',           1),
++    'settings'    : ('Settings',    'Settings',         0),
++    'ticket'      : ('Ticket',      'TicketModule',     1),
++    'timeline'    : ('Timeline',    'Timeline',         0),
++    'wiki'        : ('Wiki',        'WikiModule',       1),
+ }
+ 
+ def module_factory(mode):
+-    module_name, constructor_name = modules[mode]
++    module_name, constructor_name, has_wiki_syntax = modules[mode]
+     module = __import__(module_name, globals(),  locals())
+     constructor = getattr(module, constructor_name)
+     module = constructor()
+@@ -87,7 +89,7 @@
+         if match.group(2):
+             set_if_missing(args, 'id', match.group(2))
+         return
+-    match = re.search(r'^/(browser|log|file)(?:(/.*))?', path_info)
++    match = re.search(r'^/(browser|source|repos|log|file)(?:(/.*))?', path_info)
+     if match:
+         set_if_missing(args, 'mode', match.group(1))
+         if match.group(2):
+Index: intertrac-branch/trac/web/standalone.py
+===================================================================
+--- intertrac-branch/trac/web/standalone.py	(revision 1490)
++++ intertrac-branch/trac/web/standalone.py	(revision 1508)
+@@ -147,11 +147,12 @@
+             # naming convention: /some/path/project
+             auth = auths.get(project, None)
+             env = open_environment(path)
++            env.auth = auth
++            env.siblings = self.projects
+             env.href = href.Href('/' + project)
+             env.abs_href = href.Href('http://%s/%s' % (self.http_host, project))
+             env.set_config('trac', 'htdocs_location', '/trac_common/')
+             self.projects[project] = env
+-            self.projects[project].auth = auth
+ 
+ 
+ class TracHTTPRequestHandler(BaseHTTPRequestHandler):
+Index: intertrac-branch/trac/web/modpython_frontend.py
+===================================================================
+--- intertrac-branch/trac/web/modpython_frontend.py	(revision 1490)
++++ intertrac-branch/trac/web/modpython_frontend.py	(revision 1508)
+@@ -177,6 +177,7 @@
+         env_cache_lock.acquire()
+         if not env_path in env_cache:
+             env_cache[env_path] = open_environment(env_path)
++            # TODO: also have a projects dictionary shared by siblings, like in tracd?
+         env = env_cache[env_path]
+     finally:
+         env_cache_lock.release()
+Index: intertrac-branch/trac/web/main.py
+===================================================================
+--- intertrac-branch/trac/web/main.py	(revision 1490)
++++ intertrac-branch/trac/web/main.py	(revision 1508)
+@@ -256,6 +256,8 @@
+     # Let the wiki module build a dictionary of all page names
+     from trac.Wiki import populate_page_dict
+     populate_page_dict(db, env)
++    # FIXME: this dictionary should be created once and then
++    #        maintained by the Wiki object after creation/deletion,
+ 
+     try:
+         try:
+Index: intertrac-branch/trac/WikiFormatter.py
+===================================================================
+--- intertrac-branch/trac/WikiFormatter.py	(revision 1490)
++++ intertrac-branch/trac/WikiFormatter.py	(revision 1508)
+@@ -29,6 +29,9 @@
+ import util
+ import Mimeview
+ 
++from trac.Module import modules
++
++
+ __all__ = ['Formatter', 'OneLinerFormatter', 'wiki_to_html', 'wiki_to_oneliner']
+ 
+ 
+@@ -117,6 +120,28 @@
+     """This class contains the patterns common to both Formatter and
+     OneLinerFormatter"""
+ 
++    # regexp fragments for Trac objects:
++    _page_name = ("(^|(?<=[^A-Za-z]))" # start of string or positive lookbehind is not a letter
++                  "[A-Z]"              # first letter must be a capitalized letter,
++                  "[a-z]+"             #  followed by some lower case
++                  "(?:[A-Z][a-z]*[a-z/])+" # ... followed by one or more wiki page 'component'
++                  "(?:#[A-Za-z0-9]+)?" # optional reference to a section anchor
++                  "(?=\Z|\s|[.,;:!?\)}\]])" # lookahed for something indicating the end of the name
++                  )
++    _ticket_id = "\d+"
++    _changeset_id = "\d+"
++    _report_id = "\d+"
++
++    _wiki_ref_modules = "|".join([k for k, v in modules.items() if v[2]])
++    _module_args = "(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)])"
++
++    # regexp fragments for InterTrac support:
++    _project_name = "[a-zA-Z0-9-_]+"
++    _project_key = "[a-zA-Z]{,3}" # allow at most 3 letters for a project shorthand
++    # Note: the end of _project_key should be differentiable
++    #       from the start of _ticket_id and _changeset_id
++
++    
+     _rules = [r"(?P<bold>''')",
+               r"(?P<italic>'')",
+               r"(?P<underline>__)",
+@@ -125,12 +150,21 @@
+               r"(?P<superscript>\^)",
+               r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
+               r"(?P<htmlescapeentity>!?&#\d+;)",
+-              r"(?P<tickethref>!?#\d+)",
+-              r"(?P<changesethref>!?(\[\d+\]|\br\d+\b))",
+-              r"(?P<reporthref>!?\{\d+\})",
+-              r"(?P<modulehref>!?((?P<modulename>bug|ticket|browser|source|repos|report|query|changeset|wiki|milestone|search):(?P<moduleargs>(&#34;(.*?)&#34;|'(.*?)')|([^ ]*[^'~_\., \)]))))",
+-              r"(?P<wikihref>!?(^|(?<=[^A-Za-z]))[A-Z][a-z]+(?:[A-Z][a-z]*[a-z/])+(?:#[A-Za-z0-9]+)?(?=\Z|\s|[.,;:!?\)}\]]))",
+-              r"(?P<fancylink>!?\[(?P<fancyurl>([a-z]+:[^ ]+)) (?P<linkname>.*?)\])"]
++              # Trac Objects links:
++              r"(?P<wikihref>!?%s)" % _page_name,
++              r"(?P<tickethref>!?(?:%s:)?#%s)" % (_project_name, _ticket_id),
++              r"(?P<changesethref>!?(?:%s:)?\[%s\]|\br%s\b)" % (_project_name, _changeset_id, _changeset_id),
++              r"(?P<reporthref>!?(?:%s:)?\{%s\})" % (_project_name, _report_id),
++              # Shorthand InterTrac links:
++              r"(?P<it_tickethref>!?#((?P<it_ticket>%s)%s))" % (_project_key, _ticket_id),
++              r"(?P<it_changesethref>!?(\[(?P<it_changeset>%s)%s\]))" % (_project_key, _changeset_id),
++              r"(?P<it_reporthref>!?(\{(?P<it_report>%s)%s\}))" % (_project_key, _report_id),
++              # Generic links:
++              r"(?P<modulehref>!?((?P<it_module>%s:)?(?P<modulename>%s):(?P<moduleargs>%s)))" \
++              % (_project_name, _wiki_ref_modules, _module_args),
++              r"(?P<fancylink>!?\[(?P<it_fancy>%s:)?(?P<fancyurl>([a-z]+:[^ ]+)) (?P<linkname>.*?)\])" \
++              % (_project_name),
++              ]
+ 
+     _open_tags = []
+     env = None
+@@ -200,33 +234,108 @@
+         # the tickethref regexp
+         return match
+ 
++    # Trac Objects links:
++
++    def _wikihref_formatter(self, match, fullmatch):
++        return self._make_wiki_link(match, match)
++
+     def _tickethref_formatter(self, match, fullmatch):
+-        return self._make_ticket_link(match[1:], match)
++        sep = match.find(':')
++        if sep == -1: #  #id
++            return self._make_ticket_link(match[1:], match)
++        else:         #  project:#id
++            intertrac = match[:sep]
++            id = match[sep+2:]
++            return self._intertrac_link(intertrac, 'ticket', id, '#'+id, match)
+ 
+     def _changesethref_formatter(self, match, fullmatch):
+         if match[0] == 'r':
+-            rev = match[1:]
++            return self._make_changeset_link(match[1:], match)
+         else:
+-            rev = match[1:-1]
+-        return self._make_changeset_link(rev, match)
++            sep = match.find(':')
++            if sep == -1: # [id]
++                return self._make_changeset_link(match[1:-1], match)
++            else:         # project:[id]
++                intertrac = match[:sep]
++                id = match[sep+2:-1]
++                return self._intertrac_link(intertrac, 'changeset', id, '[%s]'%id, match)
+ 
+     def _reporthref_formatter(self, match, fullmatch):
+-        return self._make_report_link(match[1:-1], match)
++        sep = match.find(':')
++        if sep == -1: # {id}
++            return self._make_report_link(match[1:-1], match)
++        else:
++            intertrac = match[:sep]
++            id = match[sep+2:-1]
++            return self._intertrac_link(intertrac, 'report', id, '{%s}'%id, match)
+ 
+-    def _modulehref_formatter(self, match, fullmatch):
+-        return self._make_module_link(match, match)
++    # Shorthand InterTrac links:
+ 
+-    def _wikihref_formatter(self, match, fullmatch):
+-        return self._make_wiki_link(match, match)
++    def _it_tickethref_formatter(self, match, fullmatch):
++        intertrac = fullmatch.group('it_ticket')
++        id = match[1+len(intertrac):]
++        return self._intertrac_link(intertrac, 'ticket', id, '#'+id, match)
++         
++    def _it_changesethref_formatter(self, match, fullmatch):
++        intertrac = fullmatch.group('it_changeset')
++        id = match[1+len(intertrac):-1]
++        return self._intertrac_link(intertrac, 'changeset', id, '[%s]'%id, match)
+ 
++    def _it_reporthref_formatter(self, match, fullmatch):
++        intertrac = fullmatch.group('it_report')
++        id = match[1+len(intertrac):-1]
++        return self._intertrac_link(intertrac, 'report', id, '{%s}'%id, match)
++
++    # Generic links:
++    
+     def _url_formatter(self, match, fullmatch):
+         return self._make_ext_link(match, match)
+ 
++    def _modulehref_formatter(self, match, fullmatch):
++        it_module = fullmatch.group('it_module')
++        modulename = fullmatch.group('modulename')
++        moduleargs = fullmatch.group('moduleargs')
++        if it_module:
++            return self._intertrac_link(it_module[:-1], modulename, moduleargs,
++                                             '%s:%s' % (modulename, moduleargs), match)
++        else:
++            return self._make_module_link(match, match)
++
+     def _fancylink_formatter(self, match, fullmatch):
++        it_fancy = fullmatch.group('it_fancy')
+         link = fullmatch.group('fancyurl')
+         text = fullmatch.group('linkname')
+-        return self._make_module_link(link, text)
++        if it_fancy:
++            sep = link.index(':')
++            modulename = link[:sep]
++            moduleargs = link[sep+1:]
++            return self._intertrac_link(it_fancy[:-1], modulename, moduleargs, link, text)
++        else:
++            return self._make_module_link(link, text)
+ 
++    # InterTrac support:
++    def _intertrac_link(self, intertrac, module, id, target, text):
++        # first, check if it is a project key
++        intertrac = self.env.get_config('intertrac', intertrac.upper() + '.key', intertrac)
++        # check if the project name is the one of a sibling environment:
++        if self.env.siblings.has_key(intertrac):
++            intertrac_env = self.env.siblings[intertrac]
++            intertrac_fmt = OneLinerFormatter(intertrac_env, intertrac_env.get_db_cnx(), 1)
++            return re.sub(intertrac_fmt._compiled_rules, intertrac_fmt.replace, target).replace(target, text)
++        # otherwise, rely on project names that were configured
++        href = self.env.get_config('intertrac', intertrac.upper() + '.url')
++        if href:
++            title = '%s %s in %s' % (module, id,
++                                     self.env.get_config('intertrac', intertrac.upper() + '.title'))
++            _class = 'intertrac'
++        else:
++            title = "Unknown intertrac key '%s'" % intertrac
++            _class = 'missing'
++            href = self._local # FIXME: should stay on the current page
++        return '<a class="%s" title="%s" href="%s/%s/%s">%s</a>' % (
++            _class, title, href, module, id, text)
++
++
+     def _make_module_link(self, link, text):
+         sep = link.find(':')
+         if sep == -1:
+@@ -379,10 +488,12 @@
+ 
+     hdf = None
+ 
+-    # RE patterns used by other patterna
++    # RE patterns used by other patterns
+     _helper_patterns = ('idepth', 'ldepth', 'hdepth', 'fancyurl',
+                         'linkname', 'macroname', 'macroargs', 'inline',
+-                        'modulename', 'moduleargs')
++                        'modulename', 'moduleargs',
++                        # InterTrac support:
++                        'it_ticket', 'it_changeset', 'it_report', 'it_fancy', 'it_module')
+ 
+     # Forbid "dangerous" HTML tags and attributes
+     _htmlproc_disallow_rule = re.compile('(?i)<(script|noscript|embed|object|'
