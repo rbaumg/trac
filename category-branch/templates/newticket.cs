@@ -11,8 +11,8 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
 
 <form id="newticket" action="<?cs var:cgi_location ?>#preview" method="post">
  <h3>Create New <?cs 
-   if:len(enums.category) > #0 ?><?cs 
-    call:hdf_select(enums.category, "category", newticket.category, 0) ?><?cs
+   if:len(enums.ticket_type) > #0 ?><?cs 
+    call:hdf_select(enums.ticket_type, "ticket_type", newticket.ticket_type, 0) ?><?cs
    /if ?>
   Ticket
  </h3>

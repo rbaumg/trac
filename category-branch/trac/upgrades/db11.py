@@ -1,10 +1,10 @@
 sql = """
--- Add category to 'ticket'
+-- Add ticket_type to 'ticket'
 CREATE TEMP TABLE ticket_old AS SELECT * FROM ticket;
 DROP TABLE ticket;
 CREATE TABLE ticket (
         id              integer PRIMARY KEY,
-        category        text,           -- the nature of the ticket
+        ticket_type     text,           -- the nature of the ticket
         time            integer,        -- the time it was created
         changetime      integer,
         component       text,
@@ -23,7 +23,7 @@ CREATE TABLE ticket (
         keywords        text
 );
 
-INSERT INTO ticket(id, category, time, changetime, component,
+INSERT INTO ticket(id, ticket_type, time, changetime, component,
                    severity, priority, owner, reporter, cc, url, version,
                    milestone, status, resolution, summary, description, keywords)
   SELECT id, 'Bug', time, changetime, component,
@@ -31,14 +31,18 @@ INSERT INTO ticket(id, category, time, changetime, component,
          milestone, status, resolution, summary, description, keywords FROM ticket_old
   WHERE severity <> 'enhancement';
 
-INSERT INTO ticket(id, category, time, changetime, component,
+INSERT INTO ticket(id, ticket_type, time, changetime, component,
                    severity, priority, owner, reporter, cc, url, version,
                    milestone, status, resolution, summary, description, keywords)
   SELECT id, 'Feature', time, changetime, component,
          'normal', priority, owner, reporter, cc, url, version,
          milestone, status, resolution, summary, description, keywords FROM ticket_old
   WHERE severity = 'enhancement';
-"""
 
+INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Bug', '1');
+INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Feature', '2');
+INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Task', '3');
+"""
+                
 def do_upgrade(env, ver, cursor):
     cursor.execute(sql)

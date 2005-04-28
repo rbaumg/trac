@@ -51,18 +51,18 @@ class Timeline(Module):
                        " FROM revision WHERE time>=%s AND time<=%s")
             params += (start, stop)
         if 'ticket' in filters:
-            sql.append("SELECT time,id,'','newticket',summary,reporter,category"
+            sql.append("SELECT time,id,'','newticket',summary,reporter,ticket_type"
                        " FROM ticket WHERE time>=%s AND time<=%s")
             params += (start, stop)
-            # FIXME join with ticket table for retrieving category...
-            sql.append("SELECT t1.time,t1.ticket,'','reopenedticket','',t1.author,t.category"
+            # FIXME join with ticket table for retrieving ticket_type...
+            sql.append("SELECT t1.time,t1.ticket,'','reopenedticket','',t1.author,t.ticket_type"
                        " FROM ticket_change t1"
                        "   INNER JOIN ticket t ON t1.ticket = t.id"
                        " WHERE t1.field='status'"
                        "   AND t1.newvalue='reopened' AND t1.time>=%s AND t1.time<=%s")
             params += (start, stop)
             sql.append("SELECT t1.time,t1.ticket,t2.newvalue,'closedticket',"
-                       "t3.newvalue,t1.author,t.category"
+                       "t3.newvalue,t1.author,t.ticket_type"
                        " FROM ticket_change t1"
                        "   INNER JOIN ticket t ON t1.ticket = t.id"
                        "   INNER JOIN ticket_change t2 ON t1.ticket = t2.ticket"
@@ -240,7 +240,7 @@ class Timeline(Module):
             href = self.env.abs_href
 
         item['href'] = escape(href.ticket(item['idata']))
-        item['category'] = item['extra']
+        item['ticket_type'] = item['extra']
         del item['extra']
         if req.args.get('format') == 'rss':
             item['message'] = escape(wiki_to_html(item['message'],

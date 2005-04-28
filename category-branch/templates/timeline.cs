@@ -50,7 +50,7 @@ each:item = timeline.items ?><?cs
               item.node_list + item.message) ?><?cs
  elif:item.type == 'newticket' ?><?cs
   call:tlitem(item.href, 'newticket',
-              item.category + ' Ticket <em>#' + item.idata + '</em> created by ' + item.author,
+              item.ticket_type + ' Ticket <em>#' + item.idata + '</em> created by ' + item.author,
               item.message) ?><?cs
  elif:item.type == 'closedticket' ?><?cs
   if:item.message ?><?cs
@@ -59,11 +59,11 @@ each:item = timeline.items ?><?cs
    set:imessage = '' ?><?cs
   /if ?><?cs
   call:tlitem(item.href, 'closedticket',
-              item.category + ' Ticket <em>#' + item.idata + '</em> resolved by ' + item.author,
+              item.ticket_type + ' Ticket <em>#' + item.idata + '</em> resolved by ' + item.author,
               item.tdata + imessage) ?><?cs
  elif:item.type == 'reopenedticket' ?><?cs
   call:tlitem(item.href, 'newticket',
-              item.category + ' Ticket <em>#' + item.idata + '</em> reopened by ' + item.author,
+              item.ticket_type + ' Ticket <em>#' + item.idata + '</em> reopened by ' + item.author,
               '') ?><?cs
  elif:item.type == 'wiki' ?><?cs
   call:tlitem(item.href, 'wiki',

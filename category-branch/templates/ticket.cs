@@ -29,7 +29,7 @@
 
 <div id="content" class="ticket">
 
- <h1><?cs var:ticket.category ?> Ticket #<?cs var:ticket.id ?> <?cs
+ <h1><?cs var:ticket.ticket_type ?> Ticket #<?cs var:ticket.id ?> <?cs
  if:ticket.status == 'closed' ?>(Closed: <?cs var:ticket.resolution ?>)<?cs
  elif:ticket.status != 'new' ?>(<?cs var:ticket.status ?>)<?cs
  /if ?></h1>
@@ -163,8 +163,8 @@
      var:ticket.summary ?>" /><?cs
    if:trac.acl.TICKET_ADMIN ?>
     <br />
-    <label for="category">Category:</label><?cs
-    call:hdf_select(enums.category, "category", ticket.category, 0) ?>
+    <label for="ticket_type">Type:</label><?cs
+    call:hdf_select(enums.ticket_type, "ticket_type", ticket.ticket_type, 0) ?>
     <br />
     <label for="description">Description:</label>
     <div style="float: left">

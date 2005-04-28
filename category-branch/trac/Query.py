@@ -82,7 +82,7 @@ class Query(object):
 
         # FIXME: the user should be able to configure which columns should
         # be displayed
-        cols = ['category', 'id', 'summary', 'status', 'owner', 'priority', 'milestone',
+        cols = ['ticket_type', 'id', 'summary', 'status', 'owner', 'priority', 'milestone',
                 'component', 'version', 'severity', 'resolution', 'reporter']
         cols += [f['name'] for f in get_custom_fields(self.env)]
 
@@ -358,9 +358,9 @@ class QueryModule(Module):
         properties.append({'name': 'summary', 'type': 'text',
                            'label': 'Summary'})
         properties.append({
-            'name': 'category', 'type': 'select', 'label': 'Category',
+            'name': 'ticket_type', 'type': 'select', 'label': 'Type',
             'options': rows_to_list("SELECT name FROM enum "
-                                    "WHERE type='category' ORDER BY value")})
+                                    "WHERE type='ticket_type' ORDER BY value")})
         properties.append({
             'name': 'status', 'type': 'radio', 'label': 'Status',
             'options': rows_to_list("SELECT name FROM enum WHERE type='status' "
