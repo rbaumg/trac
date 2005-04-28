@@ -31,7 +31,7 @@ __all__ = ['Ticket', 'NewticketModule', 'TicketModule']
 
 
 class Ticket(dict):
-    std_fields = ['time', 'component', 'severity', 'priority', 'milestone',
+    std_fields = ['category', 'time', 'component', 'severity', 'priority', 'milestone',
                   'reporter', 'owner', 'cc', 'url', 'version', 'status',
                   'resolution', 'keywords', 'summary', 'description',
                   'changetime']
@@ -318,6 +318,8 @@ class NewticketModule(Module):
                           self.config.get('ticket', 'default_component'))
         ticket.setdefault('milestone',
                           self.config.get('ticket', 'default_milestone'))
+        ticket.setdefault('category',
+                          self.env.config.get('ticket', 'default_category'))
         ticket.setdefault('priority',
                           self.config.get('ticket', 'default_priority'))
         ticket.setdefault('severity',
@@ -342,6 +344,9 @@ class NewticketModule(Module):
                         req.hdf, 'newticket.milestones')
         util.sql_to_hdf(self.db, "SELECT name FROM version ORDER BY name",
                         req.hdf, 'newticket.versions')
+        util.sql_to_hdf(self.db, "SELECT name FROM enum WHERE type='category' "
+                                 "ORDER BY name",
+                        req.hdf, 'enums.category')
         util.sql_to_hdf(self.db, "SELECT name FROM enum WHERE type='priority' "
                                  "ORDER BY value",
                         req.hdf, 'enums.priority')
@@ -461,6 +466,7 @@ class TicketModule(Module):
         util.hdf_add_if_missing(req.hdf, 'ticket.components', ticket['component'])
         util.hdf_add_if_missing(req.hdf, 'ticket.milestones', ticket['milestone'])
         util.hdf_add_if_missing(req.hdf, 'ticket.versions', ticket['version'])
+        util.hdf_add_if_missing(req.hdf, 'enums.category', ticket['category'])
         util.hdf_add_if_missing(req.hdf, 'enums.priority', ticket['priority'])
         util.hdf_add_if_missing(req.hdf, 'enums.severity', ticket['severity'])
         util.hdf_add_if_missing(req.hdf, 'enums.resolution', 'fixed')

@@ -9,8 +9,13 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
 
 <div id="content" class="ticket">
 
-<h3>Create New Ticket:</h3>
 <form id="newticket" action="<?cs var:cgi_location ?>#preview" method="post">
+ <h3>Create New <?cs 
+   if:len(enums.category) > #0 ?><?cs 
+    call:hdf_select(enums.category, "category", newticket.category, 0) ?><?cs
+   /if ?>
+  Ticket
+ </h3>
  <div class="field">
   <label for="reporter">Your email or username:</label><br />
   <input type="text" id="reporter" name="reporter" size="40" value="<?cs

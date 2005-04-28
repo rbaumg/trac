@@ -755,6 +755,23 @@ class TracAdmin(cmd.Cmd):
                 self._do_wiki_import(filename, page, cursor)
 
 
+    ## (Ticket) Category
+    _help_category = [('category list', 'Show possible ticket categories'),
+                      ('category add <value>', 'Add a category value option'),
+                      ('category change <value> <newvalue>',
+                       'Change a category value'),
+                      ('category remove <value>', 'Remove category value')]
+ 
+    def complete_category (self, text, line, begidx, endidx):
+        if begidx == 16:
+            comp = self.get_enum_list ('category')
+        elif begidx < 15:
+            comp = ['list','add','change','remove']
+        return self.word_complete(text, comp)
+ 
+    def do_category(self, line):
+        self._do_enum('category', line)
+ 
     ## (Ticket) Priority
     _help_priority = [('priority list', 'Show possible ticket priorities'),
                        ('priority add <value>', 'Add a priority value option'),
