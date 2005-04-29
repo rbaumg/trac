@@ -38,28 +38,30 @@ class Module:
 
 
 modules = {
-#    name           (module_name,   class_name)
-    'about'       : ('About',       'About'),
-    'about_trac'  : ('About',       'About'),
-    'attachment'  : ('attachment',  'AttachmentModule'),
-    'browser'     : ('Browser',     'BrowserModule'),
-    'changeset'   : ('Changeset',   'ChangesetModule'),
-    'file'        : ('Browser',     'FileModule'),
-    'log'         : ('Browser',     'LogModule'),
-    'milestone'   : ('Milestone',   'Milestone'),
-    'newticket'   : ('Ticket',      'NewticketModule'),
-    'query'       : ('Query',       'QueryModule'),
-    'report'      : ('Report',      'Report'),
-    'roadmap'     : ('Roadmap',     'Roadmap'),
-    'search'      : ('Search',      'Search'),
-    'settings'    : ('Settings',    'Settings'),
-    'ticket'      : ('Ticket',      'TicketModule'),
-    'timeline'    : ('Timeline',    'Timeline'),
-    'wiki'        : ('Wiki',        'WikiModule'),
+#    name           (module_name,   class_name,         <module>: wiki syntax)
+    'about'       : ('About',       'About',            0),
+    'about_trac'  : ('About',       'About',            0),
+    'attachment'  : ('attachment',  'AttachmentModule', 0),
+    'browser'     : ('Browser',     'BrowserModule',    1),
+    'source'      : ('Browser',     'BrowserModule',    1),
+    'repos'       : ('Browser',     'BrowserModule',    1),
+    'changeset'   : ('Changeset',   'ChangesetModule',  1),
+    'file'        : ('Browser',     'FileModule',       0),
+    'log'         : ('Browser',     'LogModule',        0),
+    'milestone'   : ('Milestone',   'Milestone',        1),
+    'newticket'   : ('Ticket',      'NewticketModule',  0),
+    'query'       : ('Query',       'QueryModule',      1),
+    'report'      : ('Report',      'Report',           1),
+    'roadmap'     : ('Roadmap',     'Roadmap',          0),
+    'search'      : ('Search',      'Search',           1),
+    'settings'    : ('Settings',    'Settings',         0),
+    'ticket'      : ('Ticket',      'TicketModule',     1),
+    'timeline'    : ('Timeline',    'Timeline',         0),
+    'wiki'        : ('Wiki',        'WikiModule',       1),
 }
 
 def module_factory(mode):
-    module_name, constructor_name = modules[mode]
+    module_name, constructor_name, has_wiki_syntax = modules[mode]
     module = __import__(module_name, globals(),  locals())
     constructor = getattr(module, constructor_name)
     module = constructor()
@@ -87,7 +89,7 @@ def parse_path_info(args, path_info):
         if match.group(2):
             set_if_missing(args, 'id', match.group(2))
         return
-    match = re.search(r'^/(browser|log|file)(?:(/.*))?', path_info)
+    match = re.search(r'^/(browser|source|repos|log|file)(?:(/.*))?', path_info)
     if match:
         set_if_missing(args, 'mode', match.group(1))
         if match.group(2):

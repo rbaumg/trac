@@ -252,6 +252,8 @@ def dispatch_request(path_info, req, env):
     # Let the wiki module build a dictionary of all page names
     from trac.Wiki import populate_page_dict
     populate_page_dict(db, env)
+    # FIXME: this dictionary should be created once and then
+    #        maintained by the Wiki object after creation/deletion,
 
     try:
         try:

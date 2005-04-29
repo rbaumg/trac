@@ -215,6 +215,7 @@ def get_environment(req, mpr, options):
         env_cache_lock.acquire()
         if not env_path in env_cache:
             env_cache[env_path] = open_environment(env_path)
+            # TODO: also have a projects dictionary shared by siblings, like in tracd?
         env = env_cache[env_path]
     finally:
         env_cache_lock.release()

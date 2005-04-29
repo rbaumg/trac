@@ -148,11 +148,12 @@ class TracHTTPServer(ThreadingMixIn, HTTPServer):
             # naming convention: /some/path/project
             auth = auths.get(project, None)
             env = open_environment(path)
+            env.auth = auth
             env.href = href.Href('/' + project)
             env.abs_href = href.Href('http://%s/%s' % (self.http_host, project))
             env.config.set('trac', 'htdocs_location', '/trac_common/')
             self.projects[project] = env
-            self.projects[project].auth = auth
+            env.siblings = self.projects
 
 
 class TracHTTPRequestHandler(BaseHTTPRequestHandler):
