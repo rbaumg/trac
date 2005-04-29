@@ -323,8 +323,12 @@ class CommonFormatter:
         intertrac = self.env.config.get('intertrac', intertrac.upper(), intertrac)
         # check if the project name is the one of the sibling environments:
         if self.env.siblings.has_key(intertrac):
+            from trac.Wiki import populate_page_dict
             it_env = self.env.siblings[intertrac]
-            it_fmt = OneLinerFormatter(it_env, it_env.get_db_cnx(), 1)
+            it_db = it_env.get_db_cnx()
+            if not hasattr(it_env, '_wiki_pages'):
+                populate_page_dict(it_db, it_env)
+            it_fmt = OneLinerFormatter(it_env, it_db, 1)
             return re.sub(it_fmt._compiled_rules, it_fmt.replace, target).replace(target, text)
         # otherwise, rely on project names that were configured
         href = self.env.config.get('intertrac', intertrac.upper() + '.url')
