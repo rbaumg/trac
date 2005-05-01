@@ -492,7 +492,7 @@ class TicketModule(Component):
     # ITimelineEventProvider methods
 
     def get_timeline_filters(self, req):
-        if req.perm.has_permission(perm.WIKI_VIEW):
+        if req.perm.has_permission(perm.TICKET_VIEW):
             yield ('ticket', 'Ticket changes')
 
     def get_timeline_events(self, req, start, stop, filters):
