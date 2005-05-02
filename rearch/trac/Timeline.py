@@ -114,9 +114,9 @@ class TimelineModule(Component):
         for event_provider in self.event_providers:
             events += event_provider.get_timeline_events(req, start, stop,
                                                          filters)
+        events.sort(lambda x,y: cmp(y[3], x[3]))
         if maxrows and len(events) > maxrows:
             del events[maxrows:]
-        events.sort(lambda x,y: cmp(y[3], x[3]))
 
         req.hdf['title'] = 'Timeline'
 
