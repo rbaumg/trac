@@ -10,11 +10,10 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
 <div id="content" class="ticket">
 
 <form id="newticket" action="<?cs var:cgi_location ?>#preview" method="post">
- <h3>Create New <?cs 
-   if:len(enums.ticket_type) > #0 ?><?cs 
+ <h3>Create New Ticket <?cs 
+   if:len(enums.ticket_type) > #0 ?> of type <?cs 
     call:hdf_select(enums.ticket_type, "ticket_type", newticket.ticket_type, 0) ?><?cs
    /if ?>
-  Ticket
  </h3>
  <div class="field">
   <label for="reporter">Your email or username:</label><br />

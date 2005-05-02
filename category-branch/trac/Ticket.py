@@ -454,6 +454,9 @@ class TicketModule(Module):
                         req.hdf, 'ticket.milestones')
         util.sql_to_hdf(self.db, "SELECT name FROM version ORDER BY name",
                         req.hdf, 'ticket.versions')
+        util.sql_to_hdf(self.db, "SELECT name FROM enum WHERE type='ticket_type'"
+                                 " ORDER BY value",
+                        req.hdf, 'enums.ticket_type')
         util.sql_to_hdf(self.db, "SELECT name FROM enum WHERE type='priority'"
                                  " ORDER BY value",
                         req.hdf, 'enums.priority')

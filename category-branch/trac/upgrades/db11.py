@@ -26,7 +26,7 @@ CREATE TABLE ticket (
 INSERT INTO ticket(id, ticket_type, time, changetime, component,
                    severity, priority, owner, reporter, cc, url, version,
                    milestone, status, resolution, summary, description, keywords)
-  SELECT id, 'Bug', time, changetime, component,
+  SELECT id, 'Defect', time, changetime, component,
          severity, priority, owner, reporter, cc, url, version,
          milestone, status, resolution, summary, description, keywords FROM ticket_old
   WHERE severity <> 'enhancement';
@@ -39,7 +39,7 @@ INSERT INTO ticket(id, ticket_type, time, changetime, component,
          milestone, status, resolution, summary, description, keywords FROM ticket_old
   WHERE severity = 'enhancement';
 
-INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Bug', '1');
+INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Defect', '1');
 INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Feature', '2');
 INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Task', '3');
 """

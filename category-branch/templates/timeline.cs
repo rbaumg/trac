@@ -50,7 +50,7 @@ each:item = timeline.items ?><?cs
               item.node_list + item.message) ?><?cs
  elif:item.type == 'newticket' ?><?cs
   call:tlitem(item.href, 'newticket',
-              item.ticket_type + ' Ticket <em>#' + item.idata + '</em> created by ' + item.author,
+              'Ticket <em>#' + item.idata + '</em> (' + item.ticket_type + ') created by ' + item.author,
               item.message) ?><?cs
  elif:item.type == 'closedticket' ?><?cs
   if:item.message ?><?cs
