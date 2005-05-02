@@ -34,13 +34,13 @@ INSERT INTO ticket(id, ticket_type, time, changetime, component,
 INSERT INTO ticket(id, ticket_type, time, changetime, component,
                    severity, priority, owner, reporter, cc, url, version,
                    milestone, status, resolution, summary, description, keywords)
-  SELECT id, 'Feature', time, changetime, component,
+  SELECT id, 'Enhancement', time, changetime, component,
          'major', priority, owner, reporter, cc, url, version,
          milestone, status, resolution, summary, description, keywords FROM ticket_old
   WHERE severity = 'enhancement';
 
 INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Defect', '1');
-INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Feature', '2');
+INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Enhancement', '2');
 INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Task', '3');
 DELETE FROM enum WHERE type = 'severity' AND name = 'enhancement';
 """
