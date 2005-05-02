@@ -162,10 +162,8 @@
    <label for="summary">Summary:</label>
    <input id="summary" type="text" name="summary" size="70" value="<?cs
      var:ticket.summary ?>" />
-    <br />
-    <label for="ticket_type">Type:</label><?cs
-    call:hdf_select(enums.ticket_type, "ticket_type", ticket.ticket_type, 0) ?>
-    <br /><?cs
+   <br /><?cs
+   call:labelled_hdf_select('Type:', enums.ticket_type, "ticket_type", ticket.ticket_type, 0) ?><?cs
    if:trac.acl.TICKET_ADMIN ?>
     <label for="description">Description:</label>
     <div style="float: left">
@@ -178,28 +176,20 @@
            value="<?cs var:ticket.reporter ?>" /><?cs
    /if ?>
   </div>
-  <div class="col1">
-   <label for="component">Component:</label><?cs
-   call:hdf_select(ticket.components, "component", ticket.component, 0) ?>
-   <br />
-   <label for="version">Version:</label><?cs
-   call:hdf_select(ticket.versions, "version", ticket.version, 0) ?>
-   <br />
-   <label for="severity">Severity:</label><?cs
-   call:hdf_select(enums.severity, "severity", ticket.severity, 0) ?>
-   <br />
+  <div class="col1"><?cs
+   call:labelled_hdf_select("Component:", ticket.components, "component", ticket.component, 0) ?><?cs
+   call:labelled_hdf_select("Version:", ticket.versions, "version", ticket.version, 0) ?><?cs 
+   call:labelled_hdf_select("Severity:", enums.severity, "severity", ticket.severity, 0) ?>
    <label for="keywords">Keywords:</label>
    <input type="text" id="keywords" name="keywords" size="20"
        value="<?cs var:ticket.keywords ?>" />
   </div>
-  <div class="col2">
-   <label for="priority">Priority:</label><?cs
-   call:hdf_select(enums.priority, "priority", ticket.priority, 0) ?><br />
-   <label for="milestone">Milestone:</label><?cs
-   call:hdf_select(ticket.milestones, "milestone", ticket.milestone, 1) ?><br />
+  <div class="col2"><?cs
+   call:labelled_hdf_select("Priority:", enums.priority, "priority", ticket.priority, 0) ?><?cs
+   call:labelled_hdf_select("Milestone:", ticket.milestones, "milestone", ticket.milestone, 1) ?>
    <label for="owner">Assigned to:</label>
-   <input type="text" id="owner" name="owner" size="20" value="<?cs
-     var:ticket.owner ?>" disabled="disabled" /><br />
+    <input type="text" id="owner" name="owner" size="20" value="<?cs
+      var:ticket.owner ?>" disabled="disabled" /><br />
    <label for="cc">Cc:</label>
    <input type="text" id="cc" name="cc" size="30" value="<?cs var:ticket.cc ?>" />
   </div>

@@ -7,7 +7,16 @@
      alt:option.label ?><?cs var:option.name ?><?cs /alt ?></option><?cs
   /each ?>
  </select><?cs
-/def?>
+/def ?>
+
+<?cs def:labelled_hdf_select(label, options, name, selected, optional) ?><?cs 
+ if:len(options) > #0 ?>
+  <label for="<?cs var:name ?>"><?cs var:label ?></label><?cs
+   call:hdf_select(options, name, selected, optional) ?>
+  </label>
+  <br /><?cs
+ /if ?><?cs
+/def ?>
 
 <?cs def:browser_path_links(path, file) ?><?cs
  set:first = #1 ?>
