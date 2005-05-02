@@ -36,12 +36,18 @@
  /if ?></h1>
 
  <div id="searchable">
- <?cs def:ticketprop(label, name, value, fullrow) ?>
-  <th id="h_<?cs var:name ?>"><?cs var:label ?>:</th>
-  <td headers="h_<?cs var:name ?>"<?cs if:fullrow ?> colspan="3"<?cs /if ?>><?cs
-   if:value ?><?cs var:value ?><?cs else ?>&nbsp;<?cs
-   /if ?></td><?cs if:numprops % #2 && !last_prop || fullrow ?>
- </tr><tr><?cs /if ?><?cs set numprops = numprops + #1 - fullrow ?><?cs
+ <?cs def:ticketprop(label, name, value, fullrow) ?><?cs
+  if:value ?>
+    <th id="h_<?cs var:name ?>"><?cs var:label ?>:</th>
+    <td headers="h_<?cs var:name ?>"<?cs if:fullrow ?> colspan="3"<?cs /if ?>><?cs 
+     var:value ?>
+    </td><?cs 
+   if:numprops % #2 && !last_prop || fullrow ?>
+   </tr>
+   <tr><?cs 
+   /if ?><?cs 
+   set numprops = numprops + #1 - fullrow ?><?cs
+  /if ?><?cs
  /def ?>
 
 <div id="ticket">
