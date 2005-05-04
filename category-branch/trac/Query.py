@@ -406,7 +406,7 @@ class QueryModule(Module):
                 property['options'].insert(0, '')
             properties.append(property)
 
-        return properties
+        return filter(lambda p: not p.has_key('options') or len(p['options']) > 0, properties)
 
     def _get_constraint_modes(self):
         modes = {}

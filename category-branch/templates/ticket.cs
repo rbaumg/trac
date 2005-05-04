@@ -31,8 +31,8 @@
 
  <h1>Ticket #<?cs var:ticket.id ?><?cs 
  if:ticket.ticket_type ?> - <?cs var:ticket.ticket_type ?><?cs /if ?><?cs
- if:ticket.status == 'closed' ?>(Closed: <?cs var:ticket.resolution ?>)<?cs
- elif:ticket.status != 'new' ?>(<?cs var:ticket.status ?>)<?cs
+ if:ticket.status == 'closed' ?> (Closed: <?cs var:ticket.resolution ?>)<?cs
+ elif:ticket.status != 'new' ?> (<?cs var:ticket.status ?>)<?cs
  /if ?></h1>
 
  <div id="searchable">
