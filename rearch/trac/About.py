@@ -188,6 +188,8 @@ It provides an interface to the Subversion revision control systems, integrated 
         from trac.core import ComponentMeta
         plugins = []
         for component in ComponentMeta._components:
+            if not self.env.is_component_enabled(component):
+                continue
             plugin = {'name': component.__name__}
             if component.__doc__:
                 plugin['description'] = component.__doc__

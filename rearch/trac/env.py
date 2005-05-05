@@ -68,24 +68,24 @@ class Environment(ComponentManager):
         self.setup_mimeviewer()
 
     def load_components(self):
+        configured_modules = []
         for section in self.config.sections():
-            loaded_modules = []
             for name,value in self.config.options(section):
                 if name == 'module':
+                    configured_modules.append(value)
                     path = self.config.get(section, 'path')
-                    self.log.debug('Loading component module %s from %s'
-                                   % (value, path))
                     try:
                         self.load_component(value, path)
-                        loaded.append(value)
                     except ImportError, e:
                         self.log.error('Component module %s not found (%s)'
                                        % (value, e))
-            for module in db_default.default_components:
-                if not module in loaded_modules:
-                    self.load_component(module)
+        for module in db_default.default_components:
+            if not module in configured_modules:
+                self.load_component(module)
 
     def load_component(self, name, path=None):
+        self.log.debug('Loading component module %s from %s'
+                       % (name, path or 'default path'))
         try:
             return sys.modules[name]
         except KeyError:
@@ -100,6 +100,13 @@ class Environment(ComponentManager):
         component.env = self
         component.config = self.config
         component.log = self.log
+
+    def is_component_enabled(self, cls):
+        component_name = (cls.__module__ + '.' + cls.__name__).lower()
+        for name,value in self.config.options('disabled_components'):
+            if value in util.TRUE and component_name.startswith(name):
+                return False
+        return True
 
     def verify(self):
         """Verifies that self.path is a compatible trac environment"""

@@ -177,13 +177,15 @@ class RequestDispatcher(Component):
                handler.__class__.__name__ == default_handler:
                 chosen_handler = handler
                 break
-        if not chosen_handler:
-            # FIXME: Should return '404 Not Found' to the client
-            raise TracError, 'No handler matched request to %s' % req.path_info
 
         from trac.web.chrome import Chrome
         chrome = Chrome(self.env)
         chrome.populate_hdf(req, chosen_handler)
+
+        if not chosen_handler:
+            # FIXME: Should return '404 Not Found' to the client
+            raise TracError, 'No handler matched request to %s' % req.path_info
+
 
         resp = chosen_handler.process_request(req)
         if resp:

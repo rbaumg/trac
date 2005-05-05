@@ -45,7 +45,7 @@ class SearchModule(Component):
     def get_navigation_items(self, req):
         if not req.perm.has_permission(perm.SEARCH_VIEW):
             return
-        yield 'mainnav', 'search', '<a href="%s">Search</a>' \
+        yield 'mainnav', 'search', '<a href="%s" accesskey="4">Search</a>' \
               % (self.env.href.search())
 
     # IRequestHandler methods

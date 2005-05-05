@@ -134,7 +134,7 @@ class Component(object):
         xtnpt = self._extension_points.get(name)
         if xtnpt:
             extensions = ComponentMeta._registry.get(xtnpt.interface, [])
-            return [self.compmgr[extension] for extension in extensions]
+            return filter(None, [self.compmgr[cls] for cls in extensions])
         raise AttributeError, name
 
 
@@ -153,6 +153,8 @@ class ComponentManager(object):
     def __getitem__(self, cls):
         component = self.components.get(cls)
         if not component:
+            if not self.is_component_enabled(cls):
+                return None
             if cls not in ComponentMeta._components:
                 raise TracError, 'Component "%s" not registered' % cls.__name__
             try:
@@ -167,3 +169,11 @@ class ComponentManager(object):
         Can be overridden by sub-classes so that special initialization for
         components can be provided.
         """
+
+    def is_component_enabled(self, cls):
+        """
+        Can be overridden by sub-classes to veto the activation of a component.
+        If this method returns False, the component with the given class will
+        not be available.
+        """
+        return True
