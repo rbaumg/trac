@@ -208,7 +208,8 @@ facilities.
                   (_p('share/trac/htdocs/css'), glob(_p('htdocs/css/*'))),
                   (_p('share/trac/htdocs/js'), glob(_p('htdocs/js/*'))),
                   (_p('share/man/man1'), glob(_p('scripts/*.1'))),
-                  (_p('share/trac/wiki-default'), glob(_p('wiki-default/[A-Z]*')))],
+                  (_p('share/trac/wiki-default'), glob(_p('wiki-default/[A-Z]*'))),
+                  (_p('share/trac/wiki-macros'), glob(_p('wiki-macros/*.py')))],
       scripts=[_p('scripts/trac-admin'),
                _p('scripts/tracd'),
                _p('scripts/tracdb2env'),
@@ -216,6 +217,3 @@ facilities.
       cmdclass = {'install': my_install,
                   'install_scripts': my_install_scripts,
                   'install_data': my_install_data})
-
-
-
