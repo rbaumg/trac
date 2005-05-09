@@ -94,6 +94,7 @@ class WikiSystem(Component):
 
     def wiki_page_added(self, page):
         if not self.has_page(page.name):
+            self.log.debug('Adding page %s to index' % page.name)
             self.pages[page.name] = True
 
     def wiki_page_changed(self, page):
@@ -101,4 +102,5 @@ class WikiSystem(Component):
 
     def wiki_page_deleted(self, page):
         if self.has_page(page.name):
+            self.log.debug('Removing page %s from index' % page.name)
             del self.pages[page.name]

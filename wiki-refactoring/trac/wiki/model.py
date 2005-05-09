@@ -100,8 +100,8 @@ class WikiPage(object):
                 attachment.delete(db)
 
             # Let change listeners know about the deletion
-            for interceptor in WikiSystem(self.env).change_listeners:
-                interceptor.wiki_page_deleted(self)
+            for listener in WikiSystem(self.env).change_listeners:
+                listener.wiki_page_deleted(self)
 
         if handle_ta:
             db.commit()
@@ -140,7 +140,7 @@ class WikiPage(object):
             db.commit()
 
         for listener in WikiSystem(self.env).change_listeners:
-            if not self.version == 0:
+            if self.version == 0:
                 listener.wiki_page_added(self)
             else:
                 listener.wiki_page_changed(self)
