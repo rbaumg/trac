@@ -70,7 +70,7 @@ class WikiModule(Component):
         version = req.args.get('version')
 
         db = self.env.get_db_cnx()
-        page = WikiPage(self.env, req.perm, pagename, version, db)
+        page = WikiPage(self.env, pagename, version, db)
 
         add_stylesheet(req, 'wiki.css')
         if action == 'diff':
@@ -110,12 +110,13 @@ class WikiModule(Component):
             yield ('wiki', 'Wiki changes')
 
     def get_timeline_events(self, req, start, stop, filters):
-        absurls = req.args.get('format') == 'rss' # Kludge
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
         if 'wiki' in filters:
+            absurls = req.args.get('format') == 'rss' # Kludge
+            db = self.env.get_db_cnx()
+            cursor = db.cursor()
             cursor.execute("SELECT time,name,comment,author "
-                           "FROM wiki WHERE time>=%s AND time<=%s", start, stop)
+                           "FROM wiki WHERE time>=%s AND time<=%s",
+                           (start, stop))
             for t,name,comment,author in cursor:
                 if absurls:
                     href = self.env.abs_href.wiki(name)
@@ -130,7 +131,10 @@ class WikiModule(Component):
     # Internal methods
 
     def _do_delete(self, req, db, page):
-        req.perm.assert_permission(perm.WIKI_DELETE)
+        if page.readonly:
+            req.perm.assert_permission(perm.WIKI_ADMIN)
+        else:
+            req.perm.assert_permission(perm.WIKI_DELETE)
 
         version = None
         if req.args.has_key('delete_version'):
@@ -145,7 +149,12 @@ class WikiModule(Component):
             req.redirect(self.env.href.wiki(page.name))
 
     def _do_save(self, req, db, page):
-        req.perm.assert_permission(perm.WIKI_MODIFY)
+        if page.readonly:
+            req.perm.assert_permission(perm.WIKI_ADMIN)
+        elif not page.exists:
+            req.perm.assert_permission(perm.WIKI_CREATE)
+        else:
+            req.perm.assert_permission(perm.WIKI_MODIFY)
 
         page.text = req.args.get('text')
         if req.perm.has_permission(perm.WIKI_ADMIN):
@@ -193,12 +202,9 @@ class WikiModule(Component):
                 info['comment'] = escape(comment)
                 info['ipnr'] = escape(ipnr or '')
             elif version < page.version:
-                old_page = WikiPage(self.env, req.perm, page.name, version)
+                old_page = WikiPage(self.env, page.name, version)
                 break
         req.hdf['wiki'] = info
-
-        self.log.debug("Diff between version %s and %s of page %s"
-                       % (page.version, old_page.version, page.name))
 
         oldtext = old_page.text.splitlines()
         newtext = page.text.splitlines()
@@ -251,7 +257,8 @@ class WikiModule(Component):
     def _render_history(self, req, db, page):
         """
         Extract the complete history for a given page and stores it in the hdf.
-        This information is used to present a changelog/history for a given page
+        This information is used to present a changelog/history for a given
+        page.
         """
         req.perm.assert_permission(perm.WIKI_VIEW)
 

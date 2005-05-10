@@ -23,35 +23,34 @@
 #
 
 from trac.core import *
-
-
-class WikiChangeVeto(TracError):
-    """
-    TODO: doc me
-    """
+from trac.util import to_utf8
 
 
 class IWikiChangeListener(Interface):
+    """
+    Extension point interface for components that should get notified about the
+    creation, deletion and modification of wiki pages.
+    """
 
-    def wiki_page_added(self, page):
+    def wiki_page_added(page):
         """
-        TODO: doc me
-        """
-
-    def wiki_page_changed(self, page):
-        """
-        TODO: doc me
+        Called whenever a new Wiki page is added.
         """
 
-    def wiki_page_deleted(self, page):
+    def wiki_page_changed(page, version, t, comment, author, ipnr):
         """
-        TODO: doc me
-        """        
+        Called when a page has been modified.
+        """
+
+    def wiki_page_deleted(page):
+        """
+        Called when a page has been deleted.
+        """
 
 
 class IWikiMacroProvider(Interface):
     """
-    TODO: doc me
+    Extension point interface for components that provide Wiki macros.
     """
 
     def get_macros():
@@ -71,36 +70,50 @@ class IWikiMacroProvider(Interface):
 
 
 class WikiSystem(Component):
+    """
+    Represents the wiki system.
+    """
+    implements(IWikiChangeListener)
 
     change_listeners = ExtensionPoint(IWikiChangeListener)
     macro_providers = ExtensionPoint(IWikiMacroProvider)
 
-    implements(IWikiChangeListener)
-
     def __init__(self):
-        self.pages = None
+        self._pages = None
+
+    def _load_pages(self):
+        self._pages = {}
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("SELECT DISTINCT name FROM wiki")
+        for (name,) in cursor:
+            self._pages[name] = True
+
+    # Public API
+
+    def get_pages(self, prefix=None):
+        if self._pages is None:
+            self._load_pages()
+        for page in self._pages.keys():
+            if not prefix or page.startswith(prefix):
+                yield page
 
     def has_page(self, pagename):
-        if self.pages == None:
-            self.pages = {}
-            db = self.env.get_db_cnx()
-            cursor = db.cursor()
-            cursor.execute("SELECT DISTINCT name FROM wiki")
-            for (name,) in cursor:
-                self.pages[name] = True
-        return pagename in self.pages.keys()
+        if self._pages is None:
+            self._load_pages()
+        return pagename in self._pages.keys()
 
     # IWikiChangeListener methods
 
     def wiki_page_added(self, page):
         if not self.has_page(page.name):
             self.log.debug('Adding page %s to index' % page.name)
-            self.pages[page.name] = True
+            self._pages[page.name] = True
 
-    def wiki_page_changed(self, page):
+    def wiki_page_changed(self, page, version, t, comment, author, ipnr):
         pass
 
     def wiki_page_deleted(self, page):
         if self.has_page(page.name):
             self.log.debug('Removing page %s from index' % page.name)
-            del self.pages[page.name]
+            del self._pages[page.name]

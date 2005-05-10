@@ -2,6 +2,7 @@
 #
 # Copyright (C) 2003, 2004, 2005 Edgewall Software
 # Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
 #
 # Trac is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -18,8 +19,8 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
+#         Christopher Lenz <cmlenz@gmx.de>
 
-from trac import perm
 from trac.attachment import Attachment
 from trac.core import *
 from trac.wiki.api import WikiSystem
@@ -31,9 +32,8 @@ class WikiPage(object):
     """
     Represents a wiki page (new or existing).
     """
-    def __init__(self, env, perm_, name=None, version=None, db=None):
+    def __init__(self, env, name=None, version=None, db=None):
         self.env = env
-        self.perm = perm_
         self.name = name
         self._fetch(name, version, db)
         self.old_text = self.text
@@ -66,11 +66,6 @@ class WikiPage(object):
 
     def delete(self, version=None, db=None):
         assert self.exists, 'Cannot delete non-existent page'
-        if self.perm:
-            if self.readonly:
-                self.perm.assert_permission(perm.WIKI_ADMIN)
-            else:
-                self.perm.assert_permission(perm.WIKI_DELETE)
         if not db:
             db = self.env.get_db_cnx()
             handle_ta = True
@@ -108,14 +103,6 @@ class WikiPage(object):
         self.version = 0
 
     def save(self, author, comment, remote_addr, t=time.time(), db=None):
-        if self.perm:
-            if not self.exists:
-                self.perm.assert_permission(perm.WIKI_CREATE)
-            if self.readonly:
-                self.perm.assert_permission(perm.WIKI_ADMIN)
-            else:
-                self.perm.assert_permission(perm.WIKI_MODIFY)
-
         if not db:
             db = self.env.get_db_cnx()
             handle_ta = True
@@ -149,8 +136,6 @@ class WikiPage(object):
         self.old_text = self.text
 
     def get_history(self, db=None):
-        if self.perm:
-            self.perm.assert_permission(perm.WIKI_VIEW)
         if not db:
             db = self.env.get_db_cnx()
         cursor = db.cursor()
