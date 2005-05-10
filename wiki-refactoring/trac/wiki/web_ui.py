@@ -165,7 +165,7 @@ class WikiModule(Component):
                   req.remote_addr)
         req.redirect(self.env.href.wiki(page.name))
 
-    def _render_diff(self, req, db, pagename, version):
+    def _render_diff(self, req, db, page):
         req.perm.assert_permission(perm.WIKI_VIEW)
 
         add_stylesheet(req, 'diff.css')
@@ -174,30 +174,34 @@ class WikiModule(Component):
         # diff-style related item to the HDF
         diff_style, diff_options = get_diff_options(req)
         if req.args.has_key('update'):
-           req.redirect(self.env.href.wiki(pagename, version=version,
+           req.redirect(self.env.href.wiki(page.name, version=page.version,
                                            action='diff'))
 
         # Ask web spiders to not index old versions
         req.hdf['html.norobots'] = 1
 
-        new_page = WikiPage(self.env, req.perm, pagename, version)
-        old_page = WikiPage(self.env, req.perm, pagename, version - 1)
-        if not new_page.exists:
-            raise TracError('Page %s not found' % pagename)
-
         info = {
-            'version': version,
-            'history_href': escape(self.env.href.wiki(pagename, action='history'))
+            'version': page.version,
+            'history_href': escape(self.env.href.wiki(page.name,
+                                                      action='history'))
         }
-        for version,t,author,comment,ipnr in new_page.get_history():
-            info['time'] = time.strftime('%c', time.localtime(int(t)))
-            info['author'] = escape(author or 'anonymous')
-            info['comment'] = escape(comment)
-            info['ipnr'] = escape(ipnr or '')
+        old_page = None
+        for version,t,author,comment,ipnr in page.get_history():
+            if version == page.version:
+                info['time'] = time.strftime('%c', time.localtime(int(t)))
+                info['author'] = escape(author or 'anonymous')
+                info['comment'] = escape(comment)
+                info['ipnr'] = escape(ipnr or '')
+            elif version < page.version:
+                old_page = WikiPage(self.env, req.perm, page.name, version)
+                break
         req.hdf['wiki'] = info
 
+        self.log.debug("Diff between version %s and %s of page %s"
+                       % (page.version, old_page.version, page.name))
+
         oldtext = old_page.text.splitlines()
-        newtext = new_page.text.splitlines()
+        newtext = page.text.splitlines()
         context = 3
         for option in diff_options:
             if option[:2] == '-U':
