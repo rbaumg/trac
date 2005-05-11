@@ -556,10 +556,10 @@ class TracAdmin(cmd.Cmd):
 
             # Add the default wiki macros
             print ' Installing default wiki macros'
-            for f in os.listdir(trac.siteconfig.__default_macro_dir__):
+            for f in os.listdir(trac.siteconfig.__default_macros_dir__):
                 if not f.endswith('.py'):
                     continue
-                src = os.path.join(trac.siteconfig.__default_macro_dir__, f)
+                src = os.path.join(trac.siteconfig.__default_macros_dir__, f)
                 dst = os.path.join(self.__env.path, 'wiki-macros', f)
                 print " %s => %s" % (src, f)
                 shutil.copy2(src, dst)
@@ -767,6 +767,23 @@ class TracAdmin(cmd.Cmd):
                 self._do_wiki_import(filename, page, cursor)
 
 
+    ## (Ticket) Type
+    _help_ticket_type = [('ticket_type list', 'Show possible ticket categories'),
+                      ('ticket_type add <value>', 'Add a ticket_type value option'),
+                      ('ticket_type change <value> <newvalue>',
+                       'Change a ticket_type value'),
+                      ('ticket_type remove <value>', 'Remove ticket_type value')]
+ 
+    def complete_ticket_type (self, text, line, begidx, endidx):
+        if begidx == 16:
+            comp = self.get_enum_list ('ticket_type')
+        elif begidx < 15:
+            comp = ['list','add','change','remove']
+        return self.word_complete(text, comp)
+ 
+    def do_ticket_type(self, line):
+        self._do_enum('ticket_type', line)
+ 
     ## (Ticket) Priority
     _help_priority = [('priority list', 'Show possible ticket priorities'),
                        ('priority add <value>', 'Add a priority value option'),

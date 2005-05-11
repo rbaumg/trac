@@ -21,7 +21,7 @@
 
 
 # Database version identifier. Used for automatic upgrades.
-db_version = 11
+db_version = 12
 
 def __mkreports(reports):
     """Utility function used to create report data in same syntax as the
@@ -73,6 +73,7 @@ CREATE TABLE system (
 );
 CREATE TABLE ticket (
         id              integer PRIMARY KEY,
+        ticket_type     text,           -- the nature of the ticket
         time            integer,        -- the time it was created
         changetime      integer,
         component       text,
@@ -365,18 +366,14 @@ data = (('component',
                 ('resolution', 'wontfix', 3),
                 ('resolution', 'duplicate', 4),
                 ('resolution', 'worksforme', 5),
-                ('severity', 'blocker', 1),
-                ('severity', 'critical', 2),
-                ('severity', 'major', 3),
-                ('severity', 'normal', 4),
-                ('severity', 'minor', 5),
-                ('severity', 'trivial', 6),
-                ('severity', 'enhancement', 7),
-                ('priority', 'highest', 1),
-                ('priority', 'high', 2),
-                ('priority', 'normal', 3),
-                ('priority', 'low', 4),
-                ('priority', 'lowest', 5))),
+                ('priority', 'blocker', 1),
+                ('priority', 'critical', 2),
+                ('priority', 'major', 3),
+                ('priority', 'minor', 4),
+                ('priority', 'trivial', 5),
+                ('ticket_type', 'Defect', 1),
+                ('ticket_type', 'Enhancement', 2),
+                ('ticket_type', 'Task', 3))),
            ('permission',
              ('username', 'action'),
                (('anonymous', 'LOG_VIEW'),
@@ -423,8 +420,8 @@ default_config = \
    ' Visit the Trac open source project at<br />'
    '<a href="http://trac.edgewall.com/">http://trac.edgewall.com/</a>'),
   ('ticket', 'default_version', ''),
-  ('ticket', 'default_severity', 'normal'),
-  ('ticket', 'default_priority', 'normal'),
+  ('ticket', 'default_ticket_type', 'Defect'),
+  ('ticket', 'default_priority', 'major'),
   ('ticket', 'default_milestone', ''),
   ('ticket', 'default_component', 'component1'),
   ('ticket', 'restrict_owner', 'false'),

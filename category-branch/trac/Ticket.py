@@ -35,7 +35,7 @@ __all__ = ['Ticket', 'NewticketModule', 'TicketModule']
 
 
 class Ticket(dict):
-    std_fields = ['time', 'component', 'severity', 'priority', 'milestone',
+    std_fields = ['ticket_type', 'time', 'component', 'severity', 'priority', 'milestone',
                   'reporter', 'owner', 'cc', 'url', 'version', 'status',
                   'resolution', 'keywords', 'summary', 'description',
                   'changetime']
@@ -315,6 +315,8 @@ class NewticketModule(Component):
                           self.config.get('ticket', 'default_component'))
         ticket.setdefault('milestone',
                           self.config.get('ticket', 'default_milestone'))
+        ticket.setdefault('ticket_type',
+                          self.env.config.get('ticket', 'default_ticket_type'))
         ticket.setdefault('priority',
                           self.config.get('ticket', 'default_priority'))
         ticket.setdefault('severity',
@@ -339,6 +341,9 @@ class NewticketModule(Component):
                         req.hdf, 'newticket.milestones')
         util.sql_to_hdf(db, "SELECT name FROM version ORDER BY name",
                         req.hdf, 'newticket.versions')
+        util.sql_to_hdf(db, "SELECT name FROM enum WHERE type='ticket_type' "
+                                 "ORDER BY value",
+                        req.hdf, 'enums.ticket_type')
         util.sql_to_hdf(db, "SELECT name FROM enum WHERE type='priority' "
                                  "ORDER BY value",
                         req.hdf, 'enums.priority')
@@ -506,21 +511,24 @@ class TicketModule(Component):
             sql = []
 
             # New tickets
-            sql.append("SELECT time,id,'','new',summary,reporter"
+            sql.append("SELECT time,id,'','new',ticket_type,summary,reporter"
                        " FROM ticket WHERE time>=%s AND time<=%s")
 
             # Reopened tickets
-            sql.append("SELECT t1.time,t1.ticket,'','reopened',t2.newvalue,t1.author "
+            sql.append("SELECT t1.time,t1.ticket,'','reopened',t.ticket_type,"
+                       "t2.newvalue,t1.author "
                        " FROM ticket_change t1"
+                       "   INNER JOIN ticket t ON t.id=t1.ticket"
                        "   LEFT OUTER JOIN ticket_change t2 ON (t1.time=t2.time"
                        "     AND t1.ticket=t2.ticket AND t2.field='comment')"
                        " WHERE t1.field='status' AND t1.newvalue='reopened'"
                        "   AND t1.time>=%s AND t1.time<=%s")
 
             # Closed tickets
-            sql.append("SELECT t1.time,t1.ticket,t2.newvalue,'closed',"
+            sql.append("SELECT t1.time,t1.ticket,t2.newvalue,'closed',t.ticket_type,"
                        "t3.newvalue,t1.author"
                        " FROM ticket_change t1"
+                       "   INNER JOIN ticket t ON t.id=t1.ticket"
                        "   INNER JOIN ticket_change t2 ON t1.ticket=t2.ticket"
                        "     AND t1.time=t2.time"
                        "   LEFT OUTER JOIN ticket_change t3 ON t1.time=t3.time"
@@ -538,16 +546,16 @@ class TicketModule(Component):
                      'closed': 'closedticket'}
             verbs = {'new': 'created', 'reopened': 'reopened',
                      'closed': 'closed'}
-            for t,id,resolution,type,message,author in cursor:
+            for t,id,resolution,state,ticket_type,message,author in cursor:
                 if absurls:
                     href = self.env.abs_href.ticket(id)
                 else:
                     href = self.env.href.ticket(id)
-                title = 'Ticket <em>#%s</em> %s by %s' % (
-                        id, verbs[type], util.escape(author))
+                title = 'Ticket <em>#%s</em> (%s) %s by %s' % (
+                        id, ticket_type, verbs[state], util.escape(author))
                 message = wiki_to_oneliner(util.shorten_line(message), self.env,
                                            db, absurls=absurls)
-                yield kinds[type], href, title, t, author, message
+                yield kinds[state], href, title, t, author, message
 
     # Internal methods
 
@@ -614,6 +622,9 @@ class TicketModule(Component):
                         req.hdf, 'ticket.milestones')
         util.sql_to_hdf(db, "SELECT name FROM version ORDER BY name",
                         req.hdf, 'ticket.versions')
+        util.sql_to_hdf(db, "SELECT name FROM enum WHERE type='ticket_type'"
+                                 " ORDER BY value",
+                        req.hdf, 'enums.ticket_type')
         util.sql_to_hdf(db, "SELECT name FROM enum WHERE type='priority'"
                                  " ORDER BY value",
                         req.hdf, 'enums.priority')
@@ -626,6 +637,7 @@ class TicketModule(Component):
         util.hdf_add_if_missing(req.hdf, 'ticket.components', ticket['component'])
         util.hdf_add_if_missing(req.hdf, 'ticket.milestones', ticket['milestone'])
         util.hdf_add_if_missing(req.hdf, 'ticket.versions', ticket['version'])
+        util.hdf_add_if_missing(req.hdf, 'enums.ticket_type', ticket['ticket_type'])
         util.hdf_add_if_missing(req.hdf, 'enums.priority', ticket['priority'])
         util.hdf_add_if_missing(req.hdf, 'enums.severity', ticket['severity'])
         util.hdf_add_if_missing(req.hdf, 'enums.resolution', 'fixed')
@@ -706,20 +718,20 @@ class UpdateDetailsForTimeline(Component):
         if 'ticket_details' in filters:
             db = self.env.get_db_cnx()
             cursor = db.cursor()
-            cursor.execute("SELECT tc.time, tc.ticket, "
+            cursor.execute("SELECT tc.time, tc.ticket, t.ticket_type, "
                            "       tc.field, tc.oldvalue, tc.newvalue, tc.author "
                            "FROM ticket_change tc"
-                           "   LEFT JOIN ticket t ON t.id = tc.ticket "
+                           "   INNER JOIN ticket t ON t.id = tc.ticket "
                            "AND tc.time>=%s AND tc.time<=%s ORDER BY tc.time" % (start, stop))
             previous_update = None
             updates = []
-            for time,id,field,oldvalue,newvalue,author in cursor:
-                if (time,id,author) != previous_update:
+            for time,id,ticket_type,field,oldvalue,newvalue,author in cursor:
+                if (time,id,ticket_type,author) != previous_update:
                     if previous_update:
                         updates.append((previous_update,field_changes,comment))
                     field_changes = []
                     comment = ''
-                    previous_update = (time,id,author)
+                    previous_update = (time,id,ticket_type,author)
                 if field == 'comment':
                     comment = newvalue
                 else:
@@ -728,13 +740,13 @@ class UpdateDetailsForTimeline(Component):
                 updates.append((previous_update,field_changes,comment))
 
             absurls = req.args.get('format') == 'rss' # Kludge
-            for (t,id,author),field_changes,comment in updates:
+            for (t,id,ticket_type,author),field_changes,comment in updates:
                 if absurls:
                     href = self.env.abs_href.ticket(id)
                 else:
                     href = self.env.href.ticket(id) 
-                title = 'Ticket <em>#%s</em> updated by %s' \
-                        % (id, util.escape(author))
+                title = 'Ticket <em>#%s</em> (%s) updated by %s' \
+                        % (id, ticket_type, util.escape(author))
                 message = ''
                 if len(field_changes) > 0:
                     message = ', '.join(field_changes) + ' changed.<br />'

@@ -83,7 +83,7 @@ class Query(object):
 
         # FIXME: the user should be able to configure which columns should
         # be displayed
-        cols = ['id', 'summary', 'status', 'owner', 'priority', 'milestone',
+        cols = ['ticket_type', 'id', 'summary', 'status', 'owner', 'priority', 'milestone',
                 'component', 'version', 'severity', 'resolution', 'reporter']
         cols += [f['name'] for f in get_custom_fields(self.env)]
 
@@ -115,9 +115,9 @@ class Query(object):
             return 0
         cols.sort(sort_columns)
 
-        # Only display the first seven columns by default
+        # Only display the first eight columns by default
         # FIXME: Make this configurable on a per-user and/or per-query basis
-        self.cols = cols[:7]
+        self.cols = cols[:8]
         if not self.order in self.cols and not self.order == self.group:
             # Make sure the column we order by is visible, if it isn't also
             # the column we group by
@@ -437,6 +437,10 @@ class QueryModule(Component):
         properties.append({'name': 'summary', 'type': 'text',
                            'label': 'Summary'})
         properties.append({
+            'name': 'ticket_type', 'type': 'select', 'label': 'Type',
+            'options': rows_to_list("SELECT name FROM enum "
+                                    "WHERE type='ticket_type' ORDER BY value")})
+        properties.append({
             'name': 'status', 'type': 'radio', 'label': 'Status',
             'options': rows_to_list("SELECT name FROM enum WHERE type='status' "
                                     "ORDER BY value")})
@@ -481,7 +485,7 @@ class QueryModule(Component):
                 property['options'].insert(0, '')
             properties.append(property)
 
-        return properties
+        return filter(lambda p: not p.has_key('options') or len(p['options']) > 0, properties)
 
     def _get_constraint_modes(self):
         modes = {}
