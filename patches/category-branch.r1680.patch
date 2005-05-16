@@ -1,0 +1,907 @@
+Index: trac/db_default.py
+===================================================================
+--- trac/db_default.py	(revision 1680)
++++ trac/db_default.py	(working copy)
+@@ -21,7 +21,7 @@
+ 
+ 
+ # Database version identifier. Used for automatic upgrades.
+-db_version = 12
++db_version = 13
+ 
+ def __mkreports(reports):
+     """Utility function used to create report data in same syntax as the
+@@ -126,6 +126,7 @@
+     # Ticket system
+     Table('ticket', key='id')[
+         Column('id', auto_increment=True),
++        Column('type'),
+         Column('time', type='int'),
+         Column('changetime', type='int'),
+         Column('component'),
+@@ -195,7 +196,7 @@
+ """,
+ """
+ SELECT p.value AS __color__,
+-   id AS ticket, summary, component, version, milestone, severity, 
++   id AS ticket, summary, component, version, milestone, t.type AS type, 
+    (CASE status WHEN 'assigned' THEN owner||' *' ELSE owner END) AS owner,
+    time AS created,
+    changetime AS _changetime, description AS _description,
+@@ -203,7 +204,7 @@
+   FROM ticket t, enum p
+   WHERE status IN ('new', 'assigned', 'reopened') 
+ AND p.name = t.priority AND p.type = 'priority'
+-  ORDER BY p.value, milestone, severity, time
++  ORDER BY p.value, milestone, t.type, time
+ """),
+ #----------------------------------------------------------------------------
+  ('Active Tickets by Version',
+@@ -217,7 +218,7 @@
+ """
+ SELECT p.value AS __color__,
+    version AS __group__,
+-   id AS ticket, summary, component, version, severity, 
++   id AS ticket, summary, component, version, t.type AS type, 
+    (CASE status WHEN 'assigned' THEN owner||' *' ELSE owner END) AS owner,
+    time AS created,
+    changetime AS _changetime, description AS _description,
+@@ -225,7 +226,7 @@
+   FROM ticket t, enum p
+   WHERE status IN ('new', 'assigned', 'reopened') 
+ AND p.name = t.priority AND p.type = 'priority'
+-  ORDER BY (version IS NULL),version, p.value, severity, time
++  ORDER BY (version IS NULL),version, p.value, t.type, time
+ """),
+ #----------------------------------------------------------------------------
+ ('All Tickets by Milestone',
+@@ -239,7 +240,7 @@
+ """
+ SELECT p.value AS __color__,
+    milestone||' Release' AS __group__,
+-   id AS ticket, summary, component, version, severity, 
++   id AS ticket, summary, component, version, t.type AS type, 
+    (CASE status WHEN 'assigned' THEN owner||' *' ELSE owner END) AS owner,
+    time AS created,
+    changetime AS _changetime, description AS _description,
+@@ -247,7 +248,7 @@
+   FROM ticket t, enum p
+   WHERE status IN ('new', 'assigned', 'reopened') 
+ AND p.name = t.priority AND p.type = 'priority'
+-  ORDER BY (milestone IS NULL),milestone, p.value, severity, time
++  ORDER BY (milestone IS NULL),milestone, p.value, t.type, time
+ """),
+ #----------------------------------------------------------------------------
+ ('Assigned, Active Tickets by Owner',
+@@ -258,13 +259,13 @@
+ 
+ SELECT p.value AS __color__,
+    owner AS __group__,
+-   id AS ticket, summary, component, milestone, severity, time AS created,
++   id AS ticket, summary, component, milestone, t.type AS type, time AS created,
+    changetime AS _changetime, description AS _description,
+    reporter AS _reporter
+   FROM ticket t,enum p
+   WHERE status = 'assigned'
+ AND p.name=t.priority AND p.type='priority'
+-  ORDER BY owner, p.value, severity, time
++  ORDER BY owner, p.value, t.type, time
+ """),
+ #----------------------------------------------------------------------------
+ ('Assigned, Active Tickets by Owner (Full Description)',
+@@ -275,13 +276,13 @@
+ """
+ SELECT p.value AS __color__,
+    owner AS __group__,
+-   id AS ticket, summary, component, milestone, severity, time AS created,
++   id AS ticket, summary, component, milestone, t.type AS type, time AS created,
+    description AS _description_,
+    changetime AS _changetime, reporter AS _reporter
+   FROM ticket t, enum p
+   WHERE status = 'assigned'
+ AND p.name = t.priority AND p.type = 'priority'
+-  ORDER BY owner, p.value, severity, time
++  ORDER BY owner, p.value, t.type, time
+ """),
+ #----------------------------------------------------------------------------
+ ('All Tickets By Milestone  (Including closed)',
+@@ -297,7 +298,7 @@
+         (CASE owner WHEN '$USER' THEN 'font-weight: bold' END)
+     END) AS __style__,
+    id AS ticket, summary, component, status, 
+-   resolution,version, severity, priority, owner,
++   resolution,version, t.type AS type, priority, owner,
+    changetime AS modified,
+    time AS _time,reporter AS _reporter
+   FROM ticket t,enum p
+@@ -316,13 +317,13 @@
+ SELECT p.value AS __color__,
+    (CASE status WHEN 'assigned' THEN 'Assigned' ELSE 'Owned' END) AS __group__,
+    id AS ticket, summary, component, version, milestone,
+-   severity, priority, time AS created,
++   t.type AS type, priority, time AS created,
+    changetime AS _changetime, description AS _description,
+    reporter AS _reporter
+   FROM ticket t, enum p
+   WHERE t.status IN ('new', 'assigned', 'reopened') 
+ AND p.name = t.priority AND p.type = 'priority' AND owner = '$USER'
+-  ORDER BY (status = 'assigned') DESC, p.value, milestone, severity, time
++  ORDER BY (status = 'assigned') DESC, p.value, milestone, t.type, time
+ """),
+ #----------------------------------------------------------------------------
+ ('Active Tickets, Mine first',
+@@ -336,7 +337,7 @@
+      WHEN '$USER' THEN 'My Tickets' 
+      ELSE 'Active Tickets' 
+     END) AS __group__,
+-   id AS ticket, summary, component, version, milestone, severity, 
++   id AS ticket, summary, component, version, milestone, t.type AS type, 
+    (CASE status WHEN 'assigned' THEN owner||' *' ELSE owner END) AS owner,
+    time AS created,
+    changetime AS _changetime, description AS _description,
+@@ -344,7 +345,7 @@
+   FROM ticket t, enum p
+   WHERE status IN ('new', 'assigned', 'reopened') 
+ AND p.name = t.priority AND p.type = 'priority'
+-  ORDER BY (owner = '$USER') DESC, p.value, milestone, severity, time
++  ORDER BY (owner = '$USER') DESC, p.value, milestone, t.type, time
+ """))
+ 
+ 
+@@ -378,18 +379,14 @@
+                 ('resolution', 'wontfix', 3),
+                 ('resolution', 'duplicate', 4),
+                 ('resolution', 'worksforme', 5),
+-                ('severity', 'blocker', 1),
+-                ('severity', 'critical', 2),
+-                ('severity', 'major', 3),
+-                ('severity', 'normal', 4),
+-                ('severity', 'minor', 5),
+-                ('severity', 'trivial', 6),
+-                ('severity', 'enhancement', 7),
+-                ('priority', 'highest', 1),
+-                ('priority', 'high', 2),
+-                ('priority', 'normal', 3),
+-                ('priority', 'low', 4),
+-                ('priority', 'lowest', 5))),
++                ('priority', 'blocker', 1),
++                ('priority', 'critical', 2),
++                ('priority', 'major', 3),
++                ('priority', 'minor', 4),
++                ('priority', 'trivial', 5),
++                ('ticket_type', 'Defect', 1),
++                ('ticket_type', 'Enhancement', 2),
++                ('ticket_type', 'Task', 3))),
+            ('permission',
+              ('username', 'action'),
+                (('anonymous', 'LOG_VIEW'),
+@@ -436,8 +433,8 @@
+    ' Visit the Trac open source project at<br />'
+    '<a href="http://trac.edgewall.com/">http://trac.edgewall.com/</a>'),
+   ('ticket', 'default_version', ''),
+-  ('ticket', 'default_severity', 'normal'),
+-  ('ticket', 'default_priority', 'normal'),
++  ('ticket', 'default_type', 'Defect'),
++  ('ticket', 'default_priority', 'major'),
+   ('ticket', 'default_milestone', ''),
+   ('ticket', 'default_component', 'component1'),
+   ('ticket', 'restrict_owner', 'false'),
+Index: trac/scripts/admin.py
+===================================================================
+--- trac/scripts/admin.py	(revision 1680)
++++ trac/scripts/admin.py	(working copy)
+@@ -777,6 +777,23 @@
+                 self._do_wiki_import(filename, page, cursor)
+ 
+ 
++    ## (Ticket) Type
++    _help_ticket_type = [('ticket_type list', 'Show possible ticket categories'),
++                      ('ticket_type add <value>', 'Add a ticket_type value option'),
++                      ('ticket_type change <value> <newvalue>',
++                       'Change a ticket_type value'),
++                      ('ticket_type remove <value>', 'Remove ticket_type value')]
++ 
++    def complete_ticket_type (self, text, line, begidx, endidx):
++        if begidx == 16:
++            comp = self.get_enum_list ('ticket_type')
++        elif begidx < 15:
++            comp = ['list','add','change','remove']
++        return self.word_complete(text, comp)
++ 
++    def do_ticket_type(self, line):
++        self._do_enum('ticket_type', line)
++ 
+     ## (Ticket) Priority
+     _help_priority = [('priority list', 'Show possible ticket priorities'),
+                        ('priority add <value>', 'Add a priority value option'),
+Index: trac/Query.py
+===================================================================
+--- trac/Query.py	(revision 1680)
++++ trac/Query.py	(working copy)
+@@ -84,7 +84,7 @@
+ 
+         # FIXME: the user should be able to configure which columns should
+         # be displayed
+-        cols = ['id', 'summary', 'status', 'owner', 'priority', 'milestone',
++        cols = ['type', 'id', 'summary', 'status', 'owner', 'priority', 'milestone',
+                 'component', 'version', 'severity', 'resolution', 'reporter']
+         cols += [f['name'] for f in get_custom_fields(self.env)]
+ 
+@@ -116,9 +116,9 @@
+             return 0
+         cols.sort(sort_columns)
+ 
+-        # Only display the first seven columns by default
++        # Only display the first eight columns by default
+         # FIXME: Make this configurable on a per-user and/or per-query basis
+-        self.cols = cols[:7]
++        self.cols = cols[:8]
+         if not self.order in self.cols and not self.order == self.group:
+             # Make sure the column we order by is visible, if it isn't also
+             # the column we group by
+@@ -207,6 +207,8 @@
+ 
+         def get_constraint_sql(name, value, mode, neg):
+             value = sql_escape(value[len(mode and '!' or '' + mode):])
++            if c not in custom_fields:
++                name = 't.'+name
+             if mode == '~' and value:
+                 return "COALESCE(%s,'') %sLIKE '%%%s%%'" % (
+                        name, neg and 'NOT ' or '', value)
+@@ -253,7 +255,11 @@
+         order_cols = [(self.order, self.desc)]
+         if self.group and self.group != self.order:
+             order_cols.insert(0, (self.group, self.groupdesc))
+-        for col, desc in order_cols:
++        for name, desc in order_cols:
++            if name not in custom_fields:
++                col = 't.'+name
++            else:
++                col = name
+             if col == 'id':
+                 # FIXME: This is a somewhat ugly hack.  Can we also have the
+                 #        column type for this?  If it's an integer, we do first
+@@ -267,25 +273,25 @@
+                     sql.append("COALESCE(%s,'')='' DESC," % col)
+                 else:
+                     sql.append("COALESCE(%s,'')=''," % col)
+-            if col in ['status', 'resolution', 'priority', 'severity']:
++            if col in ['t.status', 't.resolution', 't.priority', 't.severity']:
+                 if desc:
+                     sql.append("%s.value DESC" % col)
+                 else:
+                     sql.append("%s.value" % col)
+-            elif col in ['milestone', 'version']:
+-                time_col = col == 'milestone' and 'due' or 'time'
++            elif col in ['t.milestone', 't.version']:
++                time_col = name == 'milestone' and 'milestone.due' or 'version.time'
+                 if desc:
+-                    sql.append("COALESCE(%s.%s,0)=0 DESC,%s.%s DESC,%s DESC"
+-                               % (col, time_col, col, time_col, col))
++                    sql.append("COALESCE(%s,0)=0 DESC,%s DESC,%s DESC"
++                               % (time_col, time_col, col))
+                 else:
+-                    sql.append("COALESCE(%s.%s,0)=0,%s.%s,%s"
+-                               % (col, time_col, col, time_col, col))
++                    sql.append("COALESCE(%s,0)=0,%s,%s"
++                               % (time_col, time_col, col))
+             else:
+                 if desc:
+                     sql.append("%s DESC" % col)
+                 else:
+                     sql.append("%s" % col)
+-            if col == self.group and not col == self.order:
++            if name == self.group and not name == self.order:
+                 sql.append(",")
+         if self.order != 'id':
+             sql.append(",id")
+@@ -438,6 +444,10 @@
+         properties.append({'name': 'summary', 'type': 'text',
+                            'label': 'Summary'})
+         properties.append({
++            'name': 'type', 'type': 'select', 'label': 'Type',
++            'options': rows_to_list("SELECT name FROM enum "
++                                    "WHERE type='ticket_type' ORDER BY value")})
++        properties.append({
+             'name': 'status', 'type': 'radio', 'label': 'Status',
+             'options': rows_to_list("SELECT name FROM enum WHERE type='status' "
+                                     "ORDER BY value")})
+@@ -491,7 +501,7 @@
+                 property['options'].insert(0, '')
+             properties.append(property)
+ 
+-        return properties
++        return filter(lambda p: not p.has_key('options') or len(p['options']) > 0, properties)
+ 
+     def _get_constraint_modes(self):
+         modes = {}
+Index: trac/tests/query.py
+===================================================================
+--- trac/tests/query.py	(revision 1680)
++++ trac/tests/query.py	(working copy)
+@@ -17,7 +17,7 @@
+         query = Query(self.env, order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ ORDER BY COALESCE(id,0)=0,id""")
+@@ -27,7 +27,7 @@
+         query = Query(self.env, order='id', desc=1)
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ ORDER BY COALESCE(id,0)=0 DESC,id DESC""")
+@@ -37,7 +37,7 @@
+         query = Query(self.env, order='id', verbose=1)
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.reporter AS reporter,t.description AS description,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.reporter AS reporter,t.description AS description,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ ORDER BY COALESCE(id,0)=0,id""")
+@@ -47,7 +47,7 @@
+         query = Query(self.env) # priority is default order
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ ORDER BY COALESCE(priority,'')='',priority.value,id""")
+@@ -57,7 +57,7 @@
+         query = Query(self.env, desc=1) # priority is default order
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ ORDER BY COALESCE(priority,'')='' DESC,priority.value DESC,id""")
+@@ -67,7 +67,7 @@
+         query = Query(self.env, order='version')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.version AS version,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.version AS version,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+   LEFT OUTER JOIN version ON (version.name=version)
+@@ -78,7 +78,7 @@
+         query = Query(self.env, order='version', desc=1)
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.version AS version,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.version AS version,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+   LEFT OUTER JOIN version ON (version.name=version)
+@@ -89,7 +89,7 @@
+         query = Query.from_string(self.env, 'milestone=milestone1', order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.component AS component,t.version AS version,t.time AS time,t.changetime AS changetime,t.milestone AS milestone,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.component AS component,t.version AS version,t.time AS time,t.changetime AS changetime,t.milestone AS milestone,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(milestone,'')='milestone1'
+@@ -100,7 +100,7 @@
+         query = Query(self.env, order='id', group='milestone')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.component AS component,t.version AS version,t.milestone AS milestone,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.component AS component,t.version AS version,t.milestone AS milestone,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+   LEFT OUTER JOIN milestone ON (milestone.name=milestone)
+@@ -111,7 +111,7 @@
+         query = Query(self.env, order='id', group='milestone', groupdesc=1)
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.component AS component,t.version AS version,t.milestone AS milestone,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.component AS component,t.version AS version,t.milestone AS milestone,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+   LEFT OUTER JOIN milestone ON (milestone.name=milestone)
+@@ -122,7 +122,7 @@
+         query = Query(self.env, group='priority')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.milestone AS milestone,t.component AS component,t.version AS version,t.priority AS priority,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.milestone AS milestone,t.component AS component,t.version AS version,t.priority AS priority,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ ORDER BY COALESCE(priority,'')='',priority.value,id""")
+@@ -132,7 +132,7 @@
+         query = Query.from_string(self.env, 'milestone!=milestone1', order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.milestone AS milestone,t.status AS status,t.owner AS owner,t.priority AS priority,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.milestone AS milestone,t.status AS status,t.owner AS owner,t.priority AS priority,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(milestone,'')!='milestone1'
+@@ -144,7 +144,7 @@
+                                   order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(status,'') IN ('new','assigned','reopened')
+@@ -155,7 +155,7 @@
+         query = Query.from_string(self.env, 'owner~=someone', order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(owner,'') LIKE '%someone%'
+@@ -166,7 +166,7 @@
+         query = Query.from_string(self.env, 'owner!~=someone', order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(owner,'') NOT LIKE '%someone%'
+@@ -177,7 +177,7 @@
+         query = Query.from_string(self.env, 'owner^=someone', order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(owner,'') LIKE 'someone%'
+@@ -188,7 +188,7 @@
+         query = Query.from_string(self.env, 'owner$=someone', order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(owner,'') LIKE '%someone'
+@@ -200,7 +200,7 @@
+         query = Query.from_string(self.env, 'foo=something', order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value,foo.value AS foo
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.status AS status,t.owner AS owner,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value,foo.value AS foo
+ FROM ticket AS t
+   LEFT OUTER JOIN ticket_custom AS foo ON (id=foo.ticket AND foo.name='foo')
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+@@ -213,7 +213,7 @@
+                                   order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(owner,'') IN ('someone','someone_else')
+@@ -225,7 +225,7 @@
+                                   order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE COALESCE(owner,'') NOT IN ('someone','someone_else')
+@@ -237,7 +237,7 @@
+                                   order='id')
+         sql = query.get_sql()
+         self.assertEqual(sql,
+-"""SELECT t.id AS id,t.summary AS summary,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
++"""SELECT t.id AS id,t.summary AS summary,t.type AS type,t.owner AS owner,t.status AS status,t.priority AS priority,t.milestone AS milestone,t.component AS component,t.time AS time,t.changetime AS changetime,priority.value AS priority_value
+ FROM ticket AS t
+   LEFT OUTER JOIN enum AS priority ON (priority.type='priority' AND priority.name=priority)
+ WHERE (COALESCE(owner,'') LIKE '%someone%' OR COALESCE(owner,'') LIKE '%someone_else%')
+Index: trac/util.py
+===================================================================
+--- trac/util.py	(revision 1680)
++++ trac/util.py	(working copy)
+@@ -141,6 +141,8 @@
+ 
+ def hdf_add_if_missing(hdf, prefix, value):
+     """Loop through the hdf values and add @value if id doesn't exist"""
++    if not value:
++        return
+     node = hdf.getObj(prefix + '.0')
+     i = 0
+     while node:
+Index: trac/upgrades/db13.py
+===================================================================
+--- trac/upgrades/db13.py	(revision 0)
++++ trac/upgrades/db13.py	(revision 0)
+@@ -0,0 +1,62 @@
++sql = """
++-- Add ticket_type to 'ticket'
++CREATE TEMP TABLE ticket_old AS SELECT * FROM ticket;
++DROP TABLE ticket;
++CREATE TABLE ticket (
++        id              integer PRIMARY KEY,
++        type            text,           -- the nature of the ticket
++        time            integer,        -- the time it was created
++        changetime      integer,
++        component       text,
++        severity        text,
++        priority        text,
++        owner           text,           -- who is this ticket assigned to
++        reporter        text,
++        cc              text,           -- email addresses to notify
++        url             text,           -- url related to this ticket
++        version         text,           --
++        milestone       text,           --
++        status          text,
++        resolution      text,
++        summary         text,           -- one-line summary
++        description     text,           -- problem description (long)
++        keywords        text
++);
++
++INSERT INTO ticket(id, type, time, changetime, component,
++                   severity, priority, owner, reporter, cc, url, version,
++                   milestone, status, resolution, summary, description, keywords)
++  SELECT id, 'Defect', time, changetime, component,
++         severity, priority, owner, reporter, cc, url, version,
++         milestone, status, resolution, summary, description, keywords FROM ticket_old
++  WHERE severity <> 'enhancement';
++
++INSERT INTO ticket(id, type, time, changetime, component,
++                   severity, priority, owner, reporter, cc, url, version,
++                   milestone, status, resolution, summary, description, keywords)
++  SELECT id, 'Enhancement', time, changetime, component,
++         'major', priority, owner, reporter, cc, url, version,
++         milestone, status, resolution, summary, description, keywords FROM ticket_old
++  WHERE severity = 'enhancement';
++
++INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Defect', '1');
++INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Enhancement', '2');
++INSERT INTO enum (type, name, value) VALUES ('ticket_type', 'Task', '3');
++DELETE FROM enum WHERE type = 'severity' AND name = 'enhancement';
++"""
++                
++def do_upgrade(env, ver, cursor):
++    cursor.execute(sql)
++    # -- upgrade reports (involve a rename)
++    cursor.execute("SELECT id,sql FROM report")
++    reports = {}
++    for id, rsql in cursor:
++        reports[id] = rsql
++    for id, rsql in reports.items():
++        parts = rsql.split('ORDER BY', 1)
++        ending = len(parts)>1 and 'ORDER BY'+parts[1] or ''
++        cursor.execute("UPDATE report SET sql=%s WHERE id=%s",
++                       (parts[0].replace('severity,',
++                                         't.type AS type, severity,') + ending,
++                        id))
++
+Index: trac/Ticket.py
+===================================================================
+--- trac/Ticket.py	(revision 1680)
++++ trac/Ticket.py	(working copy)
+@@ -36,7 +36,7 @@
+ 
+ 
+ class Ticket(dict):
+-    std_fields = ['time', 'component', 'severity', 'priority', 'milestone',
++    std_fields = ['type', 'time', 'component', 'severity', 'priority', 'milestone',
+                   'reporter', 'owner', 'cc', 'url', 'version', 'status',
+                   'resolution', 'keywords', 'summary', 'description',
+                   'changetime']
+@@ -318,6 +318,8 @@
+                           self.config.get('ticket', 'default_component'))
+         ticket.setdefault('milestone',
+                           self.config.get('ticket', 'default_milestone'))
++        ticket.setdefault('type',
++                          self.env.config.get('ticket', 'default_type'))
+         ticket.setdefault('priority',
+                           self.config.get('ticket', 'default_priority'))
+         ticket.setdefault('severity',
+@@ -342,6 +344,9 @@
+                         req.hdf, 'newticket.milestones')
+         util.sql_to_hdf(db, "SELECT name FROM version ORDER BY name",
+                         req.hdf, 'newticket.versions')
++        util.sql_to_hdf(db, "SELECT name FROM enum WHERE type='ticket_type' "
++                                 "ORDER BY value",
++                        req.hdf, 'enums.ticket_type')
+         util.sql_to_hdf(db, "SELECT name FROM enum WHERE type='priority' "
+                                  "ORDER BY value",
+                         req.hdf, 'enums.priority')
+@@ -509,12 +514,12 @@
+             sql = []
+ 
+             # New tickets
+-            sql.append("SELECT time,id,'','new',summary,reporter,summary"
++            sql.append("SELECT time,id,'','new',type,summary,reporter,summary"
+                        " FROM ticket WHERE time>=%s AND time<=%s")
+ 
+             # Reopened tickets
+-            sql.append("SELECT t1.time,t1.ticket,'','reopened',t2.newvalue, "
+-                       "       t1.author,t.summary "
++            sql.append("SELECT t1.time,t1.ticket,'','reopened',t.type,"
++                       "       t2.newvalue,t1.author,t.summary "
+                        " FROM ticket_change t1"
+                        "   LEFT OUTER JOIN ticket_change t2 ON (t1.time=t2.time"
+                        "     AND t1.ticket=t2.ticket AND t2.field='comment')"
+@@ -523,7 +528,7 @@
+                        "   AND t1.time>=%s AND t1.time<=%s")
+ 
+             # Closed tickets
+-            sql.append("SELECT t1.time,t1.ticket,t2.newvalue,'closed',"
++            sql.append("SELECT t1.time,t1.ticket,t2.newvalue,'closed',t.type,"
+                        "       t3.newvalue,t1.author,t.summary"
+                        " FROM ticket_change t1"
+                        "   INNER JOIN ticket_change t2 ON t1.ticket=t2.ticket"
+@@ -539,21 +544,20 @@
+             cursor = db.cursor()
+             cursor.execute(" UNION ALL ".join(sql), start, stop, start, stop,
+                            start, stop)
+-
+             kinds = {'new': 'newticket', 'reopened': 'newticket',
+                      'closed': 'closedticket'}
+             verbs = {'new': 'created', 'reopened': 'reopened',
+                      'closed': 'closed'}
+-            for t,id,resolution,type,message,author,summary in cursor:
++            for t,id,resolution,state,type,message,author,summary in cursor:
+                 if absurls:
+                     href = self.env.abs_href.ticket(id)
+                 else:
+                     href = self.env.href.ticket(id)
+-                title = 'Ticket <em title="%s">#%s</em> %s by %s' % (
+-                        util.escape(summary), id, verbs[type], util.escape(author))
++                title = 'Ticket <em title="%s">#%s</em> (%s) %s by %s' % (
++                        util.escape(summary), id, type, verbs[state], util.escape(author))
+                 message = wiki_to_oneliner(util.shorten_line(message), self.env,
+                                            db, absurls=absurls)
+-                yield kinds[type], href, title, t, author, message
++                yield kinds[state], href, title, t, author, message
+ 
+     # Internal methods
+ 
+@@ -620,6 +624,9 @@
+                         req.hdf, 'ticket.milestones')
+         util.sql_to_hdf(db, "SELECT name FROM version ORDER BY name",
+                         req.hdf, 'ticket.versions')
++        util.sql_to_hdf(db, "SELECT name FROM enum WHERE type='ticket_type'"
++                                 " ORDER BY value",
++                        req.hdf, 'enums.ticket_type')
+         util.sql_to_hdf(db, "SELECT name FROM enum WHERE type='priority'"
+                                  " ORDER BY value",
+                         req.hdf, 'enums.priority')
+@@ -632,6 +639,7 @@
+         util.hdf_add_if_missing(req.hdf, 'ticket.components', ticket['component'])
+         util.hdf_add_if_missing(req.hdf, 'ticket.milestones', ticket['milestone'])
+         util.hdf_add_if_missing(req.hdf, 'ticket.versions', ticket['version'])
++        util.hdf_add_if_missing(req.hdf, 'enums.ticket_type', ticket['type'])
+         util.hdf_add_if_missing(req.hdf, 'enums.priority', ticket['priority'])
+         util.hdf_add_if_missing(req.hdf, 'enums.severity', ticket['severity'])
+         util.hdf_add_if_missing(req.hdf, 'enums.resolution', 'fixed')
+@@ -712,20 +720,20 @@
+         if 'ticket_details' in filters:
+             db = self.env.get_db_cnx()
+             cursor = db.cursor()
+-            cursor.execute("SELECT tc.time,tc.ticket,tc.field, "
+-                           "       tc.oldvalue,tc.newvalue,tc.author,t.summary "
++            cursor.execute("SELECT tc.time, tc.ticket, t.type, tc.field, "
++                           "       tc.oldvalue, tc.newvalue, tc.author, t.summary "
+                            "FROM ticket_change tc"
+-                           "   LEFT JOIN ticket t ON t.id = tc.ticket "
++                           "   INNER JOIN ticket t ON t.id = tc.ticket "
+                            "AND tc.time>=%s AND tc.time<=%s ORDER BY tc.time" % (start, stop))
+             previous_update = None
+             updates = []
+-            for time,id,field,oldvalue,newvalue,author,summary in cursor:
++            for time,id,type,field,oldvalue,newvalue,author,summary in cursor:
+                 if (time,id,author,summary) != previous_update:
+                     if previous_update:
+                         updates.append((previous_update,field_changes,comment))
+                     field_changes = []
+                     comment = ''
+-                    previous_update = (time,id,author,summary)
++                    previous_update = (time,id,type,author,summary)
+                 if field == 'comment':
+                     comment = newvalue
+                 else:
+@@ -734,13 +742,13 @@
+                 updates.append((previous_update,field_changes,comment))
+ 
+             absurls = req.args.get('format') == 'rss' # Kludge
+-            for (t,id,author,summary),field_changes,comment in updates:
++            for (t,id,type,author,summary),field_changes,comment in updates:
+                 if absurls:
+                     href = self.env.abs_href.ticket(id)
+                 else:
+                     href = self.env.href.ticket(id) 
+-                title = 'Ticket <em title="%s">#%s</em> updated by %s' \
+-                        % (util.escape(summary), id, util.escape(author))
++                title = 'Ticket <em title="%s">#%s</em> (%s) updated by %s' \
++                        % (util.escape(summary), id, type, util.escape(author))
+                 message = ''
+                 if len(field_changes) > 0:
+                     message = ', '.join(field_changes) + ' changed.<br />'
+Index: templates/ticket.cs
+===================================================================
+--- templates/ticket.cs	(revision 1680)
++++ templates/ticket.cs	(working copy)
+@@ -29,17 +29,24 @@
+ <div id="content" class="ticket">
+ 
+  <h1>Ticket #<?cs var:ticket.id ?> <?cs
++ if:ticket.type ?> - <?cs var:ticket.type ?><?cs /if ?><?cs
+  if:ticket.resolution ?>(<?cs var:ticket.status ?>: <?cs var:ticket.resolution ?>)<?cs
+  elif:ticket.status != 'new' ?>(<?cs var:ticket.status ?>)<?cs
+  /if ?></h1>
+ 
+  <div id="searchable">
+- <?cs def:ticketprop(label, name, value, fullrow) ?>
+-  <th id="h_<?cs var:name ?>"><?cs var:label ?>:</th>
+-  <td headers="h_<?cs var:name ?>"<?cs if:fullrow ?> colspan="3"<?cs /if ?>><?cs
+-   if:value ?><?cs var:value ?><?cs else ?>&nbsp;<?cs
+-   /if ?></td><?cs if:numprops % #2 && !last_prop || fullrow ?>
+- </tr><tr><?cs /if ?><?cs set numprops = numprops + #1 - fullrow ?><?cs
++ <?cs def:ticketprop(label, name, value, fullrow) ?><?cs
++  if:value ?>
++    <th id="h_<?cs var:name ?>"><?cs var:label ?>:</th>
++    <td headers="h_<?cs var:name ?>"<?cs if:fullrow ?> colspan="3"<?cs /if ?>><?cs 
++     var:value ?>
++    </td><?cs 
++   if:numprops % #2 && !last_prop || fullrow ?>
++   </tr>
++   <tr><?cs 
++   /if ?><?cs 
++   set numprops = numprops + #1 - fullrow ?><?cs
++  /if ?><?cs
+  /def ?>
+ 
+ <div id="ticket">
+@@ -157,13 +164,14 @@
+   <div class="main">
+    <label for="summary">Summary:</label>
+    <input id="summary" type="text" name="summary" size="70" value="<?cs
+-     var:ticket.summary ?>" /><?cs
++     var:ticket.summary ?>" />
++   <br /><?cs
++   call:labelled_hdf_select('Type:', enums.ticket_type, "type", ticket.type, 0) ?><?cs
+    if:trac.acl.TICKET_ADMIN ?>
+-    <br />
+     <label for="description">Description:</label>
+     <div style="float: left">
+      <textarea id="description" name="description" class="wikitext" rows="10" cols="68"><?cs
+-       var:ticket.description ?></textarea>
++        var:ticket.description ?></textarea>
+     </div>
+     <br style="clear: left" />
+     <label for="reporter">Reporter:</label>
+@@ -171,25 +179,17 @@
+            value="<?cs var:ticket.reporter ?>" /><?cs
+    /if ?>
+   </div>
+-  <div class="col1">
+-   <label for="component">Component:</label><?cs
+-   call:hdf_select(ticket.components, "component", ticket.component, 0) ?>
+-   <br />
+-   <label for="version">Version:</label><?cs
+-   call:hdf_select(ticket.versions, "version", ticket.version, 1) ?>
+-   <br />
+-   <label for="severity">Severity:</label><?cs
+-   call:hdf_select(enums.severity, "severity", ticket.severity, 0) ?>
+-   <br />
++  <div class="col1"><?cs
++   call:labelled_hdf_select("Component:", ticket.components, "component", ticket.component, 0) ?><?cs
++   call:labelled_hdf_select("Version:", ticket.versions, "version", ticket.version, 1) ?><?cs 
++   call:labelled_hdf_select("Severity:", enums.severity, "severity", ticket.severity, 0) ?>
+    <label for="keywords">Keywords:</label>
+    <input type="text" id="keywords" name="keywords" size="20"
+        value="<?cs var:ticket.keywords ?>" />
+   </div>
+-  <div class="col2">
+-   <label for="priority">Priority:</label><?cs
+-   call:hdf_select(enums.priority, "priority", ticket.priority, 0) ?><br />
+-   <label for="milestone">Milestone:</label><?cs
+-   call:hdf_select(ticket.milestones, "milestone", ticket.milestone, 1) ?><br />
++  <div class="col2"><?cs
++   call:labelled_hdf_select("Priority:", enums.priority, "priority", ticket.priority, 0) ?><?cs
++   call:labelled_hdf_select("Milestone:", ticket.milestones, "milestone", ticket.milestone, 1) ?>
+    <label for="owner">Assigned to:</label>
+    <input type="text" id="owner" name="owner" size="20" value="<?cs
+      var:ticket.owner ?>" disabled="disabled" /><br />
+Index: templates/macros.cs
+===================================================================
+--- templates/macros.cs	(revision 1680)
++++ templates/macros.cs	(working copy)
+@@ -9,6 +9,15 @@
+  </select><?cs
+ /def?><?cs
+ 
++def:labelled_hdf_select(label, options, name, selected, optional) ?><?cs 
++ if:len(options) > #0 ?>
++  <label for="<?cs var:name ?>"><?cs var:label ?></label><?cs
++   call:hdf_select(options, name, selected, optional) ?>
++  </label>
++  <br /><?cs
++ /if ?><?cs
++/def ?><?cs
++
+ def:browser_path_links(path, file) ?><?cs
+  set:first = #1 ?>
+  <h1><?cs
+@@ -162,9 +171,9 @@
+    /if ?>
+   </div><?cs
+  /each ?><?cs
+-/def ?>
++/def ?><?cs 
+ 
+-<?cs def:sortable_th(order, desc, class, title) ?>
++def:sortable_th(order, desc, class, title) ?>
+  <th class="<?cs var:class ?><?cs if:order == class ?> <?cs if:desc ?>desc<?cs else ?>asc<?cs /if ?><?cs /if ?>">
+   <a title="Sort by <?cs var:class ?><?cs if:order == class && !desc ?> (descending)<?cs /if ?>"
+      href="?order=<?cs var:class ?><?cs if:order == class && !desc ?>&desc=1<?cs /if ?>"><?cs var:title ?></a>
+Index: templates/newticket.cs
+===================================================================
+--- templates/newticket.cs	(revision 1680)
++++ templates/newticket.cs	(working copy)
+@@ -11,6 +11,9 @@
+ <h3>Create New Ticket:</h3>
+ <form id="newticket" method="post" action="<?cs
+   var:trac.href.newticket ?>#preview">
++ <div class="field"><?cs
++  call:labelled_hdf_select("Type: ", enums.ticket_type, "type", newticket.type, 0) ?>
++ </div>
+  <div class="field">
+   <label for="reporter">Your email or username:</label><br />
+   <input type="text" id="reporter" name="reporter" size="40" value="<?cs
+@@ -38,32 +41,18 @@
+   <legend>Ticket Properties</legend>
+   <input type="hidden" name="action" value="create" />
+   <input type="hidden" name="status" value="new" />
+-  <div class="col1">
+-   <label for="component">Component:</label><?cs
+-   call:hdf_select(newticket.components, "component", newticket.component, 0) ?>
+-   <br />
+-   <label for="version">Version:</label><?cs
+-   call:hdf_select(newticket.versions, "version", newticket.version, 0) ?>
+-   <br />
+-   <label for="severity">Severity:</label><?cs
+-   call:hdf_select(enums.severity, "severity", newticket.severity, 0) ?>
+-   <br />
++  <div class="col1"><?cs
++   call:labelled_hdf_select("Component:", newticket.components, "component", newticket.component, 0) ?><?cs
++   call:labelled_hdf_select("Version:", newticket.versions, "version", newticket.version, 1) ?><?cs
++   call:labelled_hdf_select("Severity:", enums.severity, "severity", newticket.severity, 0) ?>
+    <label for="keywords">Keywords:</label>
+    <input type="text" id="keywords" name="keywords" size="20"
+        value="<?cs var:newticket.keywords ?>" />
+   </div>
+-  <div class="col2">
+-   <label for="priority">Priority:</label><?cs
+-   call:hdf_select(enums.priority, "priority", newticket.priority, 0) ?><br />
+-   <label for="milestone">Milestone:</label><?cs
+-   call:hdf_select(newticket.milestones, "milestone", newticket.milestone, 1) ?><br />
+-   <label for="owner">Assign to:</label><?cs
+-   if:len(newticket.users) ?><?cs
+-    call:hdf_select(newticket.users, "owner", newticket.owner, 1) ?><?cs
+-   else ?>
+-    <input type="text" id="owner" name="owner" size="20" value="<?cs
+-      var:newticket.owner ?>" /><?cs
+-   /if ?><br />
++  <div class="col2"><?cs
++   call:labelled_hdf_select("Priority:", enums.priority, "priority", newticket.priority, 0) ?><?cs
++   call:labelled_hdf_select("Milestone:", newticket.milestones, "milestone", newticket.milestone, 1) ?><?cs
++   call:labelled_hdf_select("Assign to:", newticket.users, "owner", newticket.owner, 1) ?>
+    <label for="cc">Cc:</label>
+    <input type="text" id="cc" name="cc" size="30" value="<?cs
+      var:newticket.cc ?>" />
