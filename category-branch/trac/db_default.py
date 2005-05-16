@@ -61,10 +61,10 @@ CREATE TABLE auth_cookie (
         UNIQUE(cookie, name, ipnr)
 );
 CREATE TABLE enum (
-        type            text,
+        kind            text,
         name            text,
         value           text,
-        UNIQUE(name,type)
+        UNIQUE(name,kind)
 );
 CREATE TABLE system (
         name            text PRIMARY KEY,
@@ -146,7 +146,7 @@ CREATE TABLE wiki (
          UNIQUE(name,version)
 );
 CREATE TABLE attachment (
-         type            text,
+         kind            text,
          id              text,
          filename        text,
          size            integer,
@@ -154,7 +154,7 @@ CREATE TABLE attachment (
          description     text,
          author          text,
          ipnr            text,
-         UNIQUE(type,id,filename)
+         UNIQUE(kind,id,filename)
 );
 CREATE TABLE session (
          sid             text,
@@ -183,15 +183,15 @@ reports = (
 """,
 """
 SELECT p.value AS __color__,
-   id AS ticket, summary, component, version, milestone, severity, 
+   id AS ticket, summary, component, version, milestone, type, 
    (CASE status WHEN 'assigned' THEN owner||' *' ELSE owner END) AS owner,
    time AS created,
    changetime AS _changetime, description AS _description,
    reporter AS _reporter
   FROM ticket t, enum p
   WHERE status IN ('new', 'assigned', 'reopened') 
-AND p.name = t.priority AND p.type = 'priority'
-  ORDER BY p.value, milestone, severity, time
+AND p.name = t.priority AND p.kind = 'priority'
+  ORDER BY p.value, milestone, type, time
 """),
 #----------------------------------------------------------------------------
  ('Active Tickets by Version',
@@ -205,15 +205,15 @@ for useful RSS export.
 """
 SELECT p.value AS __color__,
    version AS __group__,
-   id AS ticket, summary, component, version, severity, 
+   id AS ticket, summary, component, version, type, 
    (CASE status WHEN 'assigned' THEN owner||' *' ELSE owner END) AS owner,
    time AS created,
    changetime AS _changetime, description AS _description,
    reporter AS _reporter
   FROM ticket t, enum p
   WHERE status IN ('new', 'assigned', 'reopened') 
-AND p.name = t.priority AND p.type = 'priority'
-  ORDER BY (version IS NULL),version, p.value, severity, time
+AND p.name = t.priority AND p.kind = 'priority'
+  ORDER BY (version IS NULL),version, p.value, type, time
 """),
 #----------------------------------------------------------------------------
 ('All Tickets by Milestone',
@@ -227,15 +227,15 @@ for useful RSS export.
 """
 SELECT p.value AS __color__,
    milestone||' Release' AS __group__,
-   id AS ticket, summary, component, version, severity, 
+   id AS ticket, summary, component, version, type, 
    (CASE status WHEN 'assigned' THEN owner||' *' ELSE owner END) AS owner,
    time AS created,
    changetime AS _changetime, description AS _description,
    reporter AS _reporter
   FROM ticket t, enum p
   WHERE status IN ('new', 'assigned', 'reopened') 
-AND p.name = t.priority AND p.type = 'priority'
-  ORDER BY (milestone IS NULL),milestone, p.value, severity, time
+AND p.name = t.priority AND p.kind = 'priority'
+  ORDER BY (milestone IS NULL),milestone, p.value, type, time
 """),
 #----------------------------------------------------------------------------
 ('Assigned, Active Tickets by Owner',
@@ -246,13 +246,13 @@ List assigned tickets, group by ticket owner, sorted by priority.
 
 SELECT p.value AS __color__,
    owner AS __group__,
-   id AS ticket, summary, component, milestone, severity, time AS created,
+   id AS ticket, summary, component, milestone, type, time AS created,
    changetime AS _changetime, description AS _description,
    reporter AS _reporter
   FROM ticket t,enum p
   WHERE status = 'assigned'
-AND p.name=t.priority AND p.type='priority'
-  ORDER BY owner, p.value, severity, time
+AND p.name=t.priority AND p.kind='priority'
+  ORDER BY owner, p.value, type, time
 """),
 #----------------------------------------------------------------------------
 ('Assigned, Active Tickets by Owner (Full Description)',
@@ -263,13 +263,13 @@ This report demonstrates the use of full-row display.
 """
 SELECT p.value AS __color__,
    owner AS __group__,
-   id AS ticket, summary, component, milestone, severity, time AS created,
+   id AS ticket, summary, component, milestone, type, time AS created,
    description AS _description_,
    changetime AS _changetime, reporter AS _reporter
   FROM ticket t, enum p
   WHERE status = 'assigned'
-AND p.name = t.priority AND p.type = 'priority'
-  ORDER BY owner, p.value, severity, time
+AND p.name = t.priority AND p.kind = 'priority'
+  ORDER BY owner, p.value, type, time
 """),
 #----------------------------------------------------------------------------
 ('All Tickets By Milestone  (Including closed)',
@@ -285,11 +285,11 @@ SELECT p.value AS __color__,
         (CASE owner WHEN '$USER' THEN 'font-weight: bold' END)
     END) AS __style__,
    id AS ticket, summary, component, status, 
-   resolution,version, severity, priority, owner,
+   resolution,version, type, priority, owner,
    changetime AS modified,
    time AS _time,reporter AS _reporter
   FROM ticket t,enum p
-  WHERE p.name=t.priority AND p.type='priority'
+  WHERE p.name=t.priority AND p.kind='priority'
   ORDER BY (milestone IS NULL), milestone DESC, (status = 'closed'), 
         (CASE status WHEN 'closed' THEN modified ELSE (-1)*p.value END) DESC
 """),
@@ -304,13 +304,13 @@ logged in user when executed.
 SELECT p.value AS __color__,
    (CASE status WHEN 'assigned' THEN 'Assigned' ELSE 'Owned' END) AS __group__,
    id AS ticket, summary, component, version, milestone,
-   severity, priority, time AS created,
+   type, priority, time AS created,
    changetime AS _changetime, description AS _description,
    reporter AS _reporter
   FROM ticket t, enum p
   WHERE t.status IN ('new', 'assigned', 'reopened') 
-AND p.name = t.priority AND p.type = 'priority' AND owner = '$USER'
-  ORDER BY (status = 'assigned') DESC, p.value, milestone, severity, time
+AND p.name = t.priority AND p.kind = 'priority' AND owner = '$USER'
+  ORDER BY (status = 'assigned') DESC, p.value, milestone, type, time
 """),
 #----------------------------------------------------------------------------
 ('Active Tickets, Mine first',
@@ -324,15 +324,15 @@ SELECT p.value AS __color__,
      WHEN '$USER' THEN 'My Tickets' 
      ELSE 'Active Tickets' 
     END) AS __group__,
-   id AS ticket, summary, component, version, milestone, severity, 
+   id AS ticket, summary, component, version, milestone, type, 
    (CASE status WHEN 'assigned' THEN owner||' *' ELSE owner END) AS owner,
    time AS created,
    changetime AS _changetime, description AS _description,
    reporter AS _reporter
   FROM ticket t, enum p
   WHERE status IN ('new', 'assigned', 'reopened') 
-AND p.name = t.priority AND p.type = 'priority'
-  ORDER BY (owner = '$USER') DESC, p.value, milestone, severity, time
+AND p.name = t.priority AND p.kind = 'priority'
+  ORDER BY (owner = '$USER') DESC, p.value, milestone, type, time
 """))
 
 
@@ -356,7 +356,7 @@ data = (('component',
                (('1.0', 0),
                 ('2.0', 0))),
            ('enum',
-             ('type', 'name', 'value'),
+             ('kind', 'name', 'value'),
                (('status', 'new', 1),
                 ('status', 'assigned', 2),
                 ('status', 'reopened', 3),

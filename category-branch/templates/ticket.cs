@@ -29,7 +29,7 @@
 <div id="content" class="ticket">
 
  <h1>Ticket #<?cs var:ticket.id ?><?cs 
- if:ticket.ticket_type ?> - <?cs var:ticket.ticket_type ?><?cs /if ?><?cs
+ if:ticket.type ?> - <?cs var:ticket.type ?><?cs /if ?><?cs
  if:ticket.status == 'closed' ?> (Closed: <?cs var:ticket.resolution ?>)<?cs
  elif:ticket.status != 'new' ?> (<?cs var:ticket.status ?>)<?cs
  /if ?></h1>
@@ -166,7 +166,7 @@
    <input id="summary" type="text" name="summary" size="70" value="<?cs
      var:ticket.summary ?>" />
    <br /><?cs
-   call:labelled_hdf_select('Type:', enums.ticket_type, "ticket_type", ticket.ticket_type, 0) ?><?cs
+   call:labelled_hdf_select('Type:', enums.ticket_type, "type", ticket.type, 0) ?><?cs
    if:trac.acl.TICKET_ADMIN ?>
     <label for="description">Description:</label>
     <div style="float: left">

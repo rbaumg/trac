@@ -12,7 +12,7 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
 <form id="newticket" method="post" action="<?cs
   var:trac.href.newticket ?>#preview">
  <div class="field"><?cs
-  call:labelled_hdf_select("Type: ", enums.ticket_type, "ticket_type", newticket.ticket_type, 0) ?>
+  call:labelled_hdf_select("Type: ", enums.ticket_type, "type", newticket.type, 0) ?>
  </div>
  <div class="field">
   <label for="reporter">Your email or username:</label><br />

@@ -83,7 +83,7 @@ class Query(object):
 
         # FIXME: the user should be able to configure which columns should
         # be displayed
-        cols = ['ticket_type', 'id', 'summary', 'status', 'owner', 'priority', 'milestone',
+        cols = ['type', 'id', 'summary', 'status', 'owner', 'priority', 'milestone',
                 'component', 'version', 'severity', 'resolution', 'reporter']
         cols += [f['name'] for f in get_custom_fields(self.env)]
 
@@ -131,6 +131,7 @@ class Query(object):
 
         sql = self.get_sql()
         self.env.log.debug("Query SQL: %s" % sql)
+        print sql
 
         if not db:
             db = self.env.get_db_cnx()
@@ -198,7 +199,7 @@ class Query(object):
 
         for col in [c for c in ['status', 'resolution', 'priority', 'severity']
                     if c == self.order or c == self.group or c == 'priority']:
-            sql.append("\n  LEFT OUTER JOIN enum AS %s ON (%s.type='%s' AND %s.name=%s)"
+            sql.append("\n  LEFT OUTER JOIN enum AS %s ON (%s.kind='%s' AND %s.name=%s)"
                        % (col, col, col, col, col))
         for col in [c for c in ['milestone', 'version']
                     if c == self.order or c == self.group]:
@@ -250,6 +251,7 @@ class Query(object):
 
         sql.append("\nORDER BY ")
         order_cols = [(self.order, self.desc)]
+        print 'order_cols:', order_cols
         if self.group and self.group != self.order:
             order_cols.insert(0, (self.group, self.groupdesc))
         for col, desc in order_cols:
@@ -437,17 +439,17 @@ class QueryModule(Component):
         properties.append({'name': 'summary', 'type': 'text',
                            'label': 'Summary'})
         properties.append({
-            'name': 'ticket_type', 'type': 'select', 'label': 'Type',
+            'name': 'type', 'type': 'select', 'label': 'Type',
             'options': rows_to_list("SELECT name FROM enum "
-                                    "WHERE type='ticket_type' ORDER BY value")})
+                                    "WHERE kind='ticket_type' ORDER BY value")})
         properties.append({
             'name': 'status', 'type': 'radio', 'label': 'Status',
-            'options': rows_to_list("SELECT name FROM enum WHERE type='status' "
+            'options': rows_to_list("SELECT name FROM enum WHERE kind='status' "
                                     "ORDER BY value")})
         properties.append({
             'name': 'resolution', 'type': 'radio', 'label': 'Resolution',
             'options': [''] + rows_to_list("SELECT name FROM enum "
-                                           "WHERE type='resolution' ORDER BY value")})
+                                           "WHERE kind='resolution' ORDER BY value")})
         properties.append({
             'name': 'component', 'type': 'select', 'label': 'Component',
             'options': rows_to_list("SELECT name FROM component "
@@ -462,11 +464,11 @@ class QueryModule(Component):
         properties.append({
             'name': 'priority', 'type': 'select', 'label': 'Priority',
             'options': rows_to_list("SELECT name FROM enum "
-                                    "WHERE type='priority' ORDER BY value")})
+                                    "WHERE kind='priority' ORDER BY value")})
         properties.append({
             'name': 'severity', 'type': 'select', 'label': 'Severity',
             'options': rows_to_list("SELECT name FROM enum "
-                                    "WHERE type='severity' ORDER BY value")})
+                                    "WHERE kind='severity' ORDER BY value")})
         properties.append({'name': 'keywords', 'type': 'text',
                            'label': 'Keywords'})
         properties.append({'name': 'owner', 'type': 'text', 'label': 'Owner'})

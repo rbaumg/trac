@@ -157,10 +157,10 @@ class TracDatabase(object):
         self.assertNoTickets()
         
         c = self.db().cursor()
-        c.execute("""DELETE FROM enum WHERE type='severity'""")
+        c.execute("""DELETE FROM enum WHERE kind='severity'""")
         for value, i in s:
             print "inserting severity ", value, " ", i
-            c.execute("""INSERT INTO enum (type, name, value) VALUES (%s, %s, %s)""",
+            c.execute("""INSERT INTO enum (kind, name, value) VALUES (%s, %s, %s)""",
                       "severity", value.encode('utf-8'), i)
         self.db().commit()
     
@@ -169,10 +169,10 @@ class TracDatabase(object):
         self.assertNoTickets()
         
         c = self.db().cursor()
-        c.execute("""DELETE FROM enum WHERE type='priority'""")
+        c.execute("""DELETE FROM enum WHERE kind='priority'""")
         for value, i in s:
             print "inserting priority ", value, " ", i
-            c.execute("""INSERT INTO enum (type, name, value) VALUES (%s, %s, %s)""",
+            c.execute("""INSERT INTO enum (kind, name, value) VALUES (%s, %s, %s)""",
                       "priority",
                       value.encode('utf-8'),
                       i)

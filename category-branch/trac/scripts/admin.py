@@ -222,8 +222,8 @@ class TracAdmin(cmd.Cmd):
             result = dlist
         return result
 
-    def get_enum_list (self, type):
-        data = self.db_execsql("SELECT name FROM enum WHERE type='%s'" % type) 
+    def get_enum_list (self, kind):
+        data = self.db_execsql("SELECT name FROM enum WHERE kind='%s'" % kind) 
         return [r[0] for r in data]
 
     def get_milestone_list (self):
@@ -820,54 +820,54 @@ class TracAdmin(cmd.Cmd):
 
     # Priority and Severity share the same datastructure and methods:
     
-    def _do_enum(self, type, line):
+    def _do_enum(self, kind, line):
         arg = self.arg_tokenize(line)
         try:
             if arg[0]  == 'list':
-                self._do_enum_list(type)
+                self._do_enum_list(kind)
             elif arg[0] == 'add' and len(arg)==2:
                 name = arg[1]
-                self._do_enum_add(type, name)
+                self._do_enum_add(kind, name)
             elif arg[0] == 'change'  and len(arg)==3:
                 name = arg[1]
                 newname = arg[2]
-                self._do_enum_change(type, name, newname)
+                self._do_enum_change(kind, name, newname)
             elif arg[0] == 'remove'  and len(arg)==2:
                 name = arg[1]
-                self._do_enum_remove(type, name)
+                self._do_enum_remove(kind, name)
             else:    
-                self.do_help (type)
+                self.do_help (kind)
         except Exception, e:
             print 'Command %s failed:' % arg[0], e
 
-    def _do_enum_list(self, type):
-        data = self.db_execsql("SELECT name FROM enum WHERE type='%s'"
-                               % type)
+    def _do_enum_list(self, kind):
+        data = self.db_execsql("SELECT name FROM enum WHERE kind='%s'"
+                               % kind)
         self.print_listing(['Possible Values'], data)
 
-    def _do_enum_add(self, type, name):
-        sql = ("INSERT INTO enum(value,type,name) "
-               " SELECT 1+COALESCE(max(value),0),'%(type)s','%(name)s'"
-               "   FROM enum WHERE type='%(type)s'" 
-               % {'type':type, 'name':name})
+    def _do_enum_add(self, kind, name):
+        sql = ("INSERT INTO enum(value,kind,name) "
+               " SELECT 1+COALESCE(max(value),0),'%(kind)s','%(name)s'"
+               "   FROM enum WHERE kind='%(kind)s'" 
+               % {'kind':kind, 'name':name})
         self.db_execsql(sql)
 
-    def _do_enum_change(self, type, name, newname):
-        d = {'name':name, 'newname':newname, 'type':type}
+    def _do_enum_change(self, kind, name, newname):
+        d = {'name':name, 'newname':newname, 'kind':kind}
         data = self.db_execsql("SELECT name FROM enum" 
-                               " WHERE type='%(type)s' AND name='%(name)s'" % d)
+                               " WHERE kind='%(kind)s' AND name='%(name)s'" % d)
         if not data:
             raise Exception, "No such value '%s'" % name
         data = self.db_execsql("UPDATE enum SET name='%(newname)s'" 
-                               " WHERE type='%(type)s' AND name='%(name)s'" % d)
+                               " WHERE kind='%(kind)s' AND name='%(name)s'" % d)
 
-    def _do_enum_remove(self, type, name):
+    def _do_enum_remove(self, kind, name):
         data = self.db_execsql("SELECT name FROM enum" 
-                               " WHERE type='%s' AND name='%s'" % (type, name))
+                               " WHERE kind='%s' AND name='%s'" % (kind, name))
         if not data:
             raise Exception, "No such value '%s'" % name
-        data = self.db_execsql("DELETE FROM enum WHERE type='%s' AND name='%s'"
-                               % (type, name))
+        data = self.db_execsql("DELETE FROM enum WHERE kind='%s' AND name='%s'"
+                               % (kind, name))
 
 
     ## Milestone
