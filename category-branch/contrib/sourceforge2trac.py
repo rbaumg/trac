@@ -104,14 +104,14 @@ class ExportedProjectData(object):
         groups.sort()
         return groups
     
-    def artifactKinds(self):
-        """Returns all the artifact kinds that are used, in alphabetical order."""
+    def artifactTypes(self):
+        """Returns all the artifact types that are used, in alphabetical order."""
         t = {}
         for a in self._artifacts:
             t[a.artifact_type] = 1
-        kinds = t.keys()
-        kinds.sort()
-        return kinds
+        types = t.keys()
+        types.sort()
+        return types
 
 class TracDatabase(object):
     def __init__(self, path):
@@ -249,7 +249,7 @@ def importData(f, env):
     project = ExportedProjectData(f)
     
     db = TracDatabase(env)
-    db.setTypeList(project.artifactKinds())
+    db.setTypeList(project.artifactTypes())
     db.setComponentList(project.categories())
     db.setPriorityList(range(1, 11))
     db.setVersionList(project.groups())

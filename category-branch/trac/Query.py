@@ -131,7 +131,6 @@ class Query(object):
 
         sql = self.get_sql()
         self.env.log.debug("Query SQL: %s" % sql)
-        print sql
 
         if not db:
             db = self.env.get_db_cnx()
@@ -251,7 +250,6 @@ class Query(object):
 
         sql.append("\nORDER BY ")
         order_cols = [(self.order, self.desc)]
-        print 'order_cols:', order_cols
         if self.group and self.group != self.order:
             order_cols.insert(0, (self.group, self.groupdesc))
         for col, desc in order_cols:
