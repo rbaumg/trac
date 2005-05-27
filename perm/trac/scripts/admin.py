@@ -37,6 +37,7 @@ from trac import perm, util
 from trac.config import default_dir
 from trac.env import Environment
 from trac.Milestone import Milestone
+from trac.perm import PermissionSystem
 
 def my_sum(list):
     """Python2.2 doesn't have sum()"""
@@ -422,7 +423,8 @@ class TracAdmin(cmd.Cmd):
         if argc == 2:
             comp = ['list', 'add', 'remove']
         elif argc >= 4:
-            comp = perm.permissions + perm.meta_permissions.keys()
+            perm = PermissionSystem(self.__env)
+            comp = perm.get_all_permissions().keys()
             comp.sort()
         return self.word_complete(text, comp)
 
@@ -457,7 +459,8 @@ class TracAdmin(cmd.Cmd):
         self.print_listing(['User', 'Action'], rows)
         print
         print 'Available actions:'
-        actions = perm.permissions + perm.meta_permissions.keys()
+        perm = PermissionSystem(self.__env)
+        actions = perm.get_permissions().keys()
         actions.sort()
         text = ', '.join(actions)
         print util.wrap(text, initial_indent=' ', subsequent_indent=' ',
@@ -465,16 +468,16 @@ class TracAdmin(cmd.Cmd):
         print
 
     def _do_permission_add(self, user, action):
+        self.db_open()
         if not action.islower() and not action.isupper():
             print 'Group names must be in lower case and actions in upper case'
             return
         if action.isupper() and not \
-           action in perm.permissions + perm.meta_permissions.keys():
+           action in PermissionSystem(self.__env).get_permissions():
             print '%s is not a valid action. Use the permission list command ' \
                   'to see the available actions.' % (action)
             return
-        self.db_update("INSERT INTO permission VALUES('%s', '%s')"
-                       % (user, action))
+        PermissionSystem(self.__env).grant_permission(user, action)
 
     def _do_permission_remove(self, user, action):
         sql = "DELETE FROM permission"

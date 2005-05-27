@@ -1,5 +1,6 @@
 from trac.config import Configuration
 from trac.core import Component, ComponentManager, implements
+from trac.perm import PermissionCache
 from trac.test import Mock
 from trac.web.clearsilver import HDFWrapper
 from trac.web.chrome import add_link, add_stylesheet, Chrome, \
@@ -76,6 +77,7 @@ class ChromeTestCase(unittest.TestCase):
         req = Mock(hdf=HDFWrapper(), cgi_location='/trac.cgi', path_info='')
 
         # Verify that no logo data is put in the HDF if no logo is configured
+        env.config.set('header_logo', 'src', '')
         Chrome(env).populate_hdf(req, None)
         assert 'chrome.logo' not in req.hdf
 
@@ -116,6 +118,7 @@ class ChromeTestCase(unittest.TestCase):
         req = Mock(hdf=HDFWrapper(), cgi_location='/trac.cgi', path_info='')
 
         # No icon set in config, so no icon links
+        env.config.set('project', 'icon', '')
         Chrome(env).populate_hdf(req, None)
         assert 'chrome.links.icon' not in req.hdf
         assert 'chrome.links.shortcut icon' not in req.hdf

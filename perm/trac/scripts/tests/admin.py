@@ -92,6 +92,9 @@ class InMemoryEnvironment(Environment):
     def save_config(self):
         pass
 
+    def is_component_enabled(self, cls):
+        return cls.__module__.find('tests') == -1
+
 
 class TracadminTestCase(unittest.TestCase):
 

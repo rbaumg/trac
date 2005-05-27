@@ -23,7 +23,6 @@ from __future__ import generators
 from time import gmtime, localtime, strftime, time
 import re
 
-from trac import perm
 from trac.core import *
 from trac.Ticket import get_custom_fields, insert_custom_fields, Ticket
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
@@ -321,7 +320,7 @@ class QueryModule(Component):
         return req.path_info == '/query'
 
     def process_request(self, req):
-        req.perm.assert_permission(perm.TICKET_VIEW)
+        req.perm.assert_permission('TICKET_VIEW')
 
         constraints = self._get_constraints(req)
         if not constraints and not req.args.has_key('order'):

@@ -3,6 +3,7 @@
 #
 # Copyright (C) 2003, 2004, 2005 Edgewall Software
 # Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
 #
 # Trac is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -19,7 +20,9 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
+#         Christopher Lenz <cmlenz@gmx.de>
 
+from trac.core import ComponentManager
 from trac.db import SQLiteConnection
 
 import unittest
@@ -115,6 +118,36 @@ class InMemoryDatabase(SQLiteConnection):
             cursor.execute(SQLiteConnection.to_sql(table))
 
         self.cnx.commit()
+
+
+class EnvironmentStub(ComponentManager):
+    """A stub of the trac.env.Environment object for testing."""
+    def __init__(self, enable=None):
+        ComponentManager.__init__(self)
+        self.enabled_components = enable
+        self.db = InMemoryDatabase()
+
+        from trac.config import Configuration
+        self.config = Configuration(None)
+
+        from trac.log import logger_factory
+        self.log = logger_factory('test')
+
+        from trac.web.href import Href
+        self.href = Href('/trac.cgi')
+
+    def component_activated(self, component):
+        component.env = self
+        component.config = self.config
+        component.log = self.log
+
+    def is_component_enabled(self, cls):
+        if self.enabled_components is None:
+            return True
+        return cls in self.enabled_components
+
+    def get_db_cnx(self):
+        return self.db
 
 
 def suite():

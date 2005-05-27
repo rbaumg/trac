@@ -23,10 +23,11 @@ from __future__ import generators
 import re
 import time
 
-from trac import perm, util
+from trac import util
 from trac.attachment import attachment_to_hdf, Attachment
 from trac.core import *
 from trac.Notify import TicketNotifyEmail
+from trac.perm import IPermissionRequestor
 from trac.Timeline import ITimelineEventProvider
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.web.main import IRequestHandler
@@ -266,7 +267,7 @@ def insert_custom_fields(env, hdf, vals={}):
 
 class NewticketModule(Component):
 
-    implements(INavigationContributor, IRequestHandler)
+    implements(INavigationContributor, IPermissionRequestor, IRequestHandler)
 
     # INavigationContributor methods
 
@@ -274,10 +275,15 @@ class NewticketModule(Component):
         return 'newticket'
 
     def get_navigation_items(self, req):
-        if not req.perm.has_permission(perm.TICKET_CREATE):
+        if not req.perm.has_permission('TICKET_CREATE'):
             return
         yield 'mainnav', 'newticket', '<a href="%s">New Ticket</a>' \
               % (self.env.href.newticket())
+
+    # IPermissionRequestor methods
+
+    def get_actions(self):
+        return ['TICKET_CREATE']
 
     # IRequestHandler methods
 
@@ -285,7 +291,7 @@ class NewticketModule(Component):
         return req.path_info == '/newticket'
 
     def process_request(self, req):
-        req.perm.assert_permission(perm.TICKET_CREATE)
+        req.perm.assert_permission('TICKET_CREATE')
 
         db = self.env.get_db_cnx()
 
@@ -390,15 +396,16 @@ def available_actions(ticket, perm_):
         'reopened': ['leave', 'resolve', 'reassign'          ],
         'closed':   ['leave',                        'reopen']
     }
-    perms = {'resolve': perm.TICKET_MODIFY, 'reassign': perm.TICKET_CHGPROP,
-             'accept': perm.TICKET_CHGPROP, 'reopen': perm.TICKET_CREATE}
+    perms = {'resolve': 'TICKET_MODIFY', 'reassign': 'TICKET_CHGPROP',
+             'accept': 'TICKET_CHGPROP', 'reopen': 'TICKET_CREATE'}
     return [action for action in actions.get(ticket['status'], ['leave'])
             if action not in perms or perm_.has_permission(perms[action])]
 
 
 class TicketModule(Component):
 
-    implements(INavigationContributor, IRequestHandler, ITimelineEventProvider)
+    implements(INavigationContributor, IPermissionRequestor, IRequestHandler,
+               ITimelineEventProvider)
 
     # INavigationContributor methods
 
@@ -407,6 +414,14 @@ class TicketModule(Component):
 
     def get_navigation_items(self, req):
         return []
+
+    # IPermissionRequestor methods
+
+    def get_actions(self):
+        return ['TICKET_APPEND', 'TICKET_CHGPROP', 'TICKET_VIEW',
+                ('TICKET_MODIFY', ['TICKET_APPEND', 'TICKET_CHGPROP']),
+                ('TICKET_ADMIN', ['TICKET_CREATE', 'TICKET_MODIFY',
+                                  'TICKET_VIEW'])]
 
     # IRequestHandler methods
 
@@ -417,7 +432,7 @@ class TicketModule(Component):
             return 1
 
     def process_request(self, req):
-        req.perm.assert_permission(perm.TICKET_VIEW)
+        req.perm.assert_permission('TICKET_VIEW')
 
         action = req.args.get('action', 'view')
 
@@ -477,7 +492,7 @@ class TicketModule(Component):
     # ITimelineEventProvider methods
 
     def get_timeline_filters(self, req):
-        if req.perm.has_permission(perm.TICKET_VIEW):
+        if req.perm.has_permission('TICKET_VIEW'):
             yield ('ticket', 'Ticket changes')
 
     def get_timeline_events(self, req, start, stop, filters):
@@ -534,17 +549,17 @@ class TicketModule(Component):
     # Internal methods
 
     def _do_save(self, req, db, ticket):
-        if req.perm.has_permission(perm.TICKET_CHGPROP):
+        if req.perm.has_permission('TICKET_CHGPROP'):
             # TICKET_CHGPROP gives permission to edit the ticket
             if not req.args.get('summary'):
                 raise TracError('Tickets must contain summary.')
 
             if 'description' in req.args.keys() or 'reporter' in req.args.keys():
-                req.perm.assert_permission(perm.TICKET_ADMIN)
+                req.perm.assert_permission('TICKET_ADMIN')
 
             ticket.populate(req.args)
         else:
-            req.perm.assert_permission(perm.TICKET_APPEND)
+            req.perm.assert_permission('TICKET_APPEND')
 
         # Do any action on the ticket?
         action = req.args.get('action')
@@ -663,7 +678,7 @@ class TicketModule(Component):
                                                            id)):
             hdf = attachment_to_hdf(self.env, db, req, attachment)
             req.hdf['ticket.attachments.%s' % idx] = hdf
-        if req.perm.has_permission(perm.TICKET_APPEND):
+        if req.perm.has_permission('TICKET_APPEND'):
             req.hdf['ticket.attach_href'] = self.env.href.attachment('ticket',
                                                                      id)
 
@@ -681,7 +696,7 @@ class UpdateDetailsForTimeline(Component):
     # ITimelineEventProvider methods
 
     def get_timeline_filters(self, req):
-        if req.perm.has_permission(perm.TICKET_VIEW):
+        if req.perm.has_permission('TICKET_VIEW'):
             yield ('ticket_details', 'Ticket details')
 
     def get_timeline_events(self, req, start, stop, filters):

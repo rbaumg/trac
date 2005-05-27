@@ -36,7 +36,12 @@ class Configuration:
     def __init__(self, filename):
         self.filename = filename
         self.parser = ConfigParser()
+
         self.__defaults = {}
+        from trac.db_default import default_config
+        for section, name, value in default_config:
+            self.setdefault(section, name, value)
+
         self.__lastmtime = 0
         self.parse_if_needed()
 

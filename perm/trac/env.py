@@ -175,8 +175,6 @@ class Environment(ComponentManager):
 
     def load_config(self):
         self.config = Configuration(os.path.join(self.path, 'conf', 'trac.ini'))
-        for section,name,value in db_default.default_config:
-            self.config.setdefault(section, name, value)
 
     def get_templates_dir(self):
         return os.path.join(self.path, 'templates')
