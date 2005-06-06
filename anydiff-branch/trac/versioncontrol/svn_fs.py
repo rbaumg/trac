@@ -345,9 +345,20 @@ class SubversionRepository(Repository):
                                       entry_props,
                                       ignore_ancestry,
                                       self.pool)
+            def created_path_rev(root, default_rev, path):
+                try:
+                    path = fs.node_created_path(root, path, self.pool)
+                    rev = fs.node_created_rev(root, path, self.pool)
+                    return path, rev
+                except:
+                    return path, default_rev
             for d in editor.deltas:
-                yield (posixpath.join(old_path,d[0]), posixpath.join(new_path,d[0]),
-                       d[1], d[2])
+                opath, orev = created_path_rev(old_root, old_rev,
+                                               posixpath.join(old_path,d[0]))
+                npath, nrev = created_path_rev(new_root, new_rev,
+                                               posixpath.join(new_path,d[0]))
+                print (opath, orev, npath, nrev, d[1], d[2])
+                yield  (opath, orev, npath, nrev, d[1], d[2])
         else:
             if new_node and old_node:
                 change = Changeset.EDIT

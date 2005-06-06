@@ -116,7 +116,8 @@
   ?>/TracBrowser">TracBrowser</a> for help on using the browser.
  </div>
 
- <?cs call:anydiff(browser.path, browser.revision, browser.href) ?>
+ <?cs if:len(browser.path) > 1 ?><?cs call:anydiff(browser.path, browser.revision, browser.href) ?><?cs
+      /if ?>
 
 </div>
 <?cs include:"footer.cs"?>

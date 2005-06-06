@@ -75,16 +75,15 @@ def _get_path_links(href, path, rev):
         })
     return links
 
-def _anydiff_support(env, req, node):
-    path, rev = node.created_path, node.created_rev # Kludge: needs to be in Node interface
-    select_for_diff = req.args.get('diff')
-    req.hdf['diff.anydiff_href'] = env.href.diff(path)
-    if select_for_diff == "1":
+def _anydiff_support(env, req, path, rev):
+    action = req.args.get('diff')
+    req.hdf['diff.href'] = env.href.diff(path)
+    if action == 'set':
         req.session['diff_base_path'] = path
         req.session['diff_base_rev'] = rev
 
     if req.session.has_key('diff_base_path'):
-        if select_for_diff == "0":
+        if action == 'clear':
             del req.session['diff_base_path']
             del req.session['diff_base_rev']
         else:
@@ -130,16 +129,16 @@ class BrowserModule(Component):
 
         req.hdf['title'] = path
         req.hdf['browser'] = {
-            'path': node.path,
-            'revision': node.rev,
+            'path': path,
+            'revision': rev,
             'props': dict([(util.escape(name), util.escape(value))
                            for name, value in node.get_properties().items()]),
-            'href': self.env.href.browser(node.path,rev=node.rev),
-            'diff_href': self.env.href.diff(node.path,rev=node.rev),
-            'log_href': self.env.href.log(node.path)
+            'href': self.env.href.browser(path,rev=rev),
+            'diff_href': self.env.href.diff(path,rev=rev),
+            'log_href': self.env.href.log(path)
         }
 
-        _anydiff_support(self.env, req, node)
+        _anydiff_support(self.env, req, path, rev or repos.youngest_rev)
 
         path_links = _get_path_links(self.env.href, path, rev)
         if len(path_links) > 1:
@@ -319,7 +318,7 @@ class LogModule(Component):
         if mode != 'path_history':
             try:
                 node = repos.get_node(path, rev)
-                _anydiff_support(self.env, req, node)
+                _anydiff_support(self.env, req, path, rev or repos.youngest_rev)
             except TracError:
                 node = None
             if not node:

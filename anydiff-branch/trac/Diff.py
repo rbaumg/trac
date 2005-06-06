@@ -77,27 +77,31 @@ class DiffModule(Component):
         if old or new:
             chgset = None
             if not new:
-                new = repos.next_rev(old) # FIXME: must lookup the next entry in node history
+                new = repos.youngest_rev
             elif not old:
-                old = repos.previous_rev(new)
+                old = repos.youngest_rev
             if not old_path:
                 old_path = path
             diff = Diff(old_path=old_path, old_rev=old,
                         new_path=path, new_rev=new)
             diffargs = 'new=%s&old_path=%s&old=%s' \
                        % (new, old_path, old)
+            reverse_href = self.env.href.diff(old_path,new=old,
+                                              old_path=path,old=new)
         else:
             chgset = repos.get_changeset(rev)
             diff = Diff(old_path=path, old_rev=repos.previous_rev(rev),
                         new_path=path, new_rev=rev)
             diffargs = 'rev=%s' % rev
+            reverse_href = None
 
-        print diff
-        
         # TODO:
 #         req.check_modified(chgset.date,
 #                            diff_options[0] + ''.join(diff_options[1]))
-
+        req.hdf['diff'] = diff
+        if reverse_href:
+            req.hdf['diff.reverse_href'] = reverse_href
+            
         format = req.args.get('format')
         if format == 'diff':
             self._render_diff(req, repos, diff, chgset, diff_options)
@@ -120,7 +124,6 @@ class DiffModule(Component):
 
     def _render_html(self, req, repos, diff, chgset, diff_options):
         """HTML version"""
-        req.hdf['diff'] = diff
         req.hdf['diff.href'] = {
             'new_rev': self.env.href.changeset(diff.new_rev),
             'old_rev': self.env.href.changeset(diff.old_rev),
@@ -152,18 +155,16 @@ class DiffModule(Component):
                 add_link(req, 'last', self.env.href.diff(diff.new_path, rev=youngest_rev),
                          'Changeset %s' % youngest_rev)
         elif diff.new_path == diff.old_path: # 'diff between 2 revisions' mode
-            req.hdf['title'] = 'Diff for %s between Revisions %s and %s' \
-                               % (diff.new_path, diff.old_rev, diff.new_rev)
+            req.hdf['title'] = 'Diff r%s:%s for %' \
+                               % (diff.old_rev, diff.new_rev, diff.new_path)
         else:                           # 'arbitrary diff' mode
-            req.hdf['title'] = 'Diff between %s at Revision %s and %s at Revision %s' \
+            req.hdf['title'] = 'Diff from %s @ %s to %s @ %s' \
                                % (diff.old_path, diff.old_rev,
                                   diff.new_path, diff.new_rev)
 
         edits = []
         idx = 0
-        old_rev = diff.old_rev
-        new_rev = diff.new_rev
-        for old_path, new_path, kind, change in repos.get_diffs(**diff):
+        for old_path, old_rev, new_path, new_rev, kind, change in repos.get_diffs(**diff):
             print 'delta %d: %s %s delta from %s@%s to %s@%s' \
                   % (idx, change, kind, old_path, old_rev, new_path, new_rev)
             info = {'change': change}
@@ -178,11 +179,11 @@ class DiffModule(Component):
                 info['browser_href.new'] = self.env.href.browser(new_path,
                                                                  rev=new_rev)
             if change in (Changeset.COPY, Changeset.EDIT, Changeset.MOVE):
-                edits.append((idx, old_path, new_path, kind))
+                edits.append((idx, old_path, old_rev, new_path, new_rev, kind))
             req.hdf['diff.changes.%d' % idx] = info
             idx += 1
         
-        for idx, old_path, new_path, kind in edits:
+        for idx, old_path, old_rev, new_path, new_rev, kind in edits:
             old_node = repos.get_node(old_path, old_rev)
             new_node = repos.get_node(new_path, new_rev)
             
