@@ -75,6 +75,23 @@ def _get_path_links(href, path, rev):
         })
     return links
 
+def _anydiff_support(env, req, node):
+    path, rev = node.created_path, node.created_rev # Kludge: needs to be in Node interface
+    select_for_diff = req.args.get('diff')
+    req.hdf['diff.anydiff_href'] = env.href.diff(path)
+    if select_for_diff == "1":
+        req.session['diff_base_path'] = path
+        req.session['diff_base_rev'] = rev
+
+    if req.session.has_key('diff_base_path'):
+        if select_for_diff == "0":
+            del req.session['diff_base_path']
+            del req.session['diff_base_rev']
+        else:
+            req.hdf['session'] = {
+                'diff_base_path': req.session['diff_base_path'],
+                'diff_base_rev': req.session['diff_base_rev']
+                }
 
 class BrowserModule(Component):
 
@@ -113,13 +130,16 @@ class BrowserModule(Component):
 
         req.hdf['title'] = path
         req.hdf['browser'] = {
-            'path': path,
-            'revision': rev or repos.youngest_rev,
+            'path': node.path,
+            'revision': node.rev,
             'props': dict([(util.escape(name), util.escape(value))
                            for name, value in node.get_properties().items()]),
-            'href': self.env.href.browser(path,rev=rev or repos.youngest_rev),
-            'log_href': self.env.href.log(path)
+            'href': self.env.href.browser(node.path,rev=node.rev),
+            'diff_href': self.env.href.diff(node.path,rev=node.rev),
+            'log_href': self.env.href.log(node.path)
         }
+
+        _anydiff_support(self.env, req, node)
 
         path_links = _get_path_links(self.env.href, path, rev)
         if len(path_links) > 1:
@@ -268,6 +288,14 @@ class LogModule(Component):
         stop_rev = req.args.get('stop_rev')
         verbose = req.args.get('verbose')
         limit = int(req.args.get('limit') or 100)
+        old = req.args.get('old')
+        new = req.args.get('new')
+
+        repos = self.env.get_repository(req.authname)
+        normpath = repos.normalize_path(path)
+        rev = str(repos.normalize_rev(rev))
+        old = old or str(repos.previous_rev(rev))
+        new = new or rev
 
         req.hdf['title'] = path + ' (log)'
         req.hdf['log'] = {
@@ -276,7 +304,10 @@ class LogModule(Component):
             'verbose': verbose,
             'stop_rev': stop_rev,
             'browser_href': self.env.href.browser(path, rev=rev),
-            'log_href': self.env.href.log(path, rev=rev)
+            'log_href': self.env.href.log(path, rev=rev),
+            'diff_href': self.env.href.diff(path, old=old, new=new),
+            'old': old,
+            'new': new
         }
 
         path_links = _get_path_links(self.env.href, path, rev)
@@ -284,14 +315,11 @@ class LogModule(Component):
         if path_links:
             add_link(req, 'up', path_links[-1]['href'], 'Parent directory')
 
-        repos = self.env.get_repository(req.authname)
-        normpath = repos.normalize_path(path)
-        rev = str(repos.normalize_rev(rev))
-
         # 'node' or 'path' history: use get_node()/get_history() or get_path_history()
         if mode != 'path_history':
             try:
                 node = repos.get_node(path, rev)
+                _anydiff_support(self.env, req, node)
             except TracError:
                 node = None
             if not node:

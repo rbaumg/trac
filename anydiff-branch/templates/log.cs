@@ -1,10 +1,12 @@
 <?cs include "header.cs"?>
 <?cs include "macros.cs"?>
+<?cs include "anydiff.cs"?>
 
 <div id="ctxtnav" class="nav">
  <ul>
-  <li class="last"><a href="<?cs
-    var:log.browser_href ?>">View Latest Revision</a></li><?cs
+  <li class="last">
+   <a href="<?cs var:log.browser_href ?>">View Latest Revision</a>
+  </li><?cs
   if:len(chrome.links.prev) ?>
    <li class="first<?cs if:!len(chrome.links.next) ?> last<?cs /if ?>">
     &larr; <a href="<?cs var:chrome.links.prev.0.href ?>" title="<?cs
@@ -61,6 +63,9 @@
           title="Warning: by updating, you will clear the page history" />
   </div>
  </form>
+
+<?cs call:anydiff(log.path, log.rev, log.log_href) ?>
+
  <div class="diff">
   <div id="legend">
    <h3>Legend:</h3>
@@ -74,9 +79,19 @@
    </dl>
   </div>
  </div>
+
  <table id="chglist" class="listing">
+  <form action="<?cs var:log.diff_href ?>" method="get">
   <thead>
+   <tr class="diff">
+    <th colspan="2">
+     <div class="buttons"><input type="submit" value="Diff" 
+       title="Diff from Old Revision to New Revision (select them below)" /></div>
+    </th>
+   </tr>
    <tr>
+    <th>Old</th>
+    <th>New</th>
     <th class="change"></th>
     <th class="data">Date</th>
     <th class="rev">Rev</th>
@@ -87,6 +102,7 @@
   </thead>
   <tbody><?cs
    set:indent = #1 ?><?cs
+   set:idx = #0 ?><?cs
    each:item = log.items ?><?cs
     if:item.copyfrom_path ?>
      <tr class="<?cs if:name(item) % #2 ?>even<?cs else ?>odd<?cs /if ?>">
@@ -99,6 +115,10 @@
       set:indent = #1 ?><?cs
     /if ?>
     <tr class="<?cs if:name(item) % #2 ?>even<?cs else ?>odd<?cs /if ?>">
+     <td><input type="radio" name="old" value="<?cs var:item.rev ?>" <?cs
+          if:idx == #1 ?> checked="checked" <?cs /if ?> /></td>
+     <td><input type="radio" name="new" value="<?cs var:item.rev ?>" <?cs
+          if:idx == #0 ?> checked="checked" <?cs /if ?> /></td>
      <td class="change" style="padding-left:<?cs var:indent ?>em">
       <a title="View log starting at this revision" href="<?cs var:item.log_href ?>">
        <div class="<?cs var:item.change ?>"></div>
@@ -115,8 +135,10 @@
      <td class="author"><?cs var:log.changes[item.rev].author ?></td>
      <td class="summary"><?cs var:log.changes[item.rev].message ?></td>
     </tr><?cs
+    set:idx = idx + 1 ?><?cs
    /each ?>
   </tbody>
+  </form>
  </table><?cs
  if:len(links.prev) || len(links.next) ?><div id="paging" class="nav"><ul><?cs
   if:len(links.prev) ?><li class="first<?cs

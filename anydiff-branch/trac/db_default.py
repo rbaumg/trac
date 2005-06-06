@@ -458,6 +458,7 @@ default_config = \
 
 default_components = ('trac.About', 'trac.attachment', 'trac.Browser',
                       'trac.Changeset', 'trac.Search', 'trac.Settings',
+                      'trac.Diff',
                       'trac.ticket.query', 'trac.ticket.report',
                       'trac.Roadmap',
                       'trac.ticket.web_ui', 'trac.Timeline', 'trac.wiki.web_ui',

@@ -88,6 +88,9 @@ class CachedRepository(Repository):
     def get_node(self, path, rev=None):
         return self.repos.get_node(path, rev)
 
+    def has_node(self, path, rev):
+        return self.repos.has_node(path, rev)
+
     def get_oldest_rev(self):
         return self.repos.oldest_rev
 
@@ -111,6 +114,9 @@ class CachedRepository(Repository):
 
     def normalize_rev(self, rev):
         return self.repos.normalize_rev(rev)
+
+    def get_diffs(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
+        return self.repos.get_diffs(old_path, old_rev, new_path, new_rev, ignore_ancestry)
 
 
 class CachedChangeset(Changeset):

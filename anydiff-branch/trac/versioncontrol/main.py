@@ -42,6 +42,12 @@ class Repository(object):
         """
         raise NotImplementedError
 
+    def has_node(self, path, rev):
+        """
+        Tell if there's a node at the specified (path,rev) combination.
+        """
+        raise NotImplementedError
+    
     def get_node(self, path, rev=None):
         """
         Retrieve a Node (directory or file) from the repository at the
@@ -114,7 +120,14 @@ class Repository(object):
         'None' is a valid revision value and represents the youngest revision.
         """
         return NotImplementedError
-        
+
+    def get_diffs(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
+        """
+        Generator that yields (old_path, new_path, kind, change) tuples
+        for each node change between the two arbitrary (path,rev) pairs.
+        """
+        raise NotImplementedError
+
 
 class Node(object):
     """

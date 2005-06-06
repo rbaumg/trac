@@ -27,6 +27,7 @@ from trac.versioncontrol import Changeset, Node, Repository
 import os.path
 import time
 import weakref
+import posixpath
 
 from svn import fs, repos, core, delta
 
@@ -175,8 +176,13 @@ class SubversionRepository(Repository):
     def __del__(self):
         self.close()
 
+    def has_node(self, path, rev):
+        rev_root = fs.revision_root(self.fs_ptr, rev, self.pool)
+        node_type = fs.check_path(rev_root, path, self.pool)
+        return node_type in _kindmap
+
     def normalize_path(self, path):
-        return path == '/' and path or path.strip('/')
+        return path == '/' and path or path and path.strip('/') or ''
 
     def normalize_rev(self, rev):
         try:
@@ -267,9 +273,7 @@ class SubversionRepository(Repository):
         rev = self.normalize_rev(rev)
         expect_deletion = False
         while rev:
-            rev_root = fs.revision_root(self.fs_ptr, rev, self.pool)
-            node_type = fs.check_path(rev_root, path, self.pool)
-            if node_type in _kindmap: # then path exists at that rev
+            if self.has_node(path, rev):
                 if expect_deletion:
                     # it was missing, now it's there again: rev+1 must be a delete
                     yield path, rev+1, Changeset.DELETE
@@ -293,6 +297,65 @@ class SubversionRepository(Repository):
             else:
                 expect_deletion = True
                 rev = self.previous_rev(rev)
+
+    def get_diffs(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
+        old_node = new_node = None
+        old_rev = self.normalize_rev(old_rev)
+        new_rev = self.normalize_rev(new_rev)
+        if self.has_node(old_path, old_rev):
+            old_node = self.get_node(old_path, old_rev)
+            old_path = old_node.created_path
+            old_rev = old_node.created_rev
+        if self.has_node(new_path, new_rev):
+            new_node = self.get_node(new_path, new_rev)
+            new_path = new_node.created_path
+            new_rev = new_node.created_rev
+        if not old_node and not new_node:
+            raise TracError, ('None of the diff arguments are valid: '
+                              'neither %s in revision %s nor %s in revision %s exist '
+                              'in the repository' % (old_path, old_rev,
+                                                     new_path, new_rev))
+        elif old_node and new_node:
+            if new_node.kind != old_node.kind:
+                raise TracError, ('Diff mismatch: Trying to diff '
+                                  'a %s (%s in revision %s) '
+                                  'with a %s (%s in revision %s).' \
+                                  % (old_node.kind, old_path, old_rev,
+                                     new_node.kind, new_path, new_rev))
+        if new_node:
+            isdir = new_node.isdir
+        else:
+            isdir = old_node.isdir
+        if isdir:
+            editor = DiffChangeEditor()
+            e_ptr, e_baton = delta.make_editor(editor, self.pool)
+            old_root = fs.revision_root(self.fs_ptr, old_rev, self.pool)
+            new_root = fs.revision_root(self.fs_ptr, new_rev, self.pool)
+            if isdir:
+                old_dir, old_entry = old_path, ''
+            def authz_cb(root, path, pool): return 1
+            text_deltas = 0 # as this is currently re-done in Diff.py...
+            entry_props = 0 # ("... typically used only for working copy updates")
+            print 'svn_repos_dir_delta: ', old_dir, old_entry, ' -vs.- ', new_path
+            repos.svn_repos_dir_delta(old_root, old_path, '',
+                                      new_root, new_path,
+                                      e_ptr, e_baton, authz_cb,
+                                      text_deltas,
+                                      isdir and 1 or 0,
+                                      entry_props,
+                                      ignore_ancestry,
+                                      self.pool)
+            for d in editor.deltas:
+                yield (posixpath.join(old_path,d[0]), posixpath.join(new_path,d[0]),
+                       d[1], d[2])
+        else:
+            if new_node and old_node:
+                change = Changeset.EDIT
+            elif new_node:
+                change = Changeset.ADD
+            elif old_node:
+                change = Changeset.DELETE
+            yield (old_path, new_path, Node.FILE, change)
 
 
 class SubversionNode(Node):
@@ -450,3 +513,59 @@ class SubversionChangeset(Changeset):
 
     def _get_prop(self, name):
         return fs.revision_prop(self.fs_ptr, self.rev, name, self.pool)
+
+
+#
+# Delta editor for diffs between arbitrary nodes (recycling my old code for #295 :) )
+#
+# Note 1: the 'copyfrom_path' and 'copyfrom_rev' information is not used
+#         because 'repos.svn_repos_dir_delta' *doesn't* provide it.
+#
+# Note 2: the 'dir_baton' is the path of the parent directory
+#
+
+class DiffChangeEditor(delta.Editor): 
+
+    def __init__(self):
+        self.deltas = []
+        self.skip_dir_prop_change = 0
+
+    def _norm(self, path):
+        """Path are normalized to __not__ have a leading slash"""
+        return path == '/' and path or path and path.strip('/') or ''
+    
+    # -- svn.delta.Editor callbacks
+
+    def open_root(self, base_revision, dir_pool):
+        return '/'
+
+    def add_directory(self, path, dir_baton, copyfrom_path, copyfrom_rev, dir_pool):
+        self.deltas.append((path, Node.DIRECTORY, Changeset.ADD))
+        # don't create an additional 'Changeset.EDIT' entry for this directory
+        # in case there's also a dir property change:
+        self.skip_dir_prop_change = 1 
+        return path
+
+    def open_directory(self, path, dir_baton, base_revision, dir_pool):
+        self.deltas.append((path, Node.DIRECTORY, Changeset.EDIT))
+        self.skip_dir_prop_change = 0
+        return path
+
+    def change_dir_prop(self, dir_baton, name, value, pool):
+        if self.skip_dir_prop_change:
+            return
+        self.deltas.append((dir_baton, Node.DIRECTORY, Changeset.EDIT))
+        self.skip_dir_prop_change = 1
+
+    def close_directory(self, dir_baton):
+        self.skip_dir_prop_change = 0
+
+    def delete_entry(self, path, revision, dir_baton, pool):
+        self.deltas.append((path, Node.FILE, Changeset.DELETE)) # should be Node.UNKNOWN
+
+    def add_file(self, path, dir_baton, copyfrom_path, copyfrom_revision, dir_pool):
+        self.deltas.append((self._norm(path), Node.FILE, Changeset.ADD))
+
+    def open_file(self, path, dir_baton, dummy_rev, file_pool):
+        self.deltas.append((self._norm(path), Node.FILE, Changeset.EDIT))
+

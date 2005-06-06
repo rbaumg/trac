@@ -1,8 +1,10 @@
 <?cs include "header.cs"?>
 <?cs include "macros.cs"?>
+<?cs include "anydiff.cs"?>
 
 <div id="ctxtnav" class="nav">
  <ul>
+  <li class="first"><a href="<?cs var:browser.diff_href ?>">Diff to previous</a></li>
   <li class="last"><a href="<?cs var:browser.log_href ?>">Revision Log</a></li>
  </ul>
 </div>
@@ -113,6 +115,8 @@
   <strong>Note:</strong> See <a href="<?cs var:trac.href.wiki
   ?>/TracBrowser">TracBrowser</a> for help on using the browser.
  </div>
+
+ <?cs call:anydiff(browser.path, browser.revision, browser.href) ?>
 
 </div>
 <?cs include:"footer.cs"?>
