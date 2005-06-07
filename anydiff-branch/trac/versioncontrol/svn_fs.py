@@ -298,7 +298,7 @@ class SubversionRepository(Repository):
                 expect_deletion = True
                 rev = self.previous_rev(rev)
 
-    def _created_path_rev(root, path, default_rev):
+    def _created_path_rev(self, root, path, default_rev):
         try:
             path = fs.node_created_path(root, path, self.pool)
             rev = fs.node_created_rev(root, path, self.pool)
