@@ -31,28 +31,26 @@
    <h1>Changes for <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
     <?cs var:diff.new_path ?></a> 
    in Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
-    <?cs var:diff.new_rev ?></a></h1><?cs
+    <?cs var:diff.new_rev ?></a>
+   </h1><?cs
   elif:diff.new_path == diff.old_path ?>
    <h1>Changes in <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
-    <?cs var:diff.new_path ?></a></h1>
-   <dl>
-    <dt>from</dt><dd>Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
-    <?cs var:diff.old_rev ?></a></dd>
-    <dt>to</dt><dd>Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
-    <?cs var:diff.new_rev ?></a></dd>
-   </dl><?cs
+     <?cs var:diff.new_path ?></a>
+    from Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
+     <?cs var:diff.old_rev ?></a>
+    to Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
+     <?cs var:diff.new_rev ?></a>
+   </h1><?cs
   else ?>
-   <h1>Changes</h1>
-   <dl> 
-    <dt>from</dt><dd><a title="Show entry in browser" href="<?cs var:diff.href.old_path ?>">
-    <?cs var:diff.old_path ?></a> 
-   at Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
-    <?cs var:diff.old_rev ?></a></dd>
-    <dt>to</dt><dd><a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
+   <h1>Changes from <a title="Show entry in browser" href="<?cs var:diff.href.old_path ?>">
+     <?cs var:diff.old_path ?></a> 
+    at Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
+     <?cs var:diff.old_rev ?></a>
+    to <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
     <?cs var:diff.new_path ?></a> 
    at Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
-    <?cs var:diff.new_rev ?></a></dd>
-   </dl><?cs
+    <?cs var:diff.new_rev ?></a>
+   </h1><?cs
   /if ?>
  </div>
 

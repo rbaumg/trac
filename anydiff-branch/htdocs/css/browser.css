@@ -56,18 +56,14 @@ tr.diff input {
  padding: .8em;
  float: left;
 }
-#anydiff em {
- background: #fbfbfb;
-}
 #anydiff form, #anydiff div {
- vertical-align: top;
  display: inline;
- margin-right: 0;
- margin-left: 0;
 }
 #anydiff input { 
  vertical-align: baseline;
+ margin: 0 -0.5em 0 1em;
 }
+
 
 /* Styles for the revision log table
    (extends the styles for "table.listing") */

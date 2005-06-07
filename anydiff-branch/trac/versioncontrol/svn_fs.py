@@ -298,6 +298,14 @@ class SubversionRepository(Repository):
                 expect_deletion = True
                 rev = self.previous_rev(rev)
 
+    def _created_path_rev(root, path, default_rev):
+        try:
+            path = fs.node_created_path(root, path, self.pool)
+            rev = fs.node_created_rev(root, path, self.pool)
+            return path, rev
+        except:
+            return path, default_rev
+
     def get_diffs(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
         old_node = new_node = None
         old_rev = self.normalize_rev(old_rev)
@@ -345,19 +353,11 @@ class SubversionRepository(Repository):
                                       entry_props,
                                       ignore_ancestry,
                                       self.pool)
-            def created_path_rev(root, default_rev, path):
-                try:
-                    path = fs.node_created_path(root, path, self.pool)
-                    rev = fs.node_created_rev(root, path, self.pool)
-                    return path, rev
-                except:
-                    return path, default_rev
             for d in editor.deltas:
-                opath, orev = created_path_rev(old_root, old_rev,
-                                               posixpath.join(old_path,d[0]))
-                npath, nrev = created_path_rev(new_root, new_rev,
-                                               posixpath.join(new_path,d[0]))
-                print (opath, orev, npath, nrev, d[1], d[2])
+                opath = posixpath.join(old_path,d[0])
+                opath, orev = self._created_path_rev(old_root, opath, old_rev)
+                npath = posixpath.join(new_path,d[0])
+                npath, nrev = self._created_path_rev(new_root, npath, new_rev)
                 yield  (opath, orev, npath, nrev, d[1], d[2])
         else:
             if new_node and old_node:
@@ -366,7 +366,7 @@ class SubversionRepository(Repository):
                 change = Changeset.ADD
             elif old_node:
                 change = Changeset.DELETE
-            yield (old_path, new_path, Node.FILE, change)
+            yield (old_path, old_rev, new_path, new_rev, Node.FILE, change)
 
 
 class SubversionNode(Node):

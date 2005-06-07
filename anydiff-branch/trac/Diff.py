@@ -155,7 +155,7 @@ class DiffModule(Component):
                 add_link(req, 'last', self.env.href.diff(diff.new_path, rev=youngest_rev),
                          'Changeset %s' % youngest_rev)
         elif diff.new_path == diff.old_path: # 'diff between 2 revisions' mode
-            req.hdf['title'] = 'Diff r%s:%s for %' \
+            req.hdf['title'] = 'Diff r%s:%s for %s' \
                                % (diff.old_rev, diff.new_rev, diff.new_path)
         else:                           # 'arbitrary diff' mode
             req.hdf['title'] = 'Diff from %s @ %s to %s @ %s' \
