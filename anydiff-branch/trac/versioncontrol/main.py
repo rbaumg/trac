@@ -123,9 +123,11 @@ class Repository(object):
 
     def get_diffs(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
         """
-        Generator that yields change tuples
-        (old_path, old_rev, new_path, new_rev, kind, change)
+        Generator that yields change tuples (old_node, new_node, kind, change)
         for each node change between the two arbitrary (path,rev) pairs.
+
+        The old_node is assumed to be None when the change is an ADD,
+        the new_node is assumed to be None when the change is a DELETE.
         """
         raise NotImplementedError
 

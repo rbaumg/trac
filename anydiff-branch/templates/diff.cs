@@ -142,7 +142,13 @@
  <dt class="message">Message:</dt>
  <dd class="message" id="searchable"><?cs var:changeset.message ?></dd><?cs
  /if ?>
- <dt class="files">Files:</dt>
+ <dt class="files"><?cs 
+  if:len(diff.changes) > #0 ?>
+   Files:<?cs
+  else ?>
+   (None)<?cs
+  /if ?>
+ </dt>
  <dd class="files">
   <ul><?cs each:item = diff.changes ?>
    <li><?cs

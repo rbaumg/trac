@@ -1,6 +1,5 @@
 <?cs include "header.cs"?>
 <?cs include "macros.cs"?>
-<?cs include "anydiff.cs"?>
 
 <div id="ctxtnav" class="nav">
  <ul>
@@ -63,8 +62,6 @@
           title="Warning: by updating, you will clear the page history" />
   </div>
  </form>
-
-<?cs call:anydiff(log.path, log.rev, log.log_href) ?>
 
  <div class="diff">
   <div id="legend">

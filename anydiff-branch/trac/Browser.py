@@ -196,7 +196,12 @@ class BrowserModule(Component):
 
         req.hdf['browser.items'] = info
         req.hdf['browser.changes'] = changes
-
+        zip_href = self.env.href.diff(node.path, new=rev, old=rev, old_path='/',
+                                      format='zip')
+        add_link(req, 'alternate', zip_href, 'Zip Archive',
+                 'application/zip', 'zip')
+        
+        
     def _render_file(self, req, repos, node, rev=None):
         req.perm.assert_permission(perm.FILE_VIEW)
 
@@ -318,7 +323,6 @@ class LogModule(Component):
         if mode != 'path_history':
             try:
                 node = repos.get_node(path, rev)
-                _anydiff_support(self.env, req, path, rev or repos.youngest_rev)
             except TracError:
                 node = None
             if not node:

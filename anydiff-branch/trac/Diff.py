@@ -74,6 +74,7 @@ class DiffModule(Component):
             else:
                 req.redirect(self.env.href.diff(path, rev=rev))
 
+        rpath = path.replace('/','_') # for the .zip filename
         if old or new:
             chgset = None
             if not new:
@@ -88,13 +89,22 @@ class DiffModule(Component):
                        % (new, old_path, old)
             reverse_href = self.env.href.diff(old_path,new=old,
                                               old_path=path,old=new)
+            if old_path != path:
+                if old_path == '/':
+                    zipfilename = '%s-r%s' % (rpath, old)
+                else:
+                    zipfilename = 'diff-%s-r%s-%s-r%s' \
+                                  % (old_path.replace('/','_'), old, rpath, new)
+            else:
+                zipfilename = 'diff-%s-r%s-to-r%s' % (rpath, old, new)
         else:
             chgset = repos.get_changeset(rev)
             diff = Diff(old_path=path, old_rev=repos.previous_rev(rev),
                         new_path=path, new_rev=rev)
             diffargs = 'rev=%s' % rev
             reverse_href = None
-
+            zipfilename = 'diff_%s_r%s' % (rpath, rev)
+            
         # TODO:
 #         req.check_modified(chgset.date,
 #                            diff_options[0] + ''.join(diff_options[1]))
@@ -107,7 +117,7 @@ class DiffModule(Component):
             self._render_diff(req, repos, diff, chgset, diff_options)
             return
         elif format == 'zip':
-            self._render_zip(req, repos, diff, chgset)
+            self._render_zip(req, zipfilename, repos, diff, chgset)
             return
 
         self._render_html(req, repos, diff, chgset, diff_options)
@@ -164,29 +174,27 @@ class DiffModule(Component):
 
         edits = []
         idx = 0
-        for old_path, old_rev, new_path, new_rev, kind, change in repos.get_diffs(**diff):
-            print 'delta %d: %s %s delta from %s@%s to %s@%s' \
-                  % (idx, change, kind, old_path, old_rev, new_path, new_rev)
+        for old_node, new_node, kind, change in repos.get_diffs(**diff):
             info = {'change': change}
-            if old_path:
-                info['path.old'] = old_path
-                info['rev.old'] = old_rev
-                info['browser_href.old'] = self.env.href.browser(old_path,
-                                                                 rev=old_rev)
-            if new_path:
-                info['path.new'] = new_path
-                info['rev.new'] = new_rev
-                info['browser_href.new'] = self.env.href.browser(new_path,
-                                                                 rev=new_rev)
+            if old_node:
+                info['path.old'] = old_node.path
+                info['rev.old'] = old_node.rev # this is the created rev.
+                old_href = self.env.href.browser(old_node.path, rev=diff.old_rev)
+                # Reminder: old_node.path may not exist at old_node.rev
+                info['browser_href.old'] = old_href
+            if new_node:
+                info['path.new'] = new_node.path
+                info['rev.new'] = new_node.rev # created rev.
+                new_href = self.env.href.browser(new_node.path, rev=diff.new_rev)
+                # (same remark as above)
+                info['browser_href.new'] = new_href
             if change in (Changeset.COPY, Changeset.EDIT, Changeset.MOVE):
-                edits.append((idx, old_path, old_rev, new_path, new_rev, kind))
+                assert old_node and new_node
+                edits.append((idx, old_node, new_node, kind))
             req.hdf['diff.changes.%d' % idx] = info
             idx += 1
         
-        for idx, old_path, old_rev, new_path, new_rev, kind in edits:
-            old_node = repos.get_node(old_path, old_rev)
-            new_node = repos.get_node(new_path, new_rev)
-            
+        for idx, old_node, new_node, kind in edits:
             # Property changes
             old_props = old_node.get_properties()
             new_props = new_node.get_properties()
@@ -245,23 +253,9 @@ class DiffModule(Component):
                         'filename=Changeset%s.diff' % req.args.get('rev'))
         req.end_headers()
 
-        old_rev = diff.old_rev
-        new_rev = diff.new_rev
-        print diff
-        for old_path, new_path, kind, change in repos.get_diffs(**diff):
-            print '.diff delta : %s %s delta from %s@%s to %s@%s' \
-                  % ( change, kind, old_path, old_rev, new_path, new_rev)
-            if change == Changeset.ADD:
-                old_node = None
-            else:
-                old_node = repos.get_node(old_path, old_rev)
-            if change == Changeset.DELETE:
-                new_node = None
-            else:
-                new_node = repos.get_node(new_path, new_rev)
-
+        for old_node, new_node, kind, change in repos.get_diffs(**diff):
             # TODO: Property changes
-
+            print  old_node, new_node, kind, change 
             # Content changes
             if kind == 'dir':
                 continue
@@ -271,6 +265,8 @@ class DiffModule(Component):
             new_node_info = old_node_info = ('','')
 
             if old_node:
+                print old_node.path, old_node.rev
+                print old_node.created_path, old_node.created_rev
                 charset = mimeview.get_charset(old_node.content_type) or \
                           default_charset
                 old_content = util.to_utf8(old_node.get_content().read(),
@@ -294,7 +290,7 @@ class DiffModule(Component):
                     if option[:2] == '-U':
                         context = int(option[2:])
                         break
-                req.write('Index: ' + new_path + util.CRLF)
+                req.write('Index: ' + new_node.path + util.CRLF)
                 req.write('=' * 67 + util.CRLF)
                 req.write('--- %s (revision %s)' % old_node_info +
                           util.CRLF)
@@ -307,13 +303,13 @@ class DiffModule(Component):
                                          ignore_space_changes='-b' in diff_options[1]):
                     req.write(line + util.CRLF)
 
-    def _render_zip(self, req, repos, diff, chgset):
+    def _render_zip(self, req, filename, repos, diff, chgset):
         """ZIP archive with all the added and/or modified files."""
         new_rev = diff.new_rev
         req.send_response(200)
         req.send_header('Content-Type', 'application/zip')
         req.send_header('Content-Disposition',
-                        'filename=Changeset%s.zip' % new_rev)
+                        'filename=%s.zip' % filename)
         req.end_headers()
 
         try:
@@ -324,13 +320,13 @@ class DiffModule(Component):
 
         buf = StringIO()
         zipfile = ZipFile(buf, 'w', ZIP_DEFLATED)
-        for old_path, new_path, kind, change in repos.get_diffs(**diff):
+        for old_node, new_node, kind, change in repos.get_diffs(**diff):
             if kind == Node.FILE and change != Changeset.DELETE:
-                node = repos.get_node(new_path, new_rev)
+                assert new_node
                 zipinfo = ZipInfo()
-                zipinfo.filename = node.path
-                zipinfo.date_time = time.gmtime(node.last_modified)[:6]
+                zipinfo.filename = new_node.path
+                zipinfo.date_time = time.gmtime(new_node.last_modified)[:6]
                 zipinfo.compress_type = ZIP_DEFLATED
-                zipfile.writestr(zipinfo, node.get_content().read())
+                zipfile.writestr(zipinfo, new_node.get_content().read())
         zipfile.close()
         req.write(buf.getvalue())
