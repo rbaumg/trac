@@ -61,7 +61,7 @@ class Pool(object):
     A wrapper for a new Subversion `pool` object that ties the lifetime of the
     pool to that of a  given object.
     
-    Instances of this type return their associated `pool when called.
+    Instances of this type return their associated `pool` when called.
     """
     
     def __init__(self, parent, parent_pool=None):
@@ -298,18 +298,14 @@ class SubversionRepository(Repository):
                 expect_deletion = True
                 rev = self.previous_rev(rev)
 
-    def get_diffs(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
+    def get_deltas(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=0):
         old_node = new_node = None
         old_rev = self.normalize_rev(old_rev)
         new_rev = self.normalize_rev(new_rev)
         if self.has_node(old_path, old_rev):
             old_node = self.get_node(old_path, old_rev)
-#            old_path = old_node.created_path  # CHECK THIS CAREFULLY ONCE AGAIN
-#            old_rev = old_node.created_rev    # CHECK THIS CAREFULLY ONCE AGAIN
         if self.has_node(new_path, new_rev):
             new_node = self.get_node(new_path, new_rev)
-#            new_path = new_node.created_path  # CHECK THIS CAREFULLY ONCE AGAIN
-#            new_rev = new_node.created_rev    # CHECK THIS CAREFULLY ONCE AGAIN
         if not old_node and not new_node:
             raise TracError, ('None of the Diff arguments are valid: '
                               'neither %s in revision %s nor %s in revision %s exist '
@@ -342,7 +338,7 @@ class SubversionRepository(Repository):
                                       text_deltas,
                                       isdir and 1 or 0,
                                       entry_props,
-                                      0, #ignore_ancestry,
+                                      ignore_ancestry,
                                       self.pool)
             for path, kind, change in editor.deltas:
                 old_node = new_node = None
@@ -544,10 +540,6 @@ class DiffChangeEditor(delta.Editor):
 
     def __init__(self):
         self.deltas = []
-# FIXME
-#     def _norm(self, path):
-#         """Path are normalized to __not__ have a leading slash"""
-#         return path == '/' and path or path and path.strip('/') or ''
     
     # -- svn.delta.Editor callbacks
 
@@ -561,16 +553,14 @@ class DiffChangeEditor(delta.Editor):
         return path
 
     def change_dir_prop(self, dir_baton, name, value, pool):
-        print 'DIR EDIT'
         self.deltas.append((dir_baton, Node.DIRECTORY, Changeset.EDIT))
 
     def delete_entry(self, path, revision, dir_baton, pool):
-        self.deltas.append((path, Node.FILE, Changeset.DELETE)) # should be Node.UNKNOWN
+        self.deltas.append((path, Node.FILE, Changeset.DELETE))
 
     def add_file(self, path, dir_baton, copyfrom_path, copyfrom_revision, dir_pool):
         self.deltas.append((path, Node.FILE, Changeset.ADD))
 
     def open_file(self, path, dir_baton, dummy_rev, file_pool):
-        print 'FILE EDIT'
         self.deltas.append((path, Node.FILE, Changeset.EDIT))
 

@@ -172,9 +172,7 @@ class DiffModule(Component):
                                % (diff.old_path, diff.old_rev,
                                   diff.new_path, diff.new_rev)
 
-        edits = []
-        idx = 0
-        for old_node, new_node, kind, change in repos.get_diffs(**diff):
+        def _change_info(old_node, new_node, change):
             info = {'change': change}
             if old_node:
                 info['path.old'] = old_node.path
@@ -188,14 +186,9 @@ class DiffModule(Component):
                 new_href = self.env.href.browser(new_node.path, rev=diff.new_rev)
                 # (same remark as above)
                 info['browser_href.new'] = new_href
-            if change in (Changeset.COPY, Changeset.EDIT, Changeset.MOVE):
-                assert old_node and new_node
-                edits.append((idx, old_node, new_node, kind))
-            req.hdf['diff.changes.%d' % idx] = info
-            idx += 1
-        
-        for idx, old_node, new_node, kind in edits:
-            # Property changes
+            return info
+
+        def _prop_changes(old_node, new_node):
             old_props = old_node.get_properties()
             new_props = new_node.get_properties()
             changed_props = {}
@@ -208,23 +201,25 @@ class DiffModule(Component):
                 for k,v in new_props.items():
                     if not k in old_props:
                         changed_props[k] = {'new': v}
-                req.hdf['diff.changes.%d.props' % idx] = changed_props
+            return changed_props
 
-            if kind == Node.DIRECTORY:
-                continue
-
-            # Content changes
+        def _content_changes(old_node, new_node):
+            """
+            Returns the list of differences.
+            The list is empty when no differences between comparable files
+            are detected, but the return value is None for non-comparable files.
+            """
             default_charset = self.config.get('trac', 'default_charset')
             old_content = old_node.get_content().read()            
             if mimeview.is_binary(old_content):
-                continue
+                return None
             charset = mimeview.get_charset(old_node.content_type) or \
                       default_charset
             old_content = util.to_utf8(old_content, charset)
 
             new_content = new_node.get_content().read()
             if mimeview.is_binary(new_content):
-                continue
+                return None
             charset = mimeview.get_charset(new_node.content_type) or \
                       default_charset
             new_content = util.to_utf8(new_content, charset)
@@ -236,14 +231,35 @@ class DiffModule(Component):
                         context = int(option[2:])
                         break
                 tabwidth = int(self.config.get('diff', 'tab_width'))
-                changes = hdf_diff(old_content.splitlines(),
-                                   new_content.splitlines(),
-                                   context, tabwidth,
-                                   ignore_blank_lines='-B' in diff_options[1],
-                                   ignore_case='-i' in diff_options[1],
-                                   ignore_space_changes='-b' in diff_options[1])
-                req.hdf['diff.changes.%d.diff' % idx] = changes
+                return hdf_diff(old_content.splitlines(),
+                                new_content.splitlines(),
+                                context, tabwidth,
+                                ignore_blank_lines='-B' in diff_options[1],
+                                ignore_case='-i' in diff_options[1],
+                                ignore_space_changes='-b' in diff_options[1])
+            else:
+                return []
 
+        idx = 0
+        for old_node, new_node, kind, change in repos.get_deltas(**diff):
+            show_entry = False
+            if change in (Changeset.COPY, Changeset.EDIT, Changeset.MOVE):
+                assert old_node and new_node
+                props = _prop_changes(old_node, new_node)
+                if len(props) > 0:
+                    req.hdf['diff.changes.%d.props' % idx] = props
+                    show_entry = True
+                if kind == Node.FILE:
+                    diffs = _content_changes(old_node, new_node)
+                    if diffs == None:
+                        show_entry = True # manually compare to (previous)
+                    elif len(diffs) > 0:
+                        req.hdf['diff.changes.%d.diff' % idx] = diffs
+                        show_entry = True
+            if show_entry:
+                info = _change_info(old_node, new_node, change)
+                req.hdf['diff.changes.%d' % idx] = info
+            idx += 1 # the sequence should be immutable
 
     def _render_diff(self, req, repos, diff, chgset, diff_options):
         """Raw Unified Diff version"""
@@ -253,11 +269,11 @@ class DiffModule(Component):
                         'filename=Changeset%s.diff' % req.args.get('rev'))
         req.end_headers()
 
-        for old_node, new_node, kind, change in repos.get_diffs(**diff):
+        for old_node, new_node, kind, change in repos.get_deltas(**diff):
             # TODO: Property changes
-            print  old_node, new_node, kind, change 
+
             # Content changes
-            if kind == 'dir':
+            if kind == Node.DIRECTORY:
                 continue
 
             default_charset = self.config.get('trac', 'default_charset')
@@ -272,8 +288,8 @@ class DiffModule(Component):
                 old_content = util.to_utf8(old_node.get_content().read(),
                                            charset)
                 old_node_info = (old_node.path, old_node.rev)
-            if mimeview.is_binary(old_content):
-                continue
+                if mimeview.is_binary(old_content):
+                    continue
 
             if new_node:
                 charset = mimeview.get_charset(new_node.content_type) or \
@@ -281,8 +297,14 @@ class DiffModule(Component):
                 new_content = util.to_utf8(new_node.get_content().read(),
                                            charset)
                 new_node_info = (new_node.path, new_node.rev)
-            if mimeview.is_binary(new_content):
-                continue
+                if mimeview.is_binary(new_content):
+                    continue
+                new_path = new_node.path
+            else:
+                old_node_path = repos.normalize_path(old_node.path)
+                diff_old_path = repos.normalize_path(diff.old_path)
+                new_path = posixpath.join(diff.new_path,
+                                          old_node_path[len(diff_old_path)+1:])
 
             if old_content != new_content:
                 context = 3
@@ -290,7 +312,7 @@ class DiffModule(Component):
                     if option[:2] == '-U':
                         context = int(option[2:])
                         break
-                req.write('Index: ' + new_node.path + util.CRLF)
+                req.write('Index: ' + new_path + util.CRLF)
                 req.write('=' * 67 + util.CRLF)
                 req.write('--- %s (revision %s)' % old_node_info +
                           util.CRLF)
@@ -320,7 +342,7 @@ class DiffModule(Component):
 
         buf = StringIO()
         zipfile = ZipFile(buf, 'w', ZIP_DEFLATED)
-        for old_node, new_node, kind, change in repos.get_diffs(**diff):
+        for old_node, new_node, kind, change in repos.get_deltas(**diff):
             if kind == Node.FILE and change != Changeset.DELETE:
                 assert new_node
                 zipinfo = ZipInfo()
