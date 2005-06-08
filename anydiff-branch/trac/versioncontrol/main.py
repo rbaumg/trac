@@ -168,8 +168,21 @@ class Node(object):
         node (if the underlying version control system supports that), which
         will be indicated by the first element of the tuple (i.e. the path)
         changing.
+        Starts with an entry for the current revision.
         """
         raise NotImplementedError
+
+    def get_previous(self):
+        """
+        Return the (path, rev, chg) tuple corresponding to the previous
+        revision for that node.
+        """
+        skip = True
+        for p in self.get_history(2):
+            if skip:
+                skip = False
+            else:
+                return p
 
     def get_properties(self):
         """

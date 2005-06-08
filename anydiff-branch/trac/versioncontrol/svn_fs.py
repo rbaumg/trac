@@ -327,11 +327,9 @@ class SubversionRepository(Repository):
             e_ptr, e_baton = delta.make_editor(editor, self.pool)
             old_root = fs.revision_root(self.fs_ptr, old_rev, self.pool)
             new_root = fs.revision_root(self.fs_ptr, new_rev, self.pool)
-            old_dir, old_entry = old_path, ''
             def authz_cb(root, path, pool): return 1
             text_deltas = 0 # as this is currently re-done in Diff.py...
             entry_props = 0 # ("... typically used only for working copy updates")
-            print 'svn_repos_dir_delta: ', old_dir, old_entry, ' -vs.- ', new_path
             repos.svn_repos_dir_delta(old_root, old_path, '',
                                       new_root, new_path,
                                       e_ptr, e_baton, authz_cb,
@@ -433,6 +431,9 @@ class SubversionNode(Node):
                 newer = older
         if newer:
             yield newer
+
+#    def get_previous(self):
+#        # FIXME: redo it with fs.node_history
 
     def get_properties(self):
         props = fs.node_proplist(self.root, self.scoped_path, self.pool)

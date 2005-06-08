@@ -53,77 +53,117 @@ class DiffModule(Component):
             return 1
 
     def process_request(self, req):
+        """
+        There are different request parameters combinations,
+        which corresponds to different (chgset,restricted) pairs:
+         * only the path: latest changeset for that path
+           (chgset=True,restricted=False)
+         * the path and the rev: changeset for that path in that revision
+           (chgset=True,restricted=True)
+         * the path, old and new: diffs from path@old to path@new
+           (chgset=False,restricted=True)
+         * the old_path, old, path and new: diffs from old_path@old to path@new
+           (chgset=False,restricted=False)
+           
+        In any case, the given path@rev pair must exist.
+        """
         req.perm.assert_permission(perm.CHANGESET_VIEW)
 
+        # -- retrieve arguments
         path = req.args.get('path')
-        repos = self.env.get_repository(req.authname)
-        path = repos.normalize_path(path)
-        rev = req.args.get('rev', repos.youngest_rev) # 'path history' mode
-        old = req.args.get('old')                     # 'arbitrary diff' mode
+        rev = req.args.get('rev')       # ''Last changes'' mode
+        old = req.args.get('old')       # ''Arbitrary Diff'' mode
         new = req.args.get('new')
         old_path = req.args.get('old_path', path)
-        if old_path == path and old == new: # force 'path history' mode
-            print "force 'path history' mode"
+
+        # -- normalize and check for special case
+        repos = self.env.get_repository(req.authname)
+        path = repos.normalize_path(path)
+        rev = repos.normalize_rev(rev)
+        old_path = repos.normalize_path(old_path)
+        
+        if old_path == path and old and old == new: # ''Last Changes'' mode
             rev = old
             old_path = old = new = None
 
         diff_options = get_diff_options(req)
-        if req.args.has_key('update'):
-            if old or new:
-                req.redirect(self.env.href.diff(path, new=new, old_path=old_path, old=old))
-            else:
-                req.redirect(self.env.href.diff(path, rev=rev))
 
-        rpath = path.replace('/','_') # for the .zip filename
-        if old or new:
-            chgset = None
+        # -- setup the view mode (chgset,restricted)
+        chgset = not old and not new
+        if chgset:                      # -- ''Arbitrary Diff'' mode
+            restricted = path != '' and path != '/' # (subset or not)
+        else:                           # -- ''Last Changes'' mode
+            restricted = old_path == path # (same path or not)
+
+        # -- redirect if changing the diff options
+        if req.args.has_key('update'):
+            if chgset:
+                req.redirect(self.env.href.diff(path, rev=rev))
+            else:
+                req.redirect(self.env.href.diff(path, new=new,
+                                                old_path=old_path, old=old))
+
+        # -- preparing the diff arguments
+        if chgset:
+            prev = repos.get_node(path, rev).get_previous()
+            if prev:
+                prev_path, prev_rev = prev[:2]
+            else:
+                prev_path, prev_rev = path, repos.previous_rev(rev)
+            diff_args = Diff(old_path=prev_path, old_rev=prev_rev,
+                             new_path=path, new_rev=rev)
+        else:
             if not new:
                 new = repos.youngest_rev
             elif not old:
                 old = repos.youngest_rev
             if not old_path:
                 old_path = path
-            diff = Diff(old_path=old_path, old_rev=old,
-                        new_path=path, new_rev=new)
-            diffargs = 'new=%s&old_path=%s&old=%s' \
-                       % (new, old_path, old)
-            reverse_href = self.env.href.diff(old_path,new=old,
-                                              old_path=path,old=new)
-            if old_path != path:
-                if old_path == '/':
-                    zipfilename = '%s-r%s' % (rpath, old)
-                else:
-                    zipfilename = 'diff-%s-r%s-%s-r%s' \
-                                  % (old_path.replace('/','_'), old, rpath, new)
-            else:
-                zipfilename = 'diff-%s-r%s-to-r%s' % (rpath, old, new)
-        else:
-            chgset = repos.get_changeset(rev)
-            diff = Diff(old_path=path, old_rev=repos.previous_rev(rev),
-                        new_path=path, new_rev=rev)
-            diffargs = 'rev=%s' % rev
-            reverse_href = None
-            zipfilename = 'diff_%s_r%s' % (rpath, rev)
-            
-        # TODO:
-#         req.check_modified(chgset.date,
-#                            diff_options[0] + ''.join(diff_options[1]))
-        req.hdf['diff'] = diff
-        if reverse_href:
-            req.hdf['diff.reverse_href'] = reverse_href
-            
+            diff_args = Diff(old_path=old_path, old_rev=old,
+                             new_path=path, new_rev=new)
+
+# FIXME: what date should we choose for a diff?
+#        req.check_modified(chgset.date,
+#                           diff_options[0] + ''.join(diff_options[1]))
+
+        req.hdf['diff'] = diff_args
+
+        # -- .diff and .zip formats
         format = req.args.get('format')
         if format == 'diff':
-            self._render_diff(req, repos, diff, chgset, diff_options)
+            self._render_diff(req, repos, diff_args, diff_options)
             return
         elif format == 'zip':
-            self._render_zip(req, zipfilename, repos, diff, chgset)
+            # choosing an appropriate filename for the .zip
+            rpath = path.replace('/','_')
+            if chgset:
+                if restricted:
+                    zipfilename = 'changeset_%s_r%s' % (rpath, rev)
+                else:
+                    zipfilename = 'changeset_r%s' % rev
+            else:
+                if restricted:
+                    if old_path == '/': # special case for download (#238)
+                        zipfilename = '%s-r%s' % (rpath, old)
+                    else:
+                        zipfilename = 'diff-%s-r%s-%s-r%s' \
+                                      % (old_path.replace('/','_'), old,
+                                         rpath, new)
+                else:
+                    zipfilename = 'diff-%s-r%s-to-r%s' % (rpath, old, new)
+            self._render_zip(req, zipfilename, repos, diff_args)
             return
 
-        self._render_html(req, repos, diff, chgset, diff_options)
-        add_link(req, 'alternate', '?format=diff&'+diffargs, 'Unified Diff',
+        # -- HTML format
+        self._render_html(req, repos, chgset, restricted,
+                          diff_args, diff_options)
+        if chgset:
+            diff_params = 'rev=%s' % rev
+        else:
+            diff_params = 'new=%s&old_path=%s&old=%s' % (new, old_path, old)
+        add_link(req, 'alternate', '?format=diff&'+diff_params, 'Unified Diff',
                  'text/plain', 'diff')
-        add_link(req, 'alternate', '?format=zip&'+diffargs, 'Zip Archive',
+        add_link(req, 'alternate', '?format=zip&'+diff_params, 'Zip Archive',
                  'application/zip', 'zip')
         add_stylesheet(req, 'changeset.css')
         add_stylesheet(req, 'diff.css')
@@ -132,16 +172,25 @@ class DiffModule(Component):
 
     # Internal methods
 
-    def _render_html(self, req, repos, diff, chgset, diff_options):
-        """HTML version"""
+    def _render_html(self, req, repos, chgset, restricted, diff, diff_options):
+        """
+        HTML version
+        """
         req.hdf['diff.href'] = {
             'new_rev': self.env.href.changeset(diff.new_rev),
             'old_rev': self.env.href.changeset(diff.old_rev),
             'new_path': self.env.href.browser(diff.new_path, rev=diff.new_rev),
             'old_path': self.env.href.browser(diff.old_path, rev=diff.old_rev)
             }
-        if chgset: # 'path history' mode
-            req.hdf['title'] = 'Changes for %s at Revision %s' % (diff.new_path, chgset.rev)
+        if chgset:
+            path, rev = diff.new_path, diff.new_rev
+            chgset = repos.get_changeset(rev)
+            def _changeset(rev):
+                if restricted:
+                    return 'Changeset %s for %s' % (rev, path)
+                else:
+                    return 'Changeset %s' % rev
+            title = _changeset(rev)
             req.hdf['changeset'] = {
                 'revision': chgset.rev,
                 'time': time.strftime('%c', time.localtime(chgset.date)),
@@ -149,41 +198,66 @@ class DiffModule(Component):
                 'message': wiki_to_html(chgset.message or '--', self.env, req,
                                         escape_newlines=True)
                 }
-
             oldest_rev = repos.oldest_rev
             if chgset.rev != oldest_rev:
-                add_link(req, 'first', self.env.href.diff(diff.old_path, rev=oldest_rev),
-                         'Changeset %s' % oldest_rev) # FIXME (use the history)
-                previous_rev = repos.previous_rev(chgset.rev)
-                add_link(req, 'prev', self.env.href.diff(diff.old_path, rev=previous_rev),
-                         'Changeset %s' % previous_rev)
+                if restricted:
+                    prev = repos.get_node(path, rev).get_previous()
+                    if prev:
+                        prev_path, prev_rev = prev[:2]
+                    else:
+                        prev_path = prev_rev = None
+                else:
+                    prev_path = diff.old_path
+                    prev_rev = repos.previous_rev(chgset.rev)
+                    add_link(req, 'first',
+                             self.env.href.diff(diff.old_path, rev=oldest_rev),
+                             'Changeset %s' % oldest_rev)
+                if prev_rev:
+                    add_link(req, 'prev',
+                             self.env.href.diff(prev_path, rev=prev_rev),
+                             _changeset(prev_rev))
             youngest_rev = repos.youngest_rev
             if str(chgset.rev) != str(youngest_rev):
-                next_rev = repos.next_rev(chgset.rev)
-                add_link(req, 'next', self.env.href.diff(diff.new_path, rev=next_rev),
-                         'Changeset %s' % next_rev)
-                add_link(req, 'last', self.env.href.diff(diff.new_path, rev=youngest_rev),
-                         'Changeset %s' % youngest_rev)
-        elif diff.new_path == diff.old_path: # 'diff between 2 revisions' mode
-            req.hdf['title'] = 'Diff r%s:%s for %s' \
-                               % (diff.old_rev, diff.new_rev, diff.new_path)
-        else:                           # 'arbitrary diff' mode
-            req.hdf['title'] = 'Diff from %s @ %s to %s @ %s' \
-                               % (diff.old_path, diff.old_rev,
-                                  diff.new_path, diff.new_rev)
+                if restricted:
+                    pass # FIXME: find an effective way to find the next rev
+                else:
+                    next_rev = repos.next_rev(chgset.rev)
+                    add_link(req, 'last',
+                             self.env.href.diff(path, rev=youngest_rev),
+                             'Changeset %s' % youngest_rev)
+                    add_link(req, 'next',
+                             self.env.href.diff(path, rev=next_rev),
+                             _changeset(next_rev)) # FIXME << (see above)
+        else:
+            reverse_href = self.env.href.diff(diff.old_path, new=diff.old_rev,
+                                              old_path=diff.new_path, old=diff.new_rev)
+            req.hdf['diff.reverse_href'] = reverse_href
+            if restricted:              # 'diff between 2 revisions' mode
+                title = 'Diff r%s:%s for %s' % (diff.old_rev, diff.new_rev,
+                                                diff.new_path)
+            else:                       # 'arbitrary diff' mode
+                title = 'Diff from %s @ %s to %s @ %s' % (diff.old_path, diff.old_rev,
+                                                          diff.new_path, diff.new_rev)
+        req.hdf['title'] = title
+        req.hdf['diff'] = {
+            'chgset': chgset,
+            'restricted': restricted
+            }
 
         def _change_info(old_node, new_node, change):
             info = {'change': change}
             if old_node:
                 info['path.old'] = old_node.path
                 info['rev.old'] = old_node.rev # this is the created rev.
-                old_href = self.env.href.browser(old_node.path, rev=diff.old_rev)
+                old_href = self.env.href.browser(old_node.path,
+                                                 rev=diff.old_rev)
                 # Reminder: old_node.path may not exist at old_node.rev
                 info['browser_href.old'] = old_href
             if new_node:
                 info['path.new'] = new_node.path
                 info['rev.new'] = new_node.rev # created rev.
-                new_href = self.env.href.browser(new_node.path, rev=diff.new_rev)
+                new_href = self.env.href.browser(new_node.path,
+                                                 rev=diff.new_rev)
                 # (same remark as above)
                 info['browser_href.new'] = new_href
             return info
@@ -253,7 +327,7 @@ class DiffModule(Component):
                     show_entry = True
                 if kind == Node.FILE:
                     diffs = _content_changes(old_node, new_node)
-                    if diff != []:
+                    if diffs != []:
                         if diffs:
                             req.hdf['diff.changes.%d.diff' % idx] = diffs
                         # elif None (i.e. binary) manually compare to (previous)
@@ -263,7 +337,7 @@ class DiffModule(Component):
                 req.hdf['diff.changes.%d' % idx] = info
             idx += 1 # the sequence should be immutable
 
-    def _render_diff(self, req, repos, diff, chgset, diff_options):
+    def _render_diff(self, req, repos, diff, diff_options):
         """Raw Unified Diff version"""
         req.send_response(200)
         req.send_header('Content-Type', 'text/plain;charset=utf-8')
@@ -327,7 +401,7 @@ class DiffModule(Component):
                                          ignore_space_changes='-b' in diff_options[1]):
                     req.write(line + util.CRLF)
 
-    def _render_zip(self, req, filename, repos, diff, chgset):
+    def _render_zip(self, req, filename, repos, diff):
         """ZIP archive with all the added and/or modified files."""
         new_rev = diff.new_rev
         req.send_response(200)

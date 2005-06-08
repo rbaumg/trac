@@ -27,30 +27,36 @@
 
 <div id="content" class="changeset">
  <div id="title"><?cs
-  if:len(changeset) > #0 ?>
-   <h1>Changes for <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
-    <?cs var:diff.new_path ?></a> 
-   in Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
-    <?cs var:diff.new_rev ?></a>
-   </h1><?cs
-  elif:diff.new_path == diff.old_path ?>
-   <h1>Changes in <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
-     <?cs var:diff.new_path ?></a>
-    from Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
-     <?cs var:diff.old_rev ?></a>
-    to Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
+  if:diff.chgset ?><?cs
+   if:diff.restricted ?>
+    <h1>Changeset <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
+      <?cs var:diff.new_rev ?></a> 
+     for <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
+      <?cs var:diff.new_path ?></a> 
+    </h1><?cs
+   else ?>
+    <h1>Changeset <?cs var:diff.new_rev ?></h1><?cs
+   /if ?><?cs
+  else ?><?cs
+    if:diff.restricted ?>
+    <h1>Changes in <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
+      <?cs var:diff.new_path ?></a>
+     from Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
+      <?cs var:diff.old_rev ?></a>
+     to Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
+      <?cs var:diff.new_rev ?></a>
+    </h1><?cs
+   else ?>
+    <h1>Changes from <a title="Show entry in browser" href="<?cs var:diff.href.old_path ?>">
+      <?cs var:diff.old_path ?></a> 
+     at Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
+      <?cs var:diff.old_rev ?></a>
+     to <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
+     <?cs var:diff.new_path ?></a> 
+    at Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
      <?cs var:diff.new_rev ?></a>
-   </h1><?cs
-  else ?>
-   <h1>Changes from <a title="Show entry in browser" href="<?cs var:diff.href.old_path ?>">
-     <?cs var:diff.old_path ?></a> 
-    at Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
-     <?cs var:diff.old_rev ?></a>
-    to <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
-    <?cs var:diff.new_path ?></a> 
-   at Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
-    <?cs var:diff.new_rev ?></a>
-   </h1><?cs
+    </h1><?cs
+   /if ?><?cs
   /if ?>
  </div>
 
@@ -134,7 +140,7 @@
 <?cs /def ?>
 
 <dl id="overview"><?cs
- if:len(changeset) > #0 ?>
+ if:diff.chgset ?>
  <dt class="time">Timestamp:</dt>
  <dd class="time"><?cs var:changeset.time ?></dd>
  <dt class="author">Author:</dt>

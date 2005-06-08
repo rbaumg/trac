@@ -4,7 +4,7 @@
 
 <div id="ctxtnav" class="nav">
  <ul>
-  <li class="first"><a href="<?cs var:browser.diff_href ?>">Diff to previous</a></li>
+  <li class="first"><a href="<?cs var:browser.diff_href ?>">Last Changes</a></li>
   <li class="last"><a href="<?cs var:browser.log_href ?>">Revision Log</a></li>
  </ul>
 </div>
