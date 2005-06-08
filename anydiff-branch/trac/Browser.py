@@ -196,10 +196,11 @@ class BrowserModule(Component):
 
         req.hdf['browser.items'] = info
         req.hdf['browser.changes'] = changes
-        zip_href = self.env.href.diff(node.path, new=rev, old=rev, old_path='/',
-                                      format='zip')
-        add_link(req, 'alternate', zip_href, 'Zip Archive',
-                 'application/zip', 'zip')
+        if node.path != '':
+            zip_href = self.env.href.diff(node.path, new=rev, old=rev, old_path='/',
+                                          format='zip')
+            add_link(req, 'alternate', zip_href, 'Zip Archive',
+                     'application/zip', 'zip')
         
         
     def _render_file(self, req, repos, node, rev=None):

@@ -242,19 +242,21 @@ class DiffModule(Component):
 
         idx = 0
         for old_node, new_node, kind, change in repos.get_deltas(**diff):
-            show_entry = False
-            if change in (Changeset.COPY, Changeset.EDIT, Changeset.MOVE):
+            if change in (Changeset.ADD, Changeset.DELETE):
+                show_entry = True
+            else:
+                show_entry = False
                 assert old_node and new_node
                 props = _prop_changes(old_node, new_node)
-                if len(props) > 0:
+                if props:
                     req.hdf['diff.changes.%d.props' % idx] = props
                     show_entry = True
                 if kind == Node.FILE:
                     diffs = _content_changes(old_node, new_node)
-                    if diffs == None:
-                        show_entry = True # manually compare to (previous)
-                    elif len(diffs) > 0:
-                        req.hdf['diff.changes.%d.diff' % idx] = diffs
+                    if diff != []:
+                        if diffs:
+                            req.hdf['diff.changes.%d.diff' % idx] = diffs
+                        # elif None (i.e. binary) manually compare to (previous)
                         show_entry = True
             if show_entry:
                 info = _change_info(old_node, new_node, change)

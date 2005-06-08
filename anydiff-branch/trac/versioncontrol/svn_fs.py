@@ -341,6 +341,7 @@ class SubversionRepository(Repository):
                                       ignore_ancestry,
                                       self.pool)
             for path, kind, change in editor.deltas:
+                print '%s %s' % (kind, change)
                 old_node = new_node = None
                 if change != Changeset.ADD:
                     old_node = self.get_node(posixpath.join(old_path, path), old_rev)
@@ -348,7 +349,10 @@ class SubversionRepository(Repository):
                     new_node = self.get_node(posixpath.join(new_path, path), new_rev)
                 else:
                     kind = _kindmap[fs.check_path(old_root, old_node.path, self.pool)]
-                # TODO: filter out abusive root entries? (those with no real propchanges)
+                print 'from %s@%s to %s@%s' % (old_node and old_node.path or '--',
+                                               old_node and old_node.rev or '--',
+                                               new_node and new_node.path or '--',
+                                               new_node and new_node.rev or '--')
                 yield  (old_node, new_node, kind, change)
         else:
             if new_node and old_node:
@@ -544,19 +548,20 @@ class DiffChangeEditor(delta.Editor):
     # -- svn.delta.Editor callbacks
 
     def open_root(self, base_revision, dir_pool):
-        return '/'
+        return ('/', Changeset.EDIT)
 
     def add_directory(self, path, dir_baton, copyfrom_path, copyfrom_rev, dir_pool):
-        return path
+        return (path, Changeset.ADD)
 
     def open_directory(self, path, dir_baton, base_revision, dir_pool):
-        return path
+        return (path, dir_baton[1])
 
     def change_dir_prop(self, dir_baton, name, value, pool):
-        self.deltas.append((dir_baton, Node.DIRECTORY, Changeset.EDIT))
+        path, change = dir_baton
+        self.deltas.append((path, Node.DIRECTORY, change))
 
     def delete_entry(self, path, revision, dir_baton, pool):
-        self.deltas.append((path, Node.FILE, Changeset.DELETE))
+        self.deltas.append((path, None, Changeset.DELETE))
 
     def add_file(self, path, dir_baton, copyfrom_path, copyfrom_revision, dir_pool):
         self.deltas.append((path, Node.FILE, Changeset.ADD))
