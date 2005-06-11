@@ -2,7 +2,7 @@
 <?cs include "macros.cs"?>
 
 <div id="ctxtnav" class="nav">
- <h2>Diff Navigation</h2><?cs
+ <h2><?cs var:diff_or_changeset ?> Navigation</h2><?cs
  with:links = chrome.links ?>
   <ul><?cs
    if:diff.reverse_href ?>
@@ -11,13 +11,13 @@
     if:len(links.prev) ?>
      <li class="first<?cs if:!len(links.next) ?> last<?cs /if ?>">
       <a class="prev" href="<?cs var:links.prev.0.href ?>" title="<?cs
-        var:links.prev.0.title ?>">Previous Diff</a>
+        var:links.prev.0.title ?>">Previous <?cs var:diff_or_changeset ?></a>
      </li><?cs
     /if ?><?cs
     if:len(links.next) ?>
      <li class="<?cs if:len(links.prev) ?>first <?cs /if ?>last">
       <a class="next" href="<?cs var:links.next.0.href ?>" title="<?cs
-        var:links.next.0.title ?>">Next Diff</a>
+        var:links.next.0.title ?>">Next <?cs var:diff_or_changeset ?></a>
      </li><?cs
     /if ?><?cs
    /if ?>
@@ -67,10 +67,12 @@
 /each ?><?cs if:has_diffs || diff.options.ignoreblanklines 
   || diff.options.ignorecase || diff.options.ignorewhitespace ?>
 <form method="post" id="prefs" action="">
- <div>
-  <input type="hidden" name="old_path" value="<?cs var:diff.old_path ?>" />
-  <input type="hidden" name="old" value="<?cs var:diff.old_rev ?>" />
-  <input type="hidden" name="new" value="<?cs var:diff.new_rev ?>" />
+ <div><?cs 
+  if:!diff.chgset ?>
+   <input type="hidden" name="old_path" value="<?cs var:diff.old_path ?>" />
+   <input type="hidden" name="old" value="<?cs var:diff.old_rev ?>" />
+   <input type="hidden" name="new" value="<?cs var:diff.new_rev ?>" /><?cs
+  /if ?>
   <label for="style">View differences</label>
   <select id="style" name="style">
    <option value="inline"<?cs

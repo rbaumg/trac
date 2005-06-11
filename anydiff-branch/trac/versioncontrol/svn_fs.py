@@ -339,7 +339,6 @@ class SubversionRepository(Repository):
                                       ignore_ancestry,
                                       self.pool)
             for path, kind, change in editor.deltas:
-                print '%s %s' % (kind, change)
                 old_node = new_node = None
                 if change != Changeset.ADD:
                     old_node = self.get_node(posixpath.join(old_path, path), old_rev)
@@ -347,10 +346,6 @@ class SubversionRepository(Repository):
                     new_node = self.get_node(posixpath.join(new_path, path), new_rev)
                 else:
                     kind = _kindmap[fs.check_path(old_root, old_node.path, self.pool)]
-                print 'from %s@%s to %s@%s' % (old_node and old_node.path or '--',
-                                               old_node and old_node.rev or '--',
-                                               new_node and new_node.path or '--',
-                                               new_node and new_node.rev or '--')
                 yield  (old_node, new_node, kind, change)
         else:
             if new_node and old_node:
