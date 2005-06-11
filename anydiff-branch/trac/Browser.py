@@ -24,7 +24,7 @@ import time
 
 from trac import perm, util
 from trac.core import *
-from trac.mimeview import get_mimetype, Mimeview
+from trac.mimeview import get_mimetype, is_binary, Mimeview
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner
@@ -228,9 +228,11 @@ class BrowserModule(Component):
         else:
             charset = self.config.get('trac', 'default_charset')
 
-        if req.args.get('format') == 'raw':
+        format = req.args.get('format')
+        if format in ['raw', 'txt']:
             req.send_response(200)
-            req.send_header('Content-Type', mime_type)
+            req.send_header('Content-Type',
+                            format == 'txt' and 'text/plain' or mime_type)
             req.send_header('Content-Length', node.content_length)
             req.send_header('Last-Modified', util.http_date(node.last_modified))
             req.end_headers()
@@ -244,21 +246,30 @@ class BrowserModule(Component):
 
         else:
             # Generate HTML preview
-            content = util.to_utf8(node.get_content().read(DISP_MAX_FILE_SIZE),
-                                   charset)
+            content = node.get_content().read(DISP_MAX_FILE_SIZE)
+            if not is_binary(content):
+                content = util.to_utf8(content, charset)
+                if mime_type != 'text/plain':
+                    plain_href = self.env.href.browser(node.path,
+                                                       rev=rev and node.rev,
+                                                       format='txt')
+                    add_link(req, 'alternate', plain_href, 'Plain Text',
+                             'text/plain')
             if len(content) == DISP_MAX_FILE_SIZE:
                 req.hdf['file.max_file_size_reached'] = 1
                 req.hdf['file.max_file_size'] = DISP_MAX_FILE_SIZE
                 preview = ' '
             else:
                 preview = Mimeview(self.env).render(req, mime_type, content,
-                                                    node.name, node.rev)
+                                                    node.name, node.rev,
+                                                    annotations=['lineno'])
             req.hdf['file.preview'] = preview
 
             raw_href = self.env.href.browser(node.path, rev=rev and node.rev,
                                              format='raw')
             req.hdf['file.raw_href'] = raw_href
             add_link(req, 'alternate', raw_href, 'Original Format', mime_type)
+
             add_stylesheet(req, 'code.css')
 
 

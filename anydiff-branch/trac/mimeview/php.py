@@ -22,6 +22,8 @@
 #         Christopher Lenz <cmlenz@gmx.de>
 #
 
+from __future__ import generators
+
 from trac.core import *
 from trac.mimeview.api import IHTMLPreviewRenderer
 from trac.util import Deuglifier, NaivePopen
@@ -66,11 +68,14 @@ class PHPRenderer(Component):
 
         np = NaivePopen(cmdline, content, capturestderr=1)
         if np.errorlevel or np.err:
-            err = 'Running (%s) failed: %s, %s.' % (cmdline, np.errorlevel, np.err)
+            err = 'Running (%s) failed: %s, %s.' % (cmdline, np.errorlevel,
+                                                    np.err)
             raise Exception, err
         odata = np.out
 
         # Strip header
-        beg = odata.find('<code>')
-        odata = PhpDeuglifier().format(odata[beg:])
-        return '<div class="code-block">' + odata + '</div>'
+        html = PhpDeuglifier().format(odata.splitlines()[1])
+        for line in html.split('<br />'):
+            # PHP generates _way_ too many non-breaking spaces...
+            # We don't need them anyway, so replace them by normal spaces
+            yield line.replace('&nbsp;', ' ')
