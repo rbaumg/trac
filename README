@@ -3,13 +3,14 @@ cboos on #trac
 
 See the wiki page ChristianBoos for more info.
 
-
-== TODO ==
+== DONE ==
 
 === Category Branch ===
 
-It's in trunk, except for source:trunk/contrib/sourceforge2trac.py
+The TicketTypes feature was integrated in the trunk in r1691. 
 
+
+== TODO ==
 
 === InterTrac Branch ===
 
@@ -37,10 +38,5 @@ Depends on the XRef branch...
 
 === Anydiff Branch ===
 
-This is a little side work, initially thought to be done
-as patches and then ported on the trunk, as I did for the
-revision log enhancements, but it's more convenient to polish it 
-on a branch first, mainly because I'm still undecided if 
-it's worth keeping a separate  Diff.py/diff.cs or if I merge
-everything back in Changeset.py/changeset.cs
-
+ * The link syntax described in #199 will be done
+   using an IWikiLinkProvider (depends on InterTrac branch).
