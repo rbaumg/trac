@@ -74,8 +74,6 @@ class FileCommon(Module.Module):
         self.req.send_header('Content-Type', self.mime_type)
         self.req.send_header('Content-Length', str(self.length))
         self.req.send_header('Last-Modified', self.last_modified)
-        self.req.send_header('Pragma', 'no-cache')
-        self.req.send_header('Expires', 'Mon, 26 Jul 1997 05:00:00 GMT')
         self.req.end_headers()
         i = 0
         while 1:
@@ -306,9 +304,9 @@ class File(FileCommon):
             util.escape(self.env.href.log(self.path, self.rev)))
 
         # Try to do an educated guess about the mime-type
-        self.mime_type = svn.fs.node_prop (root, self.path,
-                                           svn.util.SVN_PROP_MIME_TYPE,
-                                           self.pool)
+        self.mime_type = svn.fs.node_prop(root, self.path,
+                                          svn.core.SVN_PROP_MIME_TYPE,
+                                          self.pool)
         if not self.mime_type:
             self.mime_type = self.env.mimeview.get_mimetype(filename=self.path) or \
                              'text/plain'
@@ -323,9 +321,9 @@ class File(FileCommon):
 
         self.length = svn.fs.file_length(root, self.path, self.pool)
         date = svn.fs.revision_prop(self.fs_ptr, self.rev,
-                                svn.util.SVN_PROP_REVISION_DATE, self.pool)
-        date_seconds = svn.util.svn_time_from_cstring(date, self.pool) / 1000000
+                                    svn.core.SVN_PROP_REVISION_DATE, self.pool)
+        date_seconds = svn.core.svn_time_from_cstring(date, self.pool) / 1000000
         self.last_modified = time.strftime("%a, %d %b %Y %H:%M:%S GMT",
-                                      time.gmtime(date_seconds))
+                                           time.gmtime(date_seconds))
         fd = svn.fs.file_contents(root, self.path, self.pool)
-        self.read_func = lambda x, f=fd: svn.util.svn_stream_read(f, x)
+        self.read_func = lambda x, f=fd: svn.core.svn_stream_read(f, x)
