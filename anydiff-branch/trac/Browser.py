@@ -61,7 +61,7 @@ def _get_changes(env, repos, revs, full=None, req=None, format=None):
         }
     return changes
 
-def _get_path_links(href, path, rev):
+def _get_path_links(href, path, rev, old_path=None, old_rev=None):
     links = []
     parts = path.split('/')
     if not parts[-1]:
@@ -71,26 +71,10 @@ def _get_path_links(href, path, rev):
         path = path + part + '/'
         links.append({
             'name': part or 'root',
-            'href': href.browser(path, rev=rev)
+            'href': href.browser(path, rev=rev, old_path=old_path, old_rev=old_rev)
         })
     return links
 
-def _anydiff_support(env, req, path, rev):
-    action = req.args.get('diff')
-    req.hdf['diff.href'] = env.href.diff(path)
-    if action == 'set':
-        req.session['diff_base_path'] = path
-        req.session['diff_base_rev'] = rev
-
-    if req.session.has_key('diff_base_path'):
-        if action == 'clear':
-            del req.session['diff_base_path']
-            del req.session['diff_base_rev']
-        else:
-            req.hdf['session'] = {
-                'diff_base_path': req.session['diff_base_path'],
-                'diff_base_rev': req.session['diff_base_rev']
-                }
 
 class BrowserModule(Component):
 
@@ -126,6 +110,7 @@ class BrowserModule(Component):
 
         repos = self.env.get_repository(req.authname)
         node = repos.get_node(path, rev)
+        rev = repos.normalize_rev(rev)
 
         req.hdf['title'] = path
         req.hdf['browser'] = {
@@ -138,16 +123,28 @@ class BrowserModule(Component):
             'log_href': self.env.href.log(path)
         }
 
-        _anydiff_support(self.env, req, path, rev or repos.youngest_rev)
+        # Diff support:
+        action = req.args.get('diff')
+        old_path = req.args.get('old_path')
+        old_rev = req.args.get('old_rev', rev or repos.youngest_rev)
+        req.hdf['diff.href'] = self.env.href.diff(path)
+        if action == 'replace':
+            old_path = path
+        elif action == 'cancel':
+            old_path = None
+        if old_path:
+            req.hdf['browser'] = { 'old_path': old_path, 'old_rev': old_rev }
+        else:
+            old_rev = None
 
-        path_links = _get_path_links(self.env.href, path, rev)
+        path_links = _get_path_links(self.env.href, path, rev, old_path, old_rev)
         if len(path_links) > 1:
             add_link(req, 'up', path_links[-2]['href'], 'Parent directory')
         req.hdf['browser.path'] = path_links
 
         if node.isdir:
             req.hdf['browser.is_dir'] = True
-            self._render_directory(req, repos, node, rev)
+            self._render_directory(req, repos, node, rev, old_path, old_rev)
         else:
             self._render_file(req, repos, node, rev)
 
@@ -156,7 +153,7 @@ class BrowserModule(Component):
 
     # Internal methods
 
-    def _render_directory(self, req, repos, node, rev=None):
+    def _render_directory(self, req, repos, node, rev=None, old_path=None, old_rev=None):
         req.perm.assert_permission(perm.BROWSER_VIEW)
 
         order = req.args.get('order', 'name').lower()
@@ -176,7 +173,8 @@ class BrowserModule(Component):
                 'rev': entry.rev,
                 'permission': 1, # FIXME
                 'log_href': self.env.href.log(entry.path, rev=rev),
-                'browser_href': self.env.href.browser(entry.path, rev=rev)
+                'browser_href': self.env.href.browser(entry.path, rev=rev,
+                                                      old_path=old_path, old_rev=old_rev)
             })
         changes = _get_changes(self.env, repos, [i['rev'] for i in info])
 
@@ -197,7 +195,8 @@ class BrowserModule(Component):
         req.hdf['browser.items'] = info
         req.hdf['browser.changes'] = changes
         if node.path != '':
-            zip_href = self.env.href.diff(node.path, new=rev, old=rev, old_path='/',
+            zip_href = self.env.href.diff(node.path, new=rev, old=rev,
+                                          old_path='/', # special case (#238)
                                           format='zip')
             add_link(req, 'alternate', zip_href, 'Zip Archive',
                      'application/zip', 'zip')
@@ -310,8 +309,14 @@ class LogModule(Component):
         repos = self.env.get_repository(req.authname)
         normpath = repos.normalize_path(path)
         rev = str(repos.normalize_rev(rev))
-        old = old or str(repos.previous_rev(rev))
-        new = new or rev
+
+        if old and new:
+            osep = util.unescape(old).rindex('#')
+            nsep = util.unescape(new).rindex('#')
+            old_path, old_rev = old[:osep], old[osep+1:]
+            new_path, new_rev = new[:nsep], new[nsep+1:]
+            req.redirect(self.env.href.diff(new_path, new=new_rev,
+                                            old_path=old_path, old=old_rev))
 
         req.hdf['title'] = path + ' (log)'
         req.hdf['log'] = {
@@ -320,10 +325,7 @@ class LogModule(Component):
             'verbose': verbose,
             'stop_rev': stop_rev,
             'browser_href': self.env.href.browser(path, rev=rev),
-            'log_href': self.env.href.log(path, rev=rev),
-            'diff_href': self.env.href.diff(path, old=old, new=new),
-            'old': old,
-            'new': new
+            'log_href': self.env.href.log(path, rev=rev)
         }
 
         path_links = _get_path_links(self.env.href, path, rev)

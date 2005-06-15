@@ -53,10 +53,10 @@ tr.diff input {
 
 #anydiff {
  margin: 0 1em 1em;
- padding: .8em;
+ padding: .2m;
  float: left;
 }
-#anydiff form, #anydiff div {
+#anydiff form, #anydiff div, #anydiff h3 {
  display: inline;
 }
 #anydiff input { 

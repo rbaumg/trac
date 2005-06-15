@@ -78,7 +78,7 @@
  </div>
 
  <table id="chglist" class="listing">
-  <form action="<?cs var:log.diff_href ?>" method="get">
+  <form action="<?cs var:log.href ?>" method="post">
   <thead>
    <tr class="diff">
     <th colspan="2">
@@ -112,9 +112,11 @@
       set:indent = #1 ?><?cs
     /if ?>
     <tr class="<?cs if:name(item) % #2 ?>even<?cs else ?>odd<?cs /if ?>">
-     <td><input type="radio" name="old" value="<?cs var:item.rev ?>" <?cs
+     <td><input type="radio" name="old" 
+                value="<?cs var:item.path ?>#<?cs var:item.rev ?>" <?cs
           if:idx == #1 ?> checked="checked" <?cs /if ?> /></td>
-     <td><input type="radio" name="new" value="<?cs var:item.rev ?>" <?cs
+     <td><input type="radio" name="new" 
+                value="<?cs var:item.path ?>#<?cs var:item.rev ?>" <?cs
           if:idx == #0 ?> checked="checked" <?cs /if ?> /></td>
      <td class="change" style="padding-left:<?cs var:indent ?>em">
       <a title="View log starting at this revision" href="<?cs var:item.log_href ?>">

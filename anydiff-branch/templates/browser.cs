@@ -1,6 +1,5 @@
-<?cs include "header.cs"?>
+    trac<?cs include "header.cs"?>
 <?cs include "macros.cs"?>
-<?cs include "anydiff.cs"?>
 
 <div id="ctxtnav" class="nav">
  <ul>
@@ -9,15 +8,24 @@
  </ul>
 </div>
 
-<div id="content" class="browser">
- <h1><?cs call:browser_path_links(browser.path, browser) ?></h1>
 
+<div id="content" class="browser">
+ <h1><?cs 
+  if:browser.old_path ?> Diff<?cs
+  /if ?> <?cs call:browser_path_links(browser.path, browser) ?>
+ </h1>
  <div id="jumprev">
-  <form action="" method="get"><div>
-   <label for="rev">View revision:</label>
-   <input type="text" id="rev" name="rev" value="<?cs
-     var:browser.revision ?>" size="4" />
-  </div></form>
+  <form action="" method="get"><?cs
+   if:browser.old_path ?>
+    <input type="hidden" name="old_path" value="<?cs var:browser.old_path ?>" />
+    <input type="hidden" name="old_rev" value="<?cs var:browser.old_rev ?>" /><?cs
+   /if ?>
+   <div>
+    <label for="rev">View revision:</label>
+    <input type="text" id="rev" name="rev" value="<?cs
+       var:browser.revision ?>" size="4" />
+   </div>
+  </form>
  </div>
 
  <?cs if:browser.is_dir ?>
@@ -116,8 +124,45 @@
   ?>/TracBrowser">TracBrowser</a> for help on using the browser.
  </div>
 
- <?cs if:len(browser.path) > 1 ?><?cs call:anydiff(browser.path, browser.revision, browser.href) ?><?cs
-      /if ?>
+  <div id="anydiff"><?cs
+   if:browser.old_path ?><?cs
+    if:browser.old_path == browser.path && browser.old_rev == browser.revision ?>
+     <h3>From this Path/Revision, select a target for Diff.</h3><?cs
+    else ?>
+     <form action="<?cs var:diff.href ?>" method="get">
+      <label for="diff">
+       <h3>From <?cs var:browser.old_path ?> in Revision <?cs var:browser.old_rev ?></h3>
+      </label>
+      <input type="hidden" name="old_path" value="<?cs var:browser.old_path ?>" />
+      <input type="hidden" name="old" value="<?cs var:browser.old_rev ?>" />
+      <input type="hidden" name="new" value="<?cs var:browser.revision ?>" />
+      <div class="buttons">
+        <input type="<?cs if:len(browser.path) > #1 ?>submit<?cs else ?>hidden<?cs /if ?>"
+               name="diff" value="Diff" 
+               title="Diff the current Path/Revision against the selected Base" />
+      </div>
+     </form><?cs
+    /if ?>
+    <form action="<?cs var:browser.href ?>" method="get">
+     <input type="hidden" name="diff" value="cancel" />
+     <div class="buttons">
+      <input type="submit" value="Cancel" 
+       title="Cancel the Diff operation" />
+     </div>
+    </form><?cs
+   elif len(browser.path) > #1 ?>
+    <form action="<?cs var:browser.href ?>" method="get">
+     <input type="hidden" name="rev" value="<?cs var:browser.revision ?>" />
+     <input type="hidden" name="diff" value="replace" />
+     <div class="buttons">
+      <input type="submit" 
+             value="<?cs if:browser.old_path ?>Replace Base for Diff <?cs
+                    else ?>Set Base for Diff<?cs /if ?>"
+             title="Select the current Path/Revision to be the new Base for a Diff" />
+     </div>
+    </form><?cs
+   /if ?>
+  </div>
 
 </div>
 <?cs include:"footer.cs"?>
