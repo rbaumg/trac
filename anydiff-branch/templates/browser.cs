@@ -1,4 +1,4 @@
-    trac<?cs include "header.cs"?>
+<?cs include "header.cs"?>
 <?cs include "macros.cs"?>
 
 <div id="ctxtnav" class="nav">
