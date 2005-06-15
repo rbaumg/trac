@@ -76,7 +76,6 @@ class DiffMixin(object):
             old_path = old = new = None
 
         diff_options = get_diff_options(req)
-        print 'DIFF OPTIONS', diff_options, req.args.has_key('update')
 
         # -- setup the view mode (chgset,restricted)
         chgset = not old and not new
@@ -142,12 +141,10 @@ class DiffMixin(object):
                     zipfilename = 'changeset_r%s' % rev
             else:
                 if restricted:
-                    if old_path == '/': # special case for download (#238)
-                        zipfilename = '%s-r%s' % (rpath, old)
-                    else:
-                        zipfilename = 'diff-%s-r%s-%s-r%s' \
-                                      % (old_path.replace('/','_'), old,
-                                         rpath, new)
+                    zipfilename = 'diff-%s-r%s-%s-r%s' \
+                                  % (old_path.replace('/','_'), old, rpath, new)
+                elif old_path == '/': # special case for download (#238)
+                    zipfilename = '%s-r%s' % (rpath, old)
                 else:
                     zipfilename = 'diff-%s-r%s-to-r%s' % (rpath, old, new)
             self._render_zip(req, zipfilename, repos, diff_args)
