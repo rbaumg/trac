@@ -1,3 +1,11 @@
+trac (0.8.4-1) unstable; urgency=critical
+
+  * New upstream release.
+    - Fixed file upload vulnerability. Trac could be tricked into uploading
+      files outside the environment directory.
+
+ -- Otavio Salvador <otavio@debian.org>  Sun, 19 Jun 2005 16:06:42 -0300
+
 trac (0.8.3-1) unstable; urgency=low
 
   * New upstream release:
