@@ -124,7 +124,6 @@ class DiffMixin(object):
             pass # FIXME: what date should we choose for a diff?
 
         req.hdf['diff'] = diff_args
-        req.hdf['diff_or_changeset'] = restricted and 'Diff' or 'Changeset'
 
         # -- .diff and .zip formats
         format = req.args.get('format')

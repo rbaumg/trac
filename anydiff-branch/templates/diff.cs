@@ -2,24 +2,26 @@
 <?cs include "macros.cs"?>
 
 <div id="ctxtnav" class="nav">
- <h2><?cs var:diff_or_changeset ?> Navigation</h2><?cs
+ <h2>Navigation</h2><?cs
  with:links = chrome.links ?>
   <ul><?cs
-   if:diff.reverse_href ?>
-    <li class="first"><a href="<?cs var:diff.reverse_href ?>">Reverse Diff</a></li><?cs
-   else ?><?cs
+   if:diff.chgset ?><?cs
     if:len(links.prev) ?>
      <li class="first<?cs if:!len(links.next) ?> last<?cs /if ?>">
       <a class="prev" href="<?cs var:links.prev.0.href ?>" title="<?cs
-        var:links.prev.0.title ?>">Previous <?cs var:diff_or_changeset ?></a>
+        var:links.prev.0.title ?>">Previous <?cs 
+         if:diff.restricted ?>Changes<?cs else ?>Changeset<?cs /if ?></a>
      </li><?cs
     /if ?><?cs
     if:len(links.next) ?>
      <li class="<?cs if:len(links.prev) ?>first <?cs /if ?>last">
       <a class="next" href="<?cs var:links.next.0.href ?>" title="<?cs
-        var:links.next.0.title ?>">Next <?cs var:diff_or_changeset ?></a>
+        var:links.next.0.title ?>">Next <?cs 
+         if:diff.restricted ?>Changes<?cs else ?>Changeset<?cs /if ?></a>
      </li><?cs
     /if ?><?cs
+   else ?>
+    <li class="first"><a href="<?cs var:diff.reverse_href ?>">Reverse Diff</a></li><?cs
    /if ?>
   </ul><?cs
  /with ?>

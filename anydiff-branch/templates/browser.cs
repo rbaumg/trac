@@ -11,9 +11,11 @@
 
 <div id="content" class="browser">
  <h1><?cs 
-  if:browser.old_path ?> Diff<?cs
-  /if ?> <?cs call:browser_path_links(browser.path, browser) ?>
- </h1>
+  if:browser.old_path ?>Current Target for Diff: <?cs
+  /if ?><?cs call:browser_path_links(browser.path, browser) ?>
+ </h1><?cs
+  if:browser.old_path ?><h2>Browse to select a different target</h2><?cs
+  /if ?>
  <div id="jumprev">
   <form action="" method="get"><?cs
    if:browser.old_path ?>
@@ -127,11 +129,11 @@
   <div id="anydiff"><?cs
    if:browser.old_path ?><?cs
     if:browser.old_path == browser.path && browser.old_rev == browser.revision ?>
-     <h3>From this Path/Revision, select a target for Diff.</h3><?cs
+     <h2>This Path/Revision is the Base for the current Diff operation.</h2><?cs
     else ?>
      <form action="<?cs var:diff.href ?>" method="get">
       <label for="diff">
-       <h3>From <?cs var:browser.old_path ?> in Revision <?cs var:browser.old_rev ?></h3>
+       <h2>Current Base for Diff: <?cs var:browser.old_path ?> in Revision <?cs var:browser.old_rev ?></h2>
       </label>
       <input type="hidden" name="old_path" value="<?cs var:browser.old_path ?>" />
       <input type="hidden" name="old" value="<?cs var:browser.old_rev ?>" />
@@ -147,7 +149,7 @@
      <input type="hidden" name="diff" value="cancel" />
      <div class="buttons">
       <input type="submit" value="Cancel" 
-       title="Cancel the Diff operation" />
+       title="Cancel the current Diff operation" />
      </div>
     </form><?cs
    elif len(browser.path) > #1 ?>
@@ -158,7 +160,7 @@
       <input type="submit" 
              value="<?cs if:browser.old_path ?>Replace Base for Diff <?cs
                     else ?>Set Base for Diff<?cs /if ?>"
-             title="Select the current Path/Revision to be the new Base for a Diff" />
+             title="Select the current Path/Revision to be the Base for a Diff operation" />
      </div>
     </form><?cs
    /if ?>
