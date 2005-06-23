@@ -125,29 +125,31 @@ class DiffMixin(object):
 
         req.hdf['diff'] = diff_args
 
-        # -- .diff and .zip formats
         format = req.args.get('format')
-        if format == 'diff':
-            self._render_diff(req, repos, diff_args, diff_options)
-            return
-        elif format == 'zip':
-            # choosing an appropriate filename for the .zip
+
+        if format in ['diff', 'zip']:
+            # choosing an appropriate filename
             rpath = path.replace('/','_')
             if chgset:
                 if restricted:
-                    zipfilename = 'changeset_%s_r%s' % (rpath, rev)
+                    filename = 'changeset_%s_r%s' % (rpath, rev)
                 else:
-                    zipfilename = 'changeset_r%s' % rev
+                    filename = 'changeset_r%s' % rev
             else:
                 if restricted:
-                    zipfilename = 'diff-%s-r%s-%s-r%s' \
+                    filename = 'diff-%s-r%s-%s-r%s' \
                                   % (old_path.replace('/','_'), old, rpath, new)
                 elif old_path == '/': # special case for download (#238)
-                    zipfilename = '%s-r%s' % (rpath, old)
+                    filename = '%s-r%s' % (rpath, old)
                 else:
-                    zipfilename = 'diff-%s-r%s-to-r%s' % (rpath, old, new)
-            self._render_zip(req, zipfilename, repos, diff_args)
-            return
+                    filename = 'diff-%s-r%s-to-r%s' % (rpath, old, new)
+            if format == 'diff':
+                self._render_diff(req, filename, repos, diff_args,
+                                  diff_options)
+                return
+            elif format == 'zip':
+                self._render_zip(req, filename, repos, diff_args)
+                return
 
         # -- HTML format
         self._render_html(req, repos, chgset, restricted,
@@ -358,12 +360,12 @@ class DiffMixin(object):
                 req.hdf['diff.changes.%d' % idx] = info
             idx += 1 # the sequence should be immutable
 
-    def _render_diff(self, req, repos, diff, diff_options):
+    def _render_diff(self, req, filename, repos, diff, diff_options):
         """Raw Unified Diff version"""
         req.send_response(200)
         req.send_header('Content-Type', 'text/plain;charset=utf-8')
         req.send_header('Content-Disposition',
-                        'filename=Changeset%s.diff' % req.args.get('rev'))
+                        'filename=%s.diff' % filename)
         req.end_headers()
 
         for old_node, new_node, kind, change in repos.get_deltas(**diff):
