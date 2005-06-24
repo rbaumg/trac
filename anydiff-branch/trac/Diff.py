@@ -137,12 +137,13 @@ class DiffMixin(object):
                     filename = 'changeset_r%s' % rev
             else:
                 if restricted:
-                    filename = 'diff-%s-r%s-%s-r%s' \
-                                  % (old_path.replace('/','_'), old, rpath, new)
+                    filename = 'diff-%s-from-r%s-to-r%s' \
+                                  % (rpath, old, new)
                 elif old_path == '/': # special case for download (#238)
                     filename = '%s-r%s' % (rpath, old)
                 else:
-                    filename = 'diff-%s-r%s-to-r%s' % (rpath, old, new)
+                    filename = 'diff-from-%s-r%s-to-%s-r%s' \
+                               % (old_path.replace('/','_'), old, rpath, new)
             if format == 'diff':
                 self._render_diff(req, filename, repos, diff_args,
                                   diff_options)
