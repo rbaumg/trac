@@ -205,23 +205,22 @@ class Mimeview(Component):
                 self.log.debug('Trying to render HTML preview using %s'
                                % renderer.__class__.__name__)
                 result = renderer.render(req, mimetype, content, filename, rev)
-                break
+                if not result:
+                    continue
+                elif isinstance(result, (str, unicode)):
+                    return result
+                elif annotations:
+                    return self._annotate(result, annotations)
+                else:
+                    buf = StringIO()
+                    buf.write('<div class="code-block"><pre>')
+                    for line in result:
+                        buf.write(line.expandtabs(8) + '\n')
+                    buf.write('</pre></div>')
+                    return buf.getvalue()
             except Exception, e:
                 self.log.warning('HTML preview using %s failed (%s)'
                                  % (renderer, e))
-
-        if result and not isinstance(result, (str, unicode)):
-            if annotations:
-                return self._annotate(result, annotations)
-            else:
-                buf = StringIO()
-                buf.write('<div class="code-block"><pre>')
-                for line in result:
-                    buf.write(line + '\n')
-                buf.write('<pre></div>')
-                return buf.getvalue()
-
-        return result
 
     def _annotate(self, lines, annotations):
         buf = StringIO()
@@ -244,7 +243,8 @@ class Mimeview(Component):
             cells = []
             for annotator in annotators:
                 cells.append(annotator.annotate_line(num + 1, line))
-            cells.append('<td>%s</td>\n' % space_re.sub(htmlify, line))
+            cells.append('<td>%s</td>\n' % space_re.sub(htmlify,
+                                                        line.expandtabs(8)))
             buf.write('<tr>' + '\n'.join(cells) + '</tr>')
         buf.write('</tbody></table>')
         return buf.getvalue()

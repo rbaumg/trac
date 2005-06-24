@@ -37,13 +37,17 @@ from trac import perm, util
 from trac.config import default_dir
 from trac.env import Environment
 from trac.Milestone import Milestone
+from trac.ticket.model import *
 
-def my_sum(list):
-    """Python2.2 doesn't have sum()"""
-    tot = 0
-    for item in list:
-        tot += item
-    return tot
+try:
+    sum
+except NameError:
+    def sum(list):
+        """Python2.2 doesn't have sum()"""
+        tot = 0
+        for item in list:
+            tot += item
+        return tot
 
 
 class TracAdmin(cmd.Cmd):
@@ -56,6 +60,9 @@ class TracAdmin(cmd.Cmd):
     ruler = ''
     prompt = "Trac> "
     __env = None
+    _date_format = '%Y-%m-%d'
+    _datetime_format = '%Y-%m-%d %H:%M:%S'
+    _date_format_hint = 'YYYY-MM-DD'
 
     def __init__(self, envdir=None):
         cmd.Cmd.__init__(self)
@@ -76,12 +83,7 @@ class TracAdmin(cmd.Cmd):
               '%(copy)s\n\n'                                    \
               "Type:  '?' or 'help' for help on commands.\n" %  \
               {'ver':trac.__version__,'copy':__copyright__}
-        while 1:
-            try:
-                self.cmdloop()
-                break
-            except KeyboardInterrupt:
-                print "\n** Interrupt. Use 'quit' to exit **"
+        self.cmdloop()
 
     ##
     ## Environment methods
@@ -110,11 +112,18 @@ class TracAdmin(cmd.Cmd):
             traceback.print_exc()
             sys.exit(1)
 
-    def db_open(self):
+    def env_open(self):
         try:
             if not self.__env:
                 self.__env = Environment(self.envname)
-            return self.__env.get_db_cnx()
+            return self.__env
+        except Exception, e:
+            print 'Failed to open environment.', e
+            sys.exit(1)
+
+    def db_open(self):
+        try:
+            return self.env_open().get_db_cnx()
         except Exception, e:
             print 'Failed to open environment.', e
             sys.exit(1)
@@ -194,7 +203,7 @@ class TracAdmin(cmd.Cmd):
             print
             if rnum == 0 and decor:
                 print ''.join(['-' for x in
-                               xrange(0, (1 + len(sep)) * cnum + my_sum(colw))])
+                               xrange(0, (1 + len(sep)) * cnum + sum(colw))])
         print
 
     def print_doc(self, doc, decor=False):
@@ -241,13 +250,13 @@ class TracAdmin(cmd.Cmd):
         rows = self.db_query("SELECT name FROM version")
         return [row[0] for row in rows]
 
-    def _parse_datetime(self, t):
+    def _parse_date(self, t):
         seconds = None
         t = t.strip()
         if t == 'now':
             seconds = int(time.time())
         else:
-            for format in ['%x %X', '%x, %X', '%X %x', '%X, %x', '%x', '%c',
+            for format in [self._date_format, '%x %X', '%x, %X', '%X %x', '%X, %x', '%x', '%c',
                            '%b %d, %Y']:
                 try:
                     pt = time.strptime(t, format)
@@ -263,6 +272,12 @@ class TracAdmin(cmd.Cmd):
         if seconds == None:
             print >> sys.stderr, 'Unknown time format'
         return seconds
+
+    def _format_date(self, s):
+        return time.strftime(self._date_format, time.localtime(s))
+
+    def _format_datetime(self, s):
+        return time.strftime(self._datetime_format, time.localtime(s))
 
 
     ##
@@ -369,42 +384,30 @@ class TracAdmin(cmd.Cmd):
             print 'Component %s failed:' % arg[0], e
 
     def _do_component_list(self):
-        rows = self.db_query("SELECT name, owner FROM component")
-        self.print_listing(['Name', 'Owner'], rows)
+        data = []
+        for c in Component.select(self.env_open()):
+            data.append((c.name, c.owner))
+        self.print_listing(['Name', 'Owner'], data)
 
     def _do_component_add(self, name, owner):
-        self.db_update("INSERT INTO component (name,owner) VALUES('%s','%s')"
-                        % (name, owner))
+        component = Component(self.env_open())
+        component.name = name
+        component.owner = owner
+        component.insert()
 
     def _do_component_rename(self, name, newname):
-        cnx = self.db_open()
-        cursor = cnx.cursor()
-        cursor.execute("SELECT name FROM component WHERE name=%s", (name,))
-        if not cursor.fetchone():
-            raise Exception("No such component '%s'" % name)
-        cursor.execute("UPDATE component SET name=%s WHERE name=%s",
-                       (newname, name))
-        cursor.execute("UPDATE ticket SET component=%s WHERE component=%s",
-                       (newname, name))
-        cnx.commit()
+        component = Component(self.env_open(), name)
+        component.name = newname
+        component.update()
 
     def _do_component_remove(self, name):
-        cnx = self.db_open()
-        cursor = cnx.cursor()
-        cursor.execute("SELECT name FROM component WHERE name=%s", (name,))
-        if not cursor.fetchone():
-            raise Exception("No such component '%s'" % name)
-        cursor.execute("DELETE FROM component WHERE name=%s", (name,))
-        cnx.commit()
+        component = Component(self.env_open(), name)
+        component.delete()
 
     def _do_component_set_owner(self, name, owner):
-        cnx = self.db_open()
-        cursor = cnx.cursor()
-        cursor.execute("SELECT name FROM component WHERE name=%s", (name,))
-        if not cursor.fetchone():
-            raise Exception("No such component '%s'" % name)
-        cursor.execute("UPDATE component SET owner=%s WHERE name=%s",
-                       (owner, name))
+        component = Component(self.env_open(), name)
+        component.owner = owner
+        component.update()
 
 
     ## Permission
@@ -639,10 +642,8 @@ class TracAdmin(cmd.Cmd):
 
     ## Resync
     def do_resync(self, line):
-        self.db_open() # We need to call this function to open the env, really stupid
-
         print 'resyncing...'
-        cnx = self.__env.get_db_cnx()
+        cnx = self.db_open() # We need to call this function to open the env, really stupid
         self.db_update("DELETE FROM revision")
         self.db_update("DELETE FROM node_change")
 
@@ -718,7 +719,7 @@ class TracAdmin(cmd.Cmd):
         rows = self.db_query("SELECT name,max(version),time "
                              "FROM wiki GROUP BY name ORDER BY name")
         self.print_listing(['Title', 'Edits', 'Modified'],
-                           [(r[0], r[1], time.ctime(r[2])) for r in rows])
+                           [(r[0], r[1], self._format_datetime(r[2])) for r in rows])
 
     def _do_wiki_remove(self, name):
         cnx = self.db_open()
@@ -761,7 +762,7 @@ class TracAdmin(cmd.Cmd):
     def _do_wiki_export(self, page, filename=''):
         data = self.db_query("SELECT text FROM wiki WHERE name='%s' "
                              "ORDER BY version DESC LIMIT 1" % page)
-        text = data[0][0]
+        text = data.next()[0]
         if not filename:
             print text
         else:
@@ -840,8 +841,11 @@ class TracAdmin(cmd.Cmd):
     def do_severity(self, line):
         self._do_enum('severity', line)
 
-    # Priority and Severity share the same datastructure and methods:
-    
+    # Type, priority, severity share the same datastructure and methods:
+
+    _enum_map = {'ticket_type': Type, 'priority': Priority,
+                 'severity': Severity}
+
     def _do_enum(self, type, line):
         arg = self.arg_tokenize(line)
         try:
@@ -863,9 +867,9 @@ class TracAdmin(cmd.Cmd):
             print 'Command %s failed:' % arg[0], e
 
     def _do_enum_list(self, type):
-        rows = self.db_query("SELECT name FROM enum WHERE type='%s' "
-                             "ORDER BY value" % type)
-        self.print_listing(['Possible Values'], rows)
+        enum_cls = self._enum_map[type]
+        self.print_listing(['Possible Values'],
+                           [(e.name,) for e in enum_cls.select(self.env_open())])
 
     def _do_enum_add(self, type, name):
         sql = ("INSERT INTO enum(value,type,name) "
@@ -875,21 +879,15 @@ class TracAdmin(cmd.Cmd):
         self.db_update(sql)
 
     def _do_enum_change(self, type, name, newname):
-        d = {'name':name, 'newname':newname, 'type':type}
-        rows = self.db_query("SELECT name FROM enum "
-                             "WHERE type='%(type)s' AND name='%(name)s'" % d)
-        if not list(rows):
-            raise Exception, "No such value '%s'" % name
-        self.db_update("UPDATE enum SET name='%(newname)s' "
-                       "WHERE type='%(type)s' AND name='%(name)s'" % d)
+        enum_cls = self._enum_map[type]
+        enum = enum_cls(self.env_open(), name)
+        enum.name = newname
+        enum.update()
 
     def _do_enum_remove(self, type, name):
-        rows = self.db_query("SELECT name FROM enum "
-                             "WHERE type='%s' AND name='%s'" % (type, name))
-        if not list(rows):
-            raise Exception, "No such value '%s'" % name
-        self.db_update("DELETE FROM enum WHERE type='%s' AND name='%s'"
-                       % (type, name))
+        enum_cls = self._enum_map[type]
+        enum = enum_cls(self.env_open(), name)
+        enum.delete()
 
 
     ## Milestone
@@ -899,10 +897,10 @@ class TracAdmin(cmd.Cmd):
                         'Rename milestone'),
                        ('milestone due <name> <due>',
                         'Set milestone due date (Format: "%s" or "now")'
-                        % util.get_date_format_hint()),
+                        % _date_format_hint),
                        ('milestone completed <name> <completed>',
                         'Set milestone completed date (Format: "%s" or "now")'
-                        % util.get_date_format_hint()),
+                        % _date_format_hint),
                        ('milestone remove <name>', 'Remove milestone')]
 
     def complete_milestone (self, text, line, begidx, endidx):
@@ -936,39 +934,34 @@ class TracAdmin(cmd.Cmd):
 
     def _do_milestone_list(self):
         data = []
-        self.db_open()
-        for m in Milestone.select(self.__env, include_completed=True):
-            data.append((m.name, m.due and time.strftime('%c', time.localtime(m.due)),
-                         m.completed and time.strftime('%c', time.localtime(m.completed))))
+        for m in Milestone.select(self.env_open(), include_completed=True):
+            data.append((m.name, m.due and self._format_date(m.due),
+                         m.completed and self._format_datetime(m.completed)))
+
         self.print_listing(['Name', 'Due', 'Completed'], data)
 
     def _do_milestone_rename(self, name, newname):
-        self.db_open()
-        milestone = Milestone(self.__env, name)
+        milestone = Milestone(self.env_open(), name)
         milestone.name = newname
         milestone.update()
 
     def _do_milestone_add(self, name):
-        self.db_open()
-        milestone = Milestone(self.__env)
+        milestone = Milestone(self.env_open())
         milestone.name = name
         milestone.insert()
 
     def _do_milestone_remove(self, name):
-        self.db_open()
-        milestone = Milestone(self.__env, name)
+        milestone = Milestone(self.env_open(), name)
         milestone.delete()
 
     def _do_milestone_set_due(self, name, t):
-        self.db_open()
-        milestone = Milestone(self.__env, name)
-        milestone.due = self._parse_datetime(t)
+        milestone = Milestone(self.env_open(), name)
+        milestone.due = self._parse_date(t)
         milestone.update()
 
     def _do_milestone_set_completed(self, name, t):
-        self.db_open()
-        milestone = Milestone(self.__env, name)
-        milestone.completed = self._parse_datetime(t)
+        milestone = Milestone(self.env_open(), name)
+        milestone.completed = self._parse_date(t)
         milestone.update()
 
     ## Version
@@ -978,12 +971,12 @@ class TracAdmin(cmd.Cmd):
                         'Rename version'),
                        ('version time <name> <time>',
                         'Set version date (Format: "%s" or "now")'
-                        % util.get_date_format_hint()),
+                        % _date_format_hint),
                        ('version remove <name>', 'Remove version')]
 
     def complete_version (self, text, line, begidx, endidx):
         if begidx in (13, 15):
-            comp = self.get_version_list ()
+            comp = self.get_version_list()
         elif begidx < 13:
             comp = ['list', 'add', 'rename', 'time', 'remove']
         return self.word_complete(text, comp)
@@ -1009,64 +1002,43 @@ class TracAdmin(cmd.Cmd):
             print 'Command %s failed:' % arg[0], e
 
     def _do_version_list(self):
-        rows = self.db_query("SELECT name,time FROM version ORDER BY time,name")
-        self.print_listing(['Name', 'Time'],
-                           [(r[0], r[1] and time.ctime(r[1])) for r in rows])
+        data = []
+        for v in Version.select(self.env_open()):
+            data.append((v.name, v.time and self._format_date(v.time)))
+        self.print_listing(['Name', 'Time'], data)
 
     def _do_version_rename(self, name, newname):
-        d = {'name':name, 'newname':newname}
-        rows = self.db_query("SELECT name FROM version "
-                             "WHERE name='%(name)s'" % d)
-        if not list(rows):
-            raise Exception, "No such version '%s'" % name
-        self.db_update("UPDATE version SET name='%(newname)s' "
-                       "WHERE name='%(name)s'" % d)
+        version = Version(self.env_open(), name)
+        version.name = newname
+        version.update()
 
     def _do_version_add(self, name):
-        self.db_update("INSERT INTO version (name, time) "
-                       "VALUES('%(name)s', 0)" % {'name':name})
+        version = Version(self.env_open())
+        version.name = name
+        version.insert()
 
     def _do_version_remove(self, name):
-        d = {'name':name}
-        rows = self.db_query("SELECT name FROM version "
-                             "WHERE name='%(name)s'" % d)
-        if not list(rows):
-            raise Exception, "No such version '%s'" % name
-        self.db_update("DELETE FROM version WHERE name='%(name)s'" % d)
+        version = Version(self.env_open(), name)
+        version.delete()
 
     def _do_version_time(self, name, t):
-        d = {'name':name}
-        rows = self.db_query("SELECT name FROM version "
-                             "WHERE name='%(name)s'" % d)
-        if not list(rows):
-            raise Exception, "No such version '%s'" % name
-        seconds = self._parse_datetime(t)
-        if seconds != None:
-            self.db_update("UPDATE version SET time='%s' WHERE name='%s'"
-                           % (seconds, name))
+        version = Version(self.env_open(), name)
+        version.time = self._parse_date(t)
+        version.update()
 
     _help_upgrade = [('upgrade', 'Upgrade database to current version')]
     def do_upgrade(self, line):
         arg = self.arg_tokenize(line)
-        do_backup = 1
+        do_backup = True
         if arg[0] in ['-b', '--no-backup']:
-            do_backup = 0
+            do_backup = False
         self.db_open()
         try:
-            curr = self.__env.get_version()
-            latest = trac.db_default.db_version
-            if  curr < latest:
-                print "Upgrade: Upgrading %s to db version %i" \
-                      % (self.envname, latest)
-                if do_backup:
-                    print "Upgrade: Backup of old database saved in " \
-                          "%s/db/trac.db.%i.bak" % (self.envname, curr)
-                else:
-                    print "Upgrade: Backup disabled. Non-existent warranty " \
-                          "voided."
-                self.__env.upgrade(do_backup)
-            else:
-                print "Upgrade: Database is up to date, no upgrade necessary."
+            if not self.__env.needs_upgrade():
+                print "Database is up to date, no upgrade necessary."
+                return
+            self.__env.upgrade(backup=do_backup)
+            print 'Upgrade done.'
         except Exception, e:
             print "Upgrade failed:", e
 
