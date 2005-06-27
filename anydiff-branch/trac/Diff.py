@@ -33,7 +33,7 @@ from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
 from trac.web.chrome import add_link, add_stylesheet
 from trac.web.main import IRequestHandler
-from trac.wiki import wiki_to_html, wiki_to_oneliner
+from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 
 
 class DiffArgs(dict):
@@ -77,7 +77,7 @@ class DiffMixin(object):
         diff_options = get_diff_options(req)
 
         # -- setup the view mode (chgset,restricted)
-        chgset = not old and not new
+        chgset = not old and not new and not old_path
         if chgset:                      # -- ''Arbitrary Diff'' mode
             restricted = path != '' and path != '/' # (subset or not)
         else:                           # -- ''Last Changes'' mode
@@ -475,19 +475,32 @@ class DiffModule(Component,DiffMixin):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        yield (r"!?\[\d+\]|\br\d+\b", (lambda x, y, z: self._format_link(x, 'changeset', y[0] == 'r' and y[1:] or y[1:-1], y)))
+        return []
 
     def get_link_resolvers(self):
-        yield ('changeset', self._format_link)
+        yield ('diff', self._format_link)
 
-    def _format_link(self, formatter, ns, rev, label):
-        cursor = formatter.db.cursor()
-        cursor.execute('SELECT message FROM revision WHERE rev=%s', (rev,))
-        row = cursor.fetchone()
-        if row:
-            return '<a class="changeset" title="%s" href="%s">%s</a>' \
-                   % (util.escape(util.shorten_line(row[0])),
-                      formatter.href.changeset(rev), label)
-        else:
-            return '<a class="missing changeset" href="%s" rel="nofollow">%s</a>' \
-                   % (formatter.href.changeset(rev), label)
+    def _format_link(self, formatter, ns, params, label):
+        def pathrev(path):
+            irev = path.find('#')
+            if irev > 0:
+                return (path[:irev], path[irev+1:])
+            else:
+                return (path, None)
+        ianydiff = params.find('//')
+        if ianydiff > 0:
+            old_path, old_rev = pathrev(params[:ianydiff])
+            new_path, new_rev = pathrev(params[ianydiff+2:])
+        else: 
+            old_path, old_rev = pathrev(params)
+            new_path = old_path
+            new_rev = None
+            if old_rev:
+                isep = old_rev.find(':')
+                if isep > 0:
+                    old_rev = old_rev[:isep]
+                    new_rev = old_rev[isep+1:]
+        href = formatter.href.diff(new_path, new=new_rev,
+                                   old_path=old_path, old=old_rev)
+        return '<a class="changeset" title="%s" href="%s">%s</a>' \
+                   % ('Diff', href, label)
