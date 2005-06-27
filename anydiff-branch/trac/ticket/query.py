@@ -23,13 +23,12 @@ from __future__ import generators
 from time import gmtime, localtime, strftime, time
 import re
 
-from trac import perm
 from trac.core import *
+from trac.perm import IPermissionRequestor
 from trac.ticket import Ticket, TicketSystem
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.web.main import IRequestHandler
-from trac.wiki import wiki_to_html, wiki_to_oneliner
-from trac.wiki.api import IWikiMacroProvider
+from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiMacroProvider, IWikiSyntaxProvider
 from trac.util import escape, shorten_line, sql_escape, CRLF, TRUE
 
 
@@ -311,7 +310,7 @@ class Query(object):
 
 class QueryModule(Component):
 
-    implements(IRequestHandler, INavigationContributor)
+    implements(IRequestHandler, INavigationContributor, IWikiSyntaxProvider)
 
     # INavigationContributor methods
 
@@ -320,7 +319,7 @@ class QueryModule(Component):
 
     def get_navigation_items(self, req):
         from trac.ticket.report import ReportModule
-        if req.perm.has_permission(perm.TICKET_VIEW) and \
+        if req.perm.has_permission('TICKET_VIEW') and \
            not self.env.is_component_enabled(ReportModule):
             yield 'mainnav', 'tickets', '<a href="%s">View Tickets</a>' \
                   % escape(self.env.href.query())
@@ -331,7 +330,7 @@ class QueryModule(Component):
         return req.path_info == '/query'
 
     def process_request(self, req):
-        req.perm.assert_permission(perm.TICKET_VIEW)
+        req.perm.assert_permission('TICKET_VIEW')
 
         constraints = self._get_constraints(req)
         if not constraints and not req.args.has_key('order'):
@@ -549,7 +548,7 @@ class QueryModule(Component):
         req.hdf['query.results'] = tickets
 
         from trac.ticket.report import ReportModule
-        if req.perm.has_permission(perm.REPORT_VIEW) and \
+        if req.perm.has_permission('REPORT_VIEW') and \
            self.env.is_component_enabled(ReportModule):
             req.hdf['query.report_href'] = self.env.href.report()
 
@@ -584,6 +583,27 @@ class QueryModule(Component):
                 result['time'] = strftime('%a, %d %b %Y %H:%M:%S GMT',
                                           gmtime(result['time']))
         req.hdf['query.results'] = results
+
+    # IWikiSyntaxProvider methods
+    
+    def get_wiki_syntax(self):
+        return []
+    
+    def get_link_resolvers(self):
+        yield ('query', self._format_link)
+
+    def _format_link(self, formatter, ns, query, label):
+        if query[0] == '?':
+            return '<a class="query" href="%s">%s</a>' \
+                   % (formatter.href.query() + query, label)
+        else:
+            from trac.ticket.query import Query, QuerySyntaxError
+            try:
+                query = Query.from_string(formatter.env, query)
+                return '<a class="query" href="%s">%s</a>' \
+                       % (query.get_href(), label)
+            except QuerySyntaxError, e:
+                return '<em class="error">[Error: %s]</em>' % util.escape(e)
 
 
 class QueryWikiMacro(Component):

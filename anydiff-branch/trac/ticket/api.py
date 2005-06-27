@@ -19,11 +19,25 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
-from trac import perm, util
+from __future__ import generators
+
+from trac import util
 from trac.core import *
+from trac.perm import IPermissionRequestor
+from trac.wiki import IWikiSyntaxProvider
+
+class MyLinkResolver(Component):
+    """
+    A dummy macro used by the unit test. We need to supply our own macro
+    because the real HelloWorld-macro can not be loaded using our
+    'fake' environment.
+    """
 
 
 class TicketSystem(Component):
+    implements(IPermissionRequestor, IWikiSyntaxProvider)
+
+    # Public API
 
     def get_available_actions(self, ticket, perm_):
         """Returns the actions that can be performed on the ticket."""
@@ -33,8 +47,8 @@ class TicketSystem(Component):
             'reopened': ['leave', 'resolve', 'reassign'          ],
             'closed':   ['leave',                        'reopen']
         }
-        perms = {'resolve': perm.TICKET_MODIFY, 'reassign': perm.TICKET_CHGPROP,
-                 'accept': perm.TICKET_CHGPROP, 'reopen': perm.TICKET_CREATE}
+        perms = {'resolve': 'TICKET_MODIFY', 'reassign': 'TICKET_CHGPROP',
+                 'accept': 'TICKET_CHGPROP', 'reopen': 'TICKET_CREATE'}
         return [action for action in actions.get(ticket['status'], ['leave'])
                 if action not in perms or perm_.has_permission(perms[action])]
 
@@ -120,3 +134,39 @@ class TicketSystem(Component):
 
         fields.sort(lambda x, y: cmp(x['order'], y['order']))
         return fields
+
+    # IPermissionRequestor methods
+
+    def get_permission_actions(self):
+        return ['TICKET_APPEND', 'TICKET_CREATE', 'TICKET_CHGPROP',
+                'TICKET_VIEW',  
+                ('TICKET_MODIFY', ['TICKET_APPEND', 'TICKET_CHGPROP']),  
+                ('TICKET_ADMIN', ['TICKET_CREATE', 'TICKET_MODIFY',  
+                                  'TICKET_VIEW'])]
+
+    # IWikiSyntaxProvider methods
+
+    def get_link_resolvers(self):
+        return [('bug', self._format_link),
+                ('ticket', self._format_link)]
+
+    def get_wiki_syntax(self):
+        yield (r"!?#\d+", lambda x, y, z: self._format_link(x, 'ticket', y[1:], y))
+
+    def _format_link(self, formatter, ns, target, label):
+        cursor = formatter.db.cursor()
+        cursor.execute("SELECT summary,status FROM ticket WHERE id=%s", (target,))
+        row = cursor.fetchone()
+        if row:
+            summary = util.escape(util.shorten_line(row[0]))
+            if row[1] in ('new', 'closed'):
+                return '<a class="%s ticket" href="%s" title="%s (%s)">%s</a>' \
+                       % (row[1], formatter.href.ticket(target), summary, row[1], label)
+            else:
+                return '<a class="ticket" href="%s" title="%s">%s</a>' \
+                       % (formatter.href.ticket(target), summary, label)
+        else:
+            return '<a class="missing ticket" href="%s" rel="nofollow">%s</a>' \
+                   % (formatter.href.ticket(target), label)
+
+    

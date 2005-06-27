@@ -24,17 +24,19 @@ import re
 import time
 import string
 
-from trac import perm
 from trac.core import *
+from trac.perm import IPermissionRequestor
 from trac.util import TracError, escape, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
+from trac.wiki import IWikiSyntaxProvider
 from trac.web.main import IRequestHandler
 
 
 class SearchModule(Component):
 
-    implements(INavigationContributor, IRequestHandler)
+    implements(INavigationContributor, IPermissionRequestor, IRequestHandler,
+               IWikiSyntaxProvider)
 
     RESULTS_PER_PAGE = 10
 
@@ -44,10 +46,15 @@ class SearchModule(Component):
         return 'search'
 
     def get_navigation_items(self, req):
-        if not req.perm.has_permission(perm.SEARCH_VIEW):
+        if not req.perm.has_permission('SEARCH_VIEW'):
             return
         yield 'mainnav', 'search', '<a href="%s" accesskey="4">Search</a>' \
               % (self.env.href.search())
+
+    # IPermissionRequestor methods
+
+    def get_permission_actions(self):
+        return ['SEARCH_VIEW']
 
     # IRequestHandler methods
 
@@ -55,7 +62,7 @@ class SearchModule(Component):
         return req.path_info == '/search'
 
     def process_request(self, req):
-        req.perm.assert_permission(perm.SEARCH_VIEW)
+        req.perm.assert_permission('SEARCH_VIEW')
         self.authzperm = SubversionAuthorizer(self.env, req.authname)
 
         req.hdf['title'] = 'Search'
@@ -151,11 +158,11 @@ class SearchModule(Component):
         keywords = query.split(' ')
 
         if changeset:
-            changeset = req.perm.has_permission(perm.CHANGESET_VIEW)
+            changeset = req.perm.has_permission('CHANGESET_VIEW')
         if tickets:
-            tickets = req.perm.has_permission(perm.TICKET_VIEW)
+            tickets = req.perm.has_permission('TICKET_VIEW')
         if wiki:
-            wiki = req.perm.has_permission(perm.WIKI_VIEW)
+            wiki = req.perm.has_permission('WIKI_VIEW')
 
         if changeset == tickets == wiki == 0:
             return ([], 0)
@@ -276,3 +283,16 @@ class SearchModule(Component):
             item['message'] = escape(self.shorten_result(msg, keywords))
             info.append(item)
         return info, more
+
+    # IWikiSyntaxProvider methods
+    
+    def get_wiki_syntax(self):
+        return []
+    
+    def get_link_resolvers(self):
+        yield ('search', self._format_link)
+
+    def _format_link(self, formatter, ns, query, label):
+        return '<a class="search" href="%s">%s</a>' \
+               % (formatter.href.search(query), label)
+

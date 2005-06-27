@@ -26,8 +26,9 @@ import time
 import re
 import posixpath
 
-from trac import mimeview, perm, util
+from trac import mimeview, util
 from trac.core import *
+from trac.perm import IPermissionRequestor
 from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
 from trac.web.chrome import add_link, add_stylesheet
@@ -56,8 +57,6 @@ class DiffMixin(object):
            
         In any case, the given path@rev pair must exist.
         """
-        req.perm.assert_permission(perm.CHANGESET_VIEW)
-
         # -- retrieve arguments
         path = req.args.get('path')
         rev = req.args.get('rev')       # ''Last changes'' mode
@@ -454,7 +453,12 @@ class DiffMixin(object):
 
 class DiffModule(Component,DiffMixin):
 
-    implements(IRequestHandler)
+    implements(IPermissionRequestor, IRequestHandler, IWikiSyntaxProvider)
+
+    # IPermissionRequestor methods
+
+    def get_permission_actions(self):
+        return ['CHANGESET_VIEW']
 
     # IRequestHandler methods
 
@@ -464,4 +468,26 @@ class DiffModule(Component,DiffMixin):
             req.args['path'] = match.group(1)
             return 1
 
-    # process_request() is provided by the DiffMixin
+    def process_request(self, req):
+        req.perm.assert_permission('CHANGESET_VIEW')
+        return DiffMixin.process_request(self, req)
+
+    # IWikiSyntaxProvider methods
+    
+    def get_wiki_syntax(self):
+        yield (r"!?\[\d+\]|\br\d+\b", (lambda x, y, z: self._format_link(x, 'changeset', y[0] == 'r' and y[1:] or y[1:-1], y)))
+
+    def get_link_resolvers(self):
+        yield ('changeset', self._format_link)
+
+    def _format_link(self, formatter, ns, rev, label):
+        cursor = formatter.db.cursor()
+        cursor.execute('SELECT message FROM revision WHERE rev=%s', (rev,))
+        row = cursor.fetchone()
+        if row:
+            return '<a class="changeset" title="%s" href="%s">%s</a>' \
+                   % (util.escape(util.shorten_line(row[0])),
+                      formatter.href.changeset(rev), label)
+        else:
+            return '<a class="missing changeset" href="%s" rel="nofollow">%s</a>' \
+                   % (formatter.href.changeset(rev), label)

@@ -25,17 +25,24 @@ from __future__ import generators
 import time
 import re
 
-from trac import mimeview, perm, util
+from trac import mimeview, util
 from trac.core import *
+from trac.perm import IPermissionRequestor
 from trac.Timeline import ITimelineEventProvider
 from trac.versioncontrol import Changeset, Node
 from trac.web.main import IRequestHandler
-from trac.wiki import wiki_to_html, wiki_to_oneliner
+from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.Diff import DiffMixin
 
 class ChangesetModule(Component,DiffMixin):
 
-    implements(IRequestHandler, ITimelineEventProvider)
+    implements(IPermissionRequestor, IRequestHandler, ITimelineEventProvider,
+               IWikiSyntaxProvider)
+
+    # IPermissionRequestor methods
+
+    def get_permission_actions(self):
+        return ['CHANGESET_VIEW']
 
     # IRequestHandler methods
 
@@ -45,12 +52,14 @@ class ChangesetModule(Component,DiffMixin):
             req.args['rev'] = match.group(1)
             return 1
 
-    # process_request() is provided by the DiffMixin
+    def process_request(self, req):
+        req.perm.assert_permission('CHANGESET_VIEW')
+        return DiffMixin.process_request(self, req)
 
     # ITimelineEventProvider methods
 
     def get_timeline_filters(self, req):
-        if req.perm.has_permission(perm.CHANGESET_VIEW):
+        if req.perm.has_permission('CHANGESET_VIEW'):
             yield ('changeset', 'Repository checkins')
 
     def get_timeline_events(self, req, start, stop, filters):
@@ -89,3 +98,23 @@ class ChangesetModule(Component,DiffMixin):
                     yield 'changeset', href, title, chgset.date, chgset.author,\
                           message
                 rev = repos.previous_rev(rev)
+
+    # IWikiSyntaxProvider methods
+    
+    def get_wiki_syntax(self):
+        yield (r"!?\[\d+\]|\br\d+\b", (lambda x, y, z: self._format_link(x, 'changeset', y[0] == 'r' and y[1:] or y[1:-1], y)))
+
+    def get_link_resolvers(self):
+        yield ('changeset', self._format_link)
+
+    def _format_link(self, formatter, ns, rev, label):
+        cursor = formatter.db.cursor()
+        cursor.execute('SELECT message FROM revision WHERE rev=%s', (rev,))
+        row = cursor.fetchone()
+        if row:
+            return '<a class="changeset" title="%s" href="%s">%s</a>' \
+                   % (util.escape(util.shorten_line(row[0])),
+                      formatter.href.changeset(rev), label)
+        else:
+            return '<a class="missing changeset" href="%s" rel="nofollow">%s</a>' \
+                   % (formatter.href.changeset(rev), label)

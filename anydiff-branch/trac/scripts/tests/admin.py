@@ -86,11 +86,18 @@ class InMemoryEnvironment(Environment):
         from trac.log import logger_factory
         self.log = logger_factory('null')
 
+    def is_component_enabled(self, cls):
+        return cls.__module__.find('.tests.') == -1
+
     def load_config(self):
         self.config = Configuration(None)
 
     def save_config(self):
         pass
+
+
+class SkipTest(Exception):
+    pass
 
 
 class TracadminTestCase(unittest.TestCase):
@@ -111,7 +118,8 @@ class TracadminTestCase(unittest.TestCase):
         self._admin.env_set('', self.env)
 
         # Set test date to 11th Jan 2004
-        self._test_date = time.strftime('%Y-%m-%d', (2004, 1, 11, 0, 0, 0, 6, 1, -1))
+        self._test_date = time.strftime('%Y-%m-%d',
+                                        (2004, 1, 11, 0, 0, 0, 6, 1, -1))
 
     def tearDown(self):
         self.env = None
@@ -129,6 +137,10 @@ class TracadminTestCase(unittest.TestCase):
         finally:
             sys.stderr = _err
             sys.stdout = _out
+
+    def _require_python(self, version):
+        if sys.version_info < version:
+            raise SkipTest, 'requires Python %d.%d.%d' % version
 
     # About test
 
@@ -176,8 +188,14 @@ Trac Admin Console %s
         a result, there is only this one test.
         """
         test_name = sys._getframe().f_code.co_name
-        test_results = self._execute('permission list')
-        self.assertEquals(self.expected_results[test_name], test_results)
+        try:
+            # textwrap not available in python < 2.3
+            self._require_python((2, 3, 0))
+
+            test_results = self._execute('permission list')
+            self.assertEquals(self.expected_results[test_name], test_results)
+        except SkipTest, e:
+            print>>sys.stderr, 'Skipping test %s: %s' % (test_name, e)
 
     def test_permission_add_one_action_ok(self):
         """
@@ -186,9 +204,15 @@ Trac Admin Console %s
         success.
         """
         test_name = sys._getframe().f_code.co_name
-        self._execute('permission add test_user WIKI_VIEW')
-        test_results = self._execute('permission list')
-        self.assertEquals(self.expected_results[test_name], test_results)
+        try:
+            # textwrap not available in python < 2.3
+            self._require_python((2, 3, 0))
+
+            self._execute('permission add test_user WIKI_VIEW')
+            test_results = self._execute('permission list')
+            self.assertEquals(self.expected_results[test_name], test_results)
+        except SkipTest, e:
+            print>>sys.stderr, 'Skipping test %s: %s' % (test_name, e)
 
     def test_permission_add_multiple_actions_ok(self):
         """
@@ -197,9 +221,15 @@ Trac Admin Console %s
         success.
         """
         test_name = sys._getframe().f_code.co_name
-        self._execute('permission add test_user LOG_VIEW FILE_VIEW')
-        test_results = self._execute('permission list')
-        self.assertEquals(self.expected_results[test_name], test_results)
+        try:
+            # textwrap not available in python < 2.3
+            self._require_python((2, 3, 0))
+
+            self._execute('permission add test_user LOG_VIEW FILE_VIEW')
+            test_results = self._execute('permission list')
+            self.assertEquals(self.expected_results[test_name], test_results)
+        except SkipTest, e:
+            print>>sys.stderr, 'Skipping test %s: %s' % (test_name, e)
 
     def test_permission_remove_one_action_ok(self):
         """
@@ -208,9 +238,15 @@ Trac Admin Console %s
         success.
         """
         test_name = sys._getframe().f_code.co_name
-        self._execute('permission remove anonymous TICKET_MODIFY')
-        test_results = self._execute('permission list')
-        self.assertEquals(self.expected_results[test_name], test_results)
+        try:
+            # textwrap not available in python < 2.3
+            self._require_python((2, 3, 0))
+
+            self._execute('permission remove anonymous TICKET_MODIFY')
+            test_results = self._execute('permission list')
+            self.assertEquals(self.expected_results[test_name], test_results)
+        except SkipTest, e:
+            print>>sys.stderr, 'Skipping test %s: %s' % (test_name, e)
 
     def test_permission_remove_multiple_actions_ok(self):
         """
@@ -219,9 +255,16 @@ Trac Admin Console %s
         for success.
         """
         test_name = sys._getframe().f_code.co_name
-        self._execute('permission remove anonymous WIKI_CREATE WIKI_MODIFY')
-        test_results = self._execute('permission list')
-        self.assertEquals(self.expected_results[test_name], test_results)
+        try:
+            # textwrap not available in python < 2.3
+            self._require_python((2, 3, 0))
+
+            test_name = sys._getframe().f_code.co_name
+            self._execute('permission remove anonymous WIKI_CREATE WIKI_MODIFY')
+            test_results = self._execute('permission list')
+            self.assertEquals(self.expected_results[test_name], test_results)
+        except SkipTest, e:
+            print>>sys.stderr, 'Skipping test %s: %s' % (test_name, e)
 
     # Component tests
 
@@ -520,7 +563,7 @@ Trac Admin Console %s
         """
         test_name = sys._getframe().f_code.co_name
         self._execute('severity add critical')
-        self._execute('severity change critical end-of-the-world')
+        self._execute('severity change critical "end-of-the-world"')
         test_results = self._execute('severity list')
         self.assertEquals(self.expected_results[test_name], test_results)
 

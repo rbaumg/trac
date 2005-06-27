@@ -1,3 +1,4 @@
+
 # -*- coding: iso8859-1 -*-
 #
 # Copyright (C) 2003, 2004, 2005 Edgewall Software
@@ -20,18 +21,25 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from __future__ import generators
+import re
 import time
+import urllib
 
-from trac import perm, util
+from trac import util
 from trac.core import *
 from trac.mimeview import get_mimetype, is_binary, Mimeview
+from trac.perm import IPermissionRequestor
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.web.main import IRequestHandler
-from trac.wiki import wiki_to_html, wiki_to_oneliner
+from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.versioncontrol import Changeset
 
 CHUNK_SIZE = 4096
 DISP_MAX_FILE_SIZE = 256 * 1024
+
+rev_re = re.compile(r"([^#]+)#(.+)")
+img_re = re.compile(r"\.(gif|jpg|jpeg|png)(\?.*)?$", re.IGNORECASE)
+
 
 def _get_changes(env, repos, revs, full=None, req=None, format=None):
     db = env.get_db_cnx()
@@ -80,7 +88,8 @@ def _get_path_links(href, path, rev, old_path=None, old_rev=None):
 
 class BrowserModule(Component):
 
-    implements(INavigationContributor, IRequestHandler)
+    implements(INavigationContributor, IPermissionRequestor, IRequestHandler,
+               IWikiSyntaxProvider)
 
     # INavigationContributor methods
 
@@ -88,10 +97,15 @@ class BrowserModule(Component):
         return 'browser'
 
     def get_navigation_items(self, req):
-        if not req.perm.has_permission(perm.BROWSER_VIEW):
+        if not req.perm.has_permission('BROWSER_VIEW'):
             return
         yield 'mainnav', 'browser', '<a href="%s">Browse Source</a>' \
               % util.escape(self.env.href.browser())
+
+    # IPermissionRequestor methods
+
+    def get_permission_actions(self):
+        return ['BROWSER_VIEW', 'FILE_VIEW']
 
     # IRequestHandler methods
 
@@ -156,7 +170,7 @@ class BrowserModule(Component):
     # Internal methods
 
     def _render_directory(self, req, repos, node, rev=None, old_path=None, old_rev=None):
-        req.perm.assert_permission(perm.BROWSER_VIEW)
+        req.perm.assert_permission('BROWSER_VIEW')
 
         order = req.args.get('order', 'name').lower()
         req.hdf['browser.order'] = order
@@ -205,7 +219,7 @@ class BrowserModule(Component):
         
         
     def _render_file(self, req, repos, node, rev=None):
-        req.perm.assert_permission(perm.FILE_VIEW)
+        req.perm.assert_permission('FILE_VIEW')
 
         changeset = repos.get_changeset(node.rev)  
         req.hdf['file'] = {  
@@ -273,10 +287,39 @@ class BrowserModule(Component):
 
             add_stylesheet(req, 'code.css')
 
+    # IWikiSyntaxProvider methods
+    
+    def get_wiki_syntax(self):
+        return []
+
+    def get_link_resolvers(self):
+        return [('repos', self._format_link),
+                ('source', self._format_link),
+                ('browser', self._format_link)]
+
+    def _format_link(self, formatter, ns, path, label):
+        rev = None
+        match = img_re.search(path)
+        if formatter.flavor != 'oneliner' and match:
+            return '<img src="%s" alt="%s" />' % \
+                   (formatter.href.file(path, format='raw'), label)
+        match = rev_re.search(path)
+        if match:
+            path = match.group(1)
+            rev = match.group(2)
+        label = urllib.unquote(label)
+        path = urllib.unquote(path)
+        if rev:
+            return '<a class="source" href="%s">%s</a>' \
+                   % (formatter.href.browser(path, rev=rev), label)
+        else:
+            return '<a class="source" href="%s">%s</a>' \
+                   % (formatter.href.browser(path), label)
+
 
 class LogModule(Component):
 
-    implements(INavigationContributor, IRequestHandler)
+    implements(INavigationContributor, IPermissionRequestor, IRequestHandler)
 
     # INavigationContributor methods
 
@@ -285,6 +328,11 @@ class LogModule(Component):
 
     def get_navigation_items(self, req):
         return []
+
+    # IPermissionRequestor methods
+
+    def get_permission_actions(self):
+        return ['LOG_VIEW']
 
     # IRequestHandler methods
 
@@ -296,7 +344,7 @@ class LogModule(Component):
             return 1
 
     def process_request(self, req):
-        req.perm.assert_permission(perm.LOG_VIEW)
+        req.perm.assert_permission('LOG_VIEW')
 
         mode = req.args.get('mode', 'stop_on_copy')
         path = req.args.get('path', '/')
