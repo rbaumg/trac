@@ -34,6 +34,7 @@ from trac.env import IEnvironmentSetupParticipant
 from trac.mimeview import *
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.web.main import IRequestHandler
+from trac.wiki.api import IWikiSyntaxProvider
 
 
 class Attachment(object):
@@ -63,8 +64,8 @@ class Attachment(object):
         row = cursor.fetchone()
         cursor.close()
         if not row:
-            raise TracError('Attachment %s/%s/%s does not exist.'
-                            % (self.parent_type, self.parent_id, filename),
+            self.filename = filename
+            raise TracError('Attachment %s does not exist.' % (self.title),
                             'Invalid Attachment')
         self.filename = row[0]
         self.description = row[1]
@@ -79,7 +80,20 @@ class Attachment(object):
         if self.filename:
             path = os.path.join(path, urllib.quote(self.filename))
         return os.path.normpath(path)
-    path = property(fget=lambda self: self._get_path())
+    path = property(_get_path)
+
+    def href(self,*args,**dict):
+        return self.env.href.attachment(self.parent_type, self.parent_id,
+                                        self.filename, *args, **dict)
+
+    def _get_title(self):
+        return '%s%s: %s' % (self.parent_type == 'ticket' and '#' or '',
+                             self.parent_id, self.filename)
+    title = property(_get_title)
+
+    def _get_parent_href(self):
+        return self.env.href(self.parent_type, self.parent_id)
+    parent_href = property(_get_parent_href)
 
     def delete(self, db=None):
         assert self.filename, 'Cannot delete non-existent attachment'
@@ -96,10 +110,11 @@ class Attachment(object):
         try:
             os.unlink(self.path)
         except OSError:
+            if handle_ta:
+                db.rollback()
             raise TracError, 'Attachment not found'
 
-        self.env.log.info('Attachment removed: %s/%s/%s'
-                          % (self.parent_type, self.parent_id, self.filename))
+        self.env.log.info('Attachment removed: %s' % self.title)
         if handle_ta:
             db.commit()
 
@@ -141,9 +156,7 @@ class Attachment(object):
             shutil.copyfileobj(fileobj, targetfile)
             self.filename = filename
 
-            self.env.log.info('New attachment: %s/%s/%s by %s'
-                              % (self.parent_type, self.parent_id,
-                                 self.filename, self.author))
+            self.env.log.info('New attachment: %s by %s' % (self.title, self.author))
             if handle_ta:
                 db.commit()
         finally:
@@ -188,9 +201,7 @@ def attachment_to_hdf(env, db, req, attachment):
         'ipnr': attachment.ipnr,
         'size': util.pretty_size(attachment.size),
         'time': time.strftime('%c', time.localtime(attachment.time)),
-        'href': env.href.attachment(attachment.parent_type,
-                                    attachment.parent_id,
-                                    attachment.filename)
+        'href': attachment.href()
     }
     return hdf
 
@@ -198,7 +209,7 @@ def attachment_to_hdf(env, db, req, attachment):
 class AttachmentModule(Component):
 
     implements(IEnvironmentSetupParticipant, IRequestHandler,
-               INavigationContributor)
+               INavigationContributor, IWikiSyntaxProvider)
 
     CHUNK_SIZE = 4096
     DISP_MAX_FILE_SIZE = 256 * 1024
@@ -265,6 +276,14 @@ class AttachmentModule(Component):
         add_stylesheet(req, 'code.css')
         return 'attachment.cs', None
 
+    # IWikiSyntaxProvider methods
+    
+    def get_wiki_syntax(self):
+        return []
+
+    def get_link_resolvers(self):
+        yield ('attachment', self._format_link)
+
     # Internal methods
 
     def _do_save(self, req, attachment):
@@ -272,8 +291,7 @@ class AttachmentModule(Component):
         req.perm.assert_permission(perm_map[attachment.parent_type])
 
         if 'cancel' in req.args.keys():
-            req.redirect(self.env.href(attachment.parent_type,
-                                       attachment.parent_id))
+            req.redirect(attachment.parent_href)
 
         upload = req.args['attachment']
         if not upload.filename:
@@ -282,6 +300,8 @@ class AttachmentModule(Component):
             size = os.fstat(upload.file.fileno())[6]
         else:
             size = upload.file.len
+        if size == 0:
+            raise TracError, 'No file uploaded'
 
         filename = upload.filename.replace('\\', '/').replace(':', '/')
         filename = os.path.basename(filename)
@@ -299,44 +319,48 @@ class AttachmentModule(Component):
         attachment.description = req.args.get('description', '')
         attachment.author = req.args.get('author', '')
         attachment.ipnr = req.remote_addr
+        if req.args.get('replace'):
+            try:
+                old_attachment = Attachment(self.env, attachment.parent_type,
+                                            attachment.parent_id, filename)
+                if not (old_attachment.author and req.authname \
+                        and old_attachment.author == req.authname):
+                    perm_map = {'ticket': perm.TICKET_ADMIN, 'wiki': perm.WIKI_DELETE}
+                    req.perm.assert_permission(perm_map[old_attachment.parent_type])
+                old_attachment.delete()
+            except TracError:
+                pass # don't worry if there's nothing to replace
+            attachment.filename = None
         attachment.insert(filename, upload.file, size)
 
         # Redirect the user to the newly created attachment
-        req.redirect(self.env.href.attachment(attachment.parent_type,
-                                              attachment.parent_id,
-                                              attachment.filename))
+        req.redirect(attachment.href())
 
     def _do_delete(self, req, attachment):
         perm_map = {'ticket': 'TICKET_ADMIN', 'wiki': 'WIKI_DELETE'}
         req.perm.assert_permission(perm_map[attachment.parent_type])
 
         if 'cancel' in req.args.keys():
-            req.redirect(self.env.href.attachment(attachment.parent_type,
-                                                  attachment.parent_id,
-                                                  attachment.filename))
+            req.redirect(attachment.href())
 
         attachment.delete()
 
         # Redirect the user to the attachment parent page
-        req.redirect(self.env.href(attachment.parent_type,
-                                   attachment.parent_id))
+        req.redirect(attachment.parent_href)
 
-    def _get_parent_link(self, parent_type, parent_id):
-        if parent_type == 'ticket':
-            return ('Ticket #' + parent_id, self.env.href.ticket(parent_id))
-        elif parent_type == 'wiki':
-            return (parent_id, self.env.href.wiki(parent_id))
+    def _get_parent_link(self, attachment):
+        if attachment.parent_type == 'ticket':
+            return ('Ticket #' + attachment.parent_id, attachment.parent_href)
+        elif attachment.parent_type == 'wiki':
+            return (attachment.parent_id, attachment.parent_href)
         return (None, None)
 
     def _render_confirm(self, req, attachment):
         perm_map = {'ticket': 'TICKET_ADMIN', 'wiki': 'WIKI_DELETE'}
         req.perm.assert_permission(perm_map[attachment.parent_type])
 
-        req.hdf['title'] = '%s%s: %s (delete)' \
-                           % (attachment.parent_type == 'ticket' and '#' or '',
-                              attachment.parent_id, attachment.filename)
-        text, link = self._get_parent_link(attachment.parent_type,
-                                           attachment.parent_id)
+        req.hdf['title'] = '%s (delete)' % attachment.title
+        text, link = self._get_parent_link(attachment)
         req.hdf['attachment'] = {
             'filename': attachment.filename,
             'mode': 'delete',
@@ -348,8 +372,7 @@ class AttachmentModule(Component):
         perm_map = {'ticket': 'TICKET_APPEND', 'wiki': 'WIKI_MODIFY'}
         req.perm.assert_permission(perm_map[attachment.parent_type])
 
-        text, link = self._get_parent_link(attachment.parent_type,
-                                           attachment.parent_id)
+        text, link = self._get_parent_link(attachment)
         req.hdf['attachment'] = {
             'mode': 'new',
             'author': util.get_reporter_id(req),
@@ -361,10 +384,12 @@ class AttachmentModule(Component):
         perm_map = {'ticket': 'TICKET_VIEW', 'wiki': 'WIKI_VIEW'}
         req.perm.assert_permission(perm_map[attachment.parent_type])
 
-        mimetype = get_mimetype(attachment.filename) or 'application/octet-stream'
+        fmt = req.args.get('format')
+        mimetype = fmt == 'txt' and 'text/plain' or \
+                   get_mimetype(attachment.filename) or 'application/octet-stream'
         charset = self.config.get('trac', 'default_charset')
 
-        if req.args.get('format') in ('raw', 'txt'):
+        if fmt in ('raw', 'txt'):
             # Render raw file
             req.send_file(attachment.path, mimetype + ';charset=' + charset)
             return
@@ -372,23 +397,17 @@ class AttachmentModule(Component):
         req.check_modified(attachment.time)
 
         # Render HTML view
-        text, link = self._get_parent_link(attachment.parent_type,
-                                           attachment.parent_id)
+        text, link = self._get_parent_link(attachment)
         add_link(req, 'up', link, text)
 
-        req.hdf['title'] = '%s%s: %s' % (attachment.parent_type == 'ticket' and '#' or '',
-                                         attachment.parent_id,
-                                         attachment.filename)
+        req.hdf['title'] = attachment.title
         req.hdf['attachment'] = attachment_to_hdf(self.env, None, req, attachment)
         req.hdf['attachment.parent'] = {
             'type': attachment.parent_type, 'id': attachment.parent_id,
             'name': text, 'href': link,
         }
 
-        raw_href = self.env.href.attachment(attachment.parent_type,
-                                            attachment.parent_id,
-                                            attachment.filename,
-                                            format='raw')
+        raw_href = attachment.href(format='raw')
         add_link(req, 'alternate', raw_href, 'Original Format', mimetype)
         req.hdf['attachment.raw_href'] = raw_href
 
@@ -403,11 +422,7 @@ class AttachmentModule(Component):
             data = fd.read(self.DISP_MAX_FILE_SIZE)
             if not is_binary(data):
                 data = util.to_utf8(data, charset)
-                add_link(req, 'alternate',
-                         self.env.href.attachment(attachment.parent_type,
-                                                  attachment.parent_id,
-                                                  attachment.filename,
-                                                  format='txt'),
+                add_link(req, 'alternate', attachment.href(format='txt'),
                          'Plain Text', mimetype)
             if len(data) >= self.DISP_MAX_FILE_SIZE:
                 req.hdf['attachment.max_file_size_reached'] = 1
@@ -420,3 +435,23 @@ class AttachmentModule(Component):
             req.hdf['attachment.preview'] = vdata
         finally:
             fd.close()
+
+    def _format_link(self, formatter, ns, link, label):
+        ids = link.split(':', 2)
+        if len(ids) == 3:
+            parent_type, parent_id, filename = ids
+        else:
+            # FIXME: the formatter should know to which object belongs
+            #        the text being formatted
+            #        (this info will also be required for TracCrossReferences)
+            path_info = formatter.req.path_info.split('/',2)
+            parent_type, parent_id = path_info[1], path_info[2] # Kludge for now
+            filename = link
+        try:
+            attachment = Attachment(self.env, parent_type, parent_id, filename)
+            return '<a class="attachment" title="%s" href="%s">%s</a>' \
+                   % ('Attachment ' + attachment.title,
+                      attachment.href(), label)
+        except TracError:
+            return '<a class="missing attachment" href="%s" rel="nofollow">%s</a>' \
+                   % (self.env.href.wiki(), label)
