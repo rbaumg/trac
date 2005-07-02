@@ -317,6 +317,13 @@ def mydict(items):
     return d
 
 
+def quote_cookie_value(path):
+    """
+    Cookie values can not contain " ,;" characters.
+    """
+    return path.replace(' ', '%20').replace(';', '%3B').replace(',', '%3C')
+
+
 if __name__ == '__main__ ':
     pass
     #print pre
