@@ -30,8 +30,9 @@ import StringIO
 import urllib
 
 from trac import util
+from trac.core import *
 from trac.mimeview import *
-from trac.wiki.api import WikiSystem
+from trac.wiki.api import WikiSystem, IWikiChangeListener
 
 __all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline']
 
@@ -255,13 +256,15 @@ class Formatter(object):
             intertrac = self._make_intertrac_link(ns, target, label)
             if intertrac:
                 return intertrac
-            else:                
-                return match
+            else:
+                interwiki = self._make_interwiki_link(ns, target, label)
+                if interwiki:
+                    return interwiki
+                else:
+                    return match
 
     def _make_intertrac_link(self, ns, target, label):
-        print 'make_intertrac', ns, target, label
         url = self.env.config.get('intertrac', ns.upper()+'.url')
-        print 'URL:', url
         if url:
             name = self.env.config.get('intertrac', ns.upper()+'.title',
                                        'Trac project %s' % ns)
@@ -274,16 +277,6 @@ class Formatter(object):
         else:
             return None
 
-    def _make_ext_link(self, url, text, title=''):
-        title_attr = title and ' title="%s"' % title or ''
-        if Formatter.img_re.search(url) and self.flavor != 'oneliner':
-            return '<img src="%s" alt="%s"%s />' % (url, title or text)
-        if not url.startswith(self._local):
-            return '<a class="ext-link" href="%s"%s>%s</a>' \
-                   % (url, title_attr, text)
-        else:
-            return '<a href="%s"%s>%s</a>' % (url, title_attr, text)
-
     def intertrac_helper(self, ns, target, label, fullmatch):
         if fullmatch: # short form
             alias = fullmatch.group('it_%s' % ns)
@@ -293,6 +286,24 @@ class Formatter(object):
                 it = self._make_intertrac_link(intertrac, target, label)
                 return it or label
         return None
+
+    def _make_interwiki_link(self, ns, target, label):
+        interwiki = InterWikiMap(self.env)
+        if interwiki.has_key(ns):
+            return self._make_ext_link(interwiki.url(ns, target), label,
+                                       '%s in %s' % (target, ns))
+        else:
+            return None
+
+    def _make_ext_link(self, url, text, title=''):
+        title_attr = title and ' title="%s"' % title or ''
+        if Formatter.img_re.search(url) and self.flavor != 'oneliner':
+            return '<img src="%s" alt="%s"%s />' % (url, title or text)
+        if not url.startswith(self._local):
+            return '<a class="ext-link" href="%s"%s>%s</a>' \
+                   % (url, title_attr, text)
+        else:
+            return '<a href="%s"%s>%s</a>' % (url, title_attr, text)
 
     def _bold_formatter(self, match, fullmatch):
         return self.simple_tag_handler('<strong>', '</strong>')
@@ -668,3 +679,58 @@ def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
     out = StringIO.StringIO()
     OutlineFormatter(env, absurls ,db).format(wikitext, out, max_depth)
     return out.getvalue()
+
+
+# InterWiki support
+
+class InterWikiMap(Component):
+
+    implements(IWikiChangeListener)
+
+    _page_name = 'InterWikiTxt'
+    _interwiki_re = re.compile(r"(\w+)[ \t]+(.*)[ \t]*$",re.UNICODE)
+
+    def __init__(self):
+        self._interwiki_map = None
+
+    def has_key(self, ns):
+        if not self._interwiki_map:
+            self._update()
+        return self._interwiki_map.has_key(ns.upper())
+
+    def url(self, ns, target):
+        return self._interwiki_map[ns.upper()] + target
+        # FIXME: take $n arguments into account, according to #1414
+
+    # IWikiChangeListener methods
+
+    def wiki_page_added(self, page):
+        if page == InterWikiMap._page_name:
+            self._update()
+
+    def wiki_page_changed(self, page, version, t, comment, author, ipnr):
+        if page == InterWikiMap._page_name:
+            self._update()
+
+    def wiki_page_deleted(self, page):
+        if page == InterWikiMap._page_name:
+            self._interwiki_map.clear()
+
+    def _update(self):
+        from trac.wiki.model import WikiPage
+        self._interwiki_map = {}
+        content = WikiPage(self.env, InterWikiMap._page_name).text
+        in_map = False
+        for line in content.split('\n'):
+            if in_map:
+                if line.startswith('----'):
+                    in_map = False
+                else:
+                    m = re.match(InterWikiMap._interwiki_re, line)
+                    if m:
+                        interwiki = m.group(1).upper()
+                        url = m.group(2)
+                        self._interwiki_map[interwiki] = url
+            elif line.startswith('----'):
+                in_map = True
+

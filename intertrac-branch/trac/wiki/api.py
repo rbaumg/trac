@@ -160,7 +160,6 @@ class WikiSystem(Component):
             self._external_handlers = handlers
             self._helper_patterns = helpers
             self._compiled_rules = rules
-        return self._compiled_rules
 
     def _get_link_resolvers(self):
         if not self._link_resolvers:
