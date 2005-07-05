@@ -151,6 +151,7 @@ class TracHTTPServer(HTTPServer):
             env.config.set('trac', 'htdocs_location', '')
             self.projects[project] = env
             self.projects[project].auth = auth
+            env.siblings = self.projects
 
 
 class TracHTTPRequestHandler(BaseHTTPRequestHandler):

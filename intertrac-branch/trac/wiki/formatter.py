@@ -125,7 +125,6 @@ class WikiProcessor(object):
 class Formatter(object):
     flavor = 'default'
 
-    _link_resolvers = None
     # Rules provided by IWikiSyntaxProviders are inserted between pre_rules and post_rules
     _pre_rules = [r"(?P<bolditalic>''''')",
                   r"(?P<bold>''')",
@@ -146,9 +145,6 @@ class Formatter(object):
                    r"(?P<last_table_cell>\|\|$)",
                    r"(?P<table_cell>\|\|)"]
 
-    _compiled_rules = None
-    _helper_patterns = None
-    _external_handlers = None
     _processor_re = re.compile('#\!([\w+-][\w+-/]*)')
     _anchor_re = re.compile('[^\w\d\.-:]+', re.UNICODE)
     
@@ -176,47 +172,22 @@ class Formatter(object):
     db = property(fget=_get_db)
 
     def _get_rules(self):
-        if not Formatter._compiled_rules:
-            helpers = []
-            handlers = {}
-            syntax = Formatter._pre_rules[:]
-            wiki = WikiSystem(self.env)
-            i = 0
-            for resolver in wiki.syntax_providers:
-                for regexp, handler in resolver.get_wiki_syntax():
-                    handlers['i'+str(i)] = handler
-                    syntax.append('(?P<i%d>%s)' % (i, regexp))
-                    i += 1
-            syntax += Formatter._post_rules[:]
-            helper_re = re.compile(r'\?P<([a-z]+)>')
-            for rule in syntax:
-                helpers += helper_re.findall(rule)[1:]
-            rules = re.compile('(?:' + string.join(syntax, '|') + ')')
-            Formatter._external_handlers = handlers
-            Formatter._helper_patterns = helpers
-            Formatter._compiled_rules = rules
-        return Formatter._compiled_rules
+        return WikiSystem(self.env).rules
     rules = property(_get_rules)
 
     def _get_link_resolvers(self):
-        if not Formatter._link_resolvers:
-            resolvers = {}
-            wiki = WikiSystem(self.env)
-            for resolver in wiki.syntax_providers:
-                for namespace, handler in resolver.get_link_resolvers():
-                    resolvers[namespace] = handler
-            Formatter._link_resolvers = resolvers
-        return Formatter._link_resolvers
+        return WikiSystem(self.env).link_resolvers
     link_resolvers = property(_get_link_resolvers)
 
     def replace(self, fullmatch):
+        wiki = WikiSystem(self.env)        
         for itype, match in fullmatch.groupdict().items():
-            if match and not itype in Formatter._helper_patterns:
+            if match and not itype in wiki.helper_patterns:
                 # Check for preceding escape character '!'
                 if match[0] == '!':
                     return match[1:]
-                if itype in self._external_handlers:
-                    return self._external_handlers[itype](self, match, fullmatch)
+                if itype in wiki.external_handlers:
+                    return wiki.external_handlers[itype](self, match, fullmatch)
                 else:
                     return getattr(self, '_' + itype + '_formatter')(match, fullmatch)
 
@@ -271,10 +242,15 @@ class Formatter(object):
         return self._make_link(ns, target, match, label)
 
     def _make_link(self, ns, target, match, label):
+        # check first for an alias defined in trac.ini
+        ns = self.env.config.get('intertrac', ns.upper(), ns)
         if ns in self.link_resolvers:
-            return self._link_resolvers[ns](self, ns, target, label)
+            return self.link_resolvers[ns](self, ns, target, label)
         elif target[:2] == '//' or ns == "mailto":
             return self._make_ext_link(ns+':'+target, label)
+        elif self.env.siblings.has_key(ns):
+            ref = wiki_to_oneliner(target, self.env.siblings[ns])
+            return ref.replace('>%s' % target, '>%s' % label)
         else:
             return match
 

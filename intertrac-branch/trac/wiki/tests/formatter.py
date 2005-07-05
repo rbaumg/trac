@@ -53,8 +53,8 @@ class WikiTestCase(unittest.TestCase):
                 self.config = Configuration(None)
                 self.href = Href('/')
                 self.abs_href = Href('http://www.example.com/')
-                self._wiki_pages = {}
                 self.path = ''
+                self.siblings = {}
             def component_activated(self, component):
                 component.env = self
                 component.config = self.config

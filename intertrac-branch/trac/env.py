@@ -79,6 +79,7 @@ class Environment(Component, ComponentManager):
             pass
 
         self.path = path
+        self.siblings = {}
         self.__cnx_pool = None
         if create:
             self.create(db_str)
