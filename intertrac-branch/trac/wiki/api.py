@@ -189,7 +189,12 @@ class WikiSystem(Component):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        yield (r"!?(^|(?<=[^A-Za-z]))[A-Z][a-z]+(?:[A-Z][a-z]*[a-z/])+(?:#[A-Za-z0-9]+)?(?=\Z|\s|[.,;:!?\)}\]])", lambda x, y, z: self._format_link(x, 'wiki', y, y))
+        yield (r"!?(^|(?<=[^A-Za-z]))"     # where to start
+               r"[A-Z][a-z]+"              # initial WikiPageNames component
+               r"(?:[A-Z][a-z]*[a-z/])+"   # additional WikiPageNames components
+               r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
+               r"(?=\Z|\s|[.,;:!?\)}\]])", # where to end
+               lambda x, y, z: self._format_link(x, 'wiki', y, y))
 
     def get_link_resolvers(self):
         yield ('wiki', self._format_link)
