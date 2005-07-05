@@ -298,7 +298,7 @@ class Formatter(object):
     def _make_ext_link(self, url, text, title=''):
         title_attr = title and ' title="%s"' % title or ''
         if Formatter.img_re.search(url) and self.flavor != 'oneliner':
-            return '<img src="%s" alt="%s"%s />' % (url, title or text)
+            return '<img src="%s" alt="%s" />' % (url, title or text)
         if not url.startswith(self._local):
             return '<a class="ext-link" href="%s"%s>%s</a>' \
                    % (url, title_attr, text)
