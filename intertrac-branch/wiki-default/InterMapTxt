@@ -1,0 +1,99 @@
+= InterWikiTxt =
+
+This is the InterMapTxt wiki page, modelled after the MeatBall:InterMapTxt page
+(the intial content of this page also comes from that page, as of the 5th of July 2005).
+
+This page is interpreted in a special way by Trac, in order to support
+!InterWiki links in a flexible and dynamic way.
+
+After the first line separator in this page, every line
+gets interpreted as an !InterWiki specification, 
+comprising an !InterWiki prefix followed by an URL (space separated).
+
+New !InterWiki links can be created by adding to that list, in real time.
+Note however that ''deletions'' are also taken into account immediately,
+so handle with care!
+
+Also note that !InterWiki prefixes are case insensitive.
+
+----
+{{{
+AbbeNormal http://ourpla.net/cgi/pikie?
+AcadWiki http://xarch.tu-graz.ac.at/autocad/wiki/
+Acronym http://www.acronymfinder.com/af-query.asp?String=exact&Acronym=
+Advogato http://www.advogato.org/
+ALife http://news.alife.org/wiki/index.php?
+AnnotationWiki http://www.seedwiki.com/page.cfm?wikiid=368&doc=
+AtomWiki http://intertwingly.net/wiki/pie/
+BeatWiki: http://wiki.doebe.li/
+BookShelved http://bookshelved.org/cgi-bin/wiki.pl?
+BridgesWiki http://c2.com:8000/
+C2find http://c2.com/cgi/wiki?FindPage&value=
+Cache http://www.google.com/search?q=cache:
+CarpeWiki http://carpe.com/wiki/wiki.pl?
+CommunityWiki http://www.emacswiki.org/cgi-bin/community?
+CraoWiki http://wiki.crao.net/index.php/
+CreationMatters http://www.ourpla.net/cgi-bin/wiki.pl?
+Dictionary http://www.dict.org/bin/Dict?Database=*&Form=Dict1&Strategy=*&Query=
+DseWiki http://www.wikiservice.at/dse/wiki.cgi?
+EmacsWiki http://www.emacswiki.org/cgi-bin/wiki.pl?
+FIRSTwiki http://www.firstwiki.org/
+Foldoc http://www.foldoc.org/foldoc/foldoc.cgi?
+FoxWiki http://fox.wikis.com/wc.dll?Wiki~
+FractalWiki http://www.wikiservice.at/fractal/wikidev.cgi?
+Google http://www.google.com/search?q=
+GoogleGroups http://groups.google.com/groups?q=
+HammondWiki http://www.dairiki.org/HammondWiki/
+HerzKinderWiki http://www.herzkinderinfo.de/Mediawiki/index.php/
+h2g2 http://www.bbc.co.uk/dna/h2g2/
+IAWiki http://www.IAwiki.net/
+IMDB http://us.imdb.com/Title?
+JargonFile http://downlode.org/perl/jargon-redirect.cgi?term=
+JspWiki http://www.ecyrd.com/JSPWiki/Wiki.jsp?page=
+JuraWiki http://jurawiki.de/
+KnowHow http://www2.iro.umontreal.ca/~paquetse/cgi-bin/wiki.cgi?
+LinuxWiki http://linuxwiki.org/
+LiveJournal http://livejournal.com/users/
+Login http://www.usemod.com/cgi-bin/mb.pl?action=login&p_userid=
+MbTest http://www.usemod.com/cgi-bin/mbtest.pl?
+MeatBall http://www.usemod.com/cgi-bin/mb.pl?
+MetaWiki http://sunir.org/apps/meta.pl?
+MetaWikiPedia http://meta.wikipedia.org/wiki/
+Mineralienatlas http://www.mineralienatlas.de/lexikon/index.php/
+MoinMoin http://moinmoin.wikiwikiweb.de/
+OddMuse http://www.emacswiki.org/cgi-bin/oddmuse/
+OpenWiki http://openwiki.com/?
+OrgPatterns http://www.easycomp.org/cgi-bin/OrgPatterns?
+PeriPeri http://www.srcf.ucam.org/~cjp39/Peri/
+PersonalTelco http://wiki.personaltelco.net/index.cgi/
+PhpWiki http://phpwiki.sourceforge.net/phpwiki/
+Pikie http://pikie.darktech.org/cgi/pikie?
+PythonInfo http://www.python.org/moin/
+PythonWiki http://www.pythonwiki.de/
+PyWiki http://www.voght.com/cgi-bin/pywiki?
+ReformSociety http://www.reformsociety.com/
+SeattleWireless http://seattlewireless.net/?
+SEEDS http://www.IslandSeeds.org/wiki/?
+SenseisLibrary http://senseis.xmp.net/?
+SkoleLinux http://www.skolelinux.de/wiki/
+StrikiWiki http://ch.twi.tudelft.nl/~mostert/striki/teststriki.pl?
+Tavi http://tavi.sourceforge.net/
+ThoughtStorms http://www.nooranch.com/synaesmedia/wiki/wiki.cgi?
+TrustixWiki http://doc.trustix.org/cgi-bin/trustixdoc.cgi?
+TWiki http://twiki.org/cgi-bin/view/
+Unreal http://wiki.beyondunreal.com/wiki/
+UseMod http://www.usemod.com/cgi-bin/wiki.pl?
+WebSeitzWiki http://webseitz.fluxent.com/wiki/
+WcsWiki http://www.myelin.co.nz/cgi-bin/wcswiki.pl?
+WhoIs http://www.whois.sc/
+Why http://clublet.com/c/c/why?
+Wiki http://c2.com/cgi/wiki?
+WikiPedia http://en.wikipedia.org/wiki/
+WikiTravel http://www.wikitravel.org/article/
+WikiWorld http://WikiWorld.com/wiki/index.php/
+WLUG http://www.wlug.org.nz/
+WorldWideWiki http://www.worldwidewiki.net/wiki/
+YpsiEyeball http://sknkwrks.dyndns.org:1957/writewiki/wiki.pl?
+ZWiki http://www.zwiki.org/
+}}}
+----
