@@ -687,7 +687,7 @@ class InterWikiMap(Component):
 
     implements(IWikiChangeListener)
 
-    _page_name = 'InterWikiTxt'
+    _page_name = 'InterMapTxt'
     _interwiki_re = re.compile(r"(\w+)[ \t]+(.*)[ \t]*$",re.UNICODE)
 
     def __init__(self):
@@ -705,15 +705,15 @@ class InterWikiMap(Component):
     # IWikiChangeListener methods
 
     def wiki_page_added(self, page):
-        if page == InterWikiMap._page_name:
+        if page.name == InterWikiMap._page_name:
             self._update()
 
     def wiki_page_changed(self, page, version, t, comment, author, ipnr):
-        if page == InterWikiMap._page_name:
+        if page.name == InterWikiMap._page_name:
             self._update()
 
     def wiki_page_deleted(self, page):
-        if page == InterWikiMap._page_name:
+        if page.name == InterWikiMap._page_name:
             self._interwiki_map.clear()
 
     def _update(self):
