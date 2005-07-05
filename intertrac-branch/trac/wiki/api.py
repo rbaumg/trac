@@ -153,7 +153,7 @@ class WikiSystem(Component):
                     syntax.append('(?P<i%d>%s)' % (i, regexp))
                     i += 1
             syntax += Formatter._post_rules[:]
-            helper_re = re.compile(r'\?P<([a-z]+)>')
+            helper_re = re.compile(r'\?P<([a-z\d_]+)>')
             for rule in syntax:
                 helpers += helper_re.findall(rule)[1:]
             rules = re.compile('(?:' + '|'.join(syntax) + ')')

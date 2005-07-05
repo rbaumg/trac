@@ -151,9 +151,13 @@ class TicketSystem(Component):
                 ('ticket', self._format_link)]
 
     def get_wiki_syntax(self):
-        yield (r"!?#\d+", lambda x, y, z: self._format_link(x, 'ticket', y[1:], y))
+        yield (r"!?#(?P<it_ticket>[a-zA-Z_-]{0,3})\d+",
+               lambda x, y, z: self._format_link(x, 'ticket', y[1:], y, z))
 
-    def _format_link(self, formatter, ns, target, label):
+    def _format_link(self, formatter, ns, target, label, fullmatch=None):
+        intertrac = formatter.intertrac_helper(ns, target, label, fullmatch)
+        if intertrac:
+            return intertrac
         cursor = formatter.db.cursor()
         cursor.execute("SELECT summary,status FROM ticket WHERE id=%s", (target,))
         row = cursor.fetchone()

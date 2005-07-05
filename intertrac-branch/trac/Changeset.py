@@ -102,12 +102,18 @@ class ChangesetModule(Component,DiffMixin):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        yield (r"!?\[\d+\]|\br\d+\b", (lambda x, y, z: self._format_link(x, 'changeset', y[0] == 'r' and y[1:] or y[1:-1], y)))
+        yield (r"!?\[(?P<it_changeset>[a-zA-Z_-]{0,3})\d+\]|\br\d+\b",
+               (lambda x, y, z: self._format_link(x, 'changeset',
+                                                  y[0] == 'r' and y[1:] or y[1:-1],
+                                                  y, z)))
 
     def get_link_resolvers(self):
         yield ('changeset', self._format_link)
 
-    def _format_link(self, formatter, ns, rev, label):
+    def _format_link(self, formatter, ns, rev, label, fullmatch=None):
+        intertrac = formatter.intertrac_helper(ns, rev, label, fullmatch)
+        if intertrac:
+            return intertrac
         cursor = formatter.db.cursor()
         cursor.execute('SELECT message FROM revision WHERE rev=%s', (rev,))
         row = cursor.fetchone()

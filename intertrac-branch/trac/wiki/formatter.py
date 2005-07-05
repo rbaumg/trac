@@ -252,18 +252,27 @@ class Formatter(object):
             ref = wiki_to_oneliner(target, self.env.siblings[ns])
             return ref.replace('>%s' % target, '>%s' % label)
         else:
-            url = self.env.config.get('intertrac', ns.upper()+'.url')
-            if url:
-                name = self.env.config.get('intertrac', ns.upper()+'.title',
-                                           'Trac project %s' % ns)
-                sep = target.find(':')
-                if sep != -1:
-                    url = '%s/%s/%s' % (url, target[:sep], target[sep+1:])
-                else: 
-                    url = '%s/search?q=%s' % (url, urllib.quote_plus(target))
-                return self._make_ext_link(url, label, '%s in %s' % (target, name))
+            intertrac = self._make_intertrac_link(ns, target, label)
+            if intertrac:
+                return intertrac
             else:                
                 return match
+
+    def _make_intertrac_link(self, ns, target, label):
+        print 'make_intertrac', ns, target, label
+        url = self.env.config.get('intertrac', ns.upper()+'.url')
+        print 'URL:', url
+        if url:
+            name = self.env.config.get('intertrac', ns.upper()+'.title',
+                                       'Trac project %s' % ns)
+            sep = target.find(':')
+            if sep != -1:
+                url = '%s/%s/%s' % (url, target[:sep], target[sep+1:])
+            else: 
+                url = '%s/search?q=%s' % (url, urllib.quote_plus(target))
+            return self._make_ext_link(url, label, '%s in %s' % (target, name))
+        else:
+            return None
 
     def _make_ext_link(self, url, text, title=''):
         title_attr = title and ' title="%s"' % title or ''
@@ -274,6 +283,16 @@ class Formatter(object):
                    % (url, title_attr, text)
         else:
             return '<a href="%s"%s>%s</a>' % (url, title_attr, text)
+
+    def intertrac_helper(self, ns, target, label, fullmatch):
+        if fullmatch: # short form
+            alias = fullmatch.group('it_%s' % ns)
+            if alias:
+                intertrac = self.env.config.get('intertrac', alias.upper(), alias)
+                target = '%s:%s' % (ns, target[len(alias):])
+                it = self._make_intertrac_link(intertrac, target, label)
+                return it or label
+        return None
 
     def _bold_formatter(self, match, fullmatch):
         return self.simple_tag_handler('<strong>', '</strong>')
