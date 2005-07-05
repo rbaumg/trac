@@ -193,7 +193,8 @@ class WikiSystem(Component):
                r"[A-Z][a-z]+"              # initial WikiPageNames component
                r"(?:[A-Z][a-z]*[a-z/])+"   # additional WikiPageNames components
                r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
-               r"(?=\Z|\s|[.,;:!?\)}\]])", # where to end
+               r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end
+               r"(?!:\S)",                 # InterWiki support               
                lambda x, y, z: self._format_link(x, 'wiki', y, y))
 
     def get_link_resolvers(self):

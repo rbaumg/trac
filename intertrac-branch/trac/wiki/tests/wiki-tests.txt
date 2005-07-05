@@ -62,10 +62,10 @@ CamelCase AlabamA ABc AlaBamA FooBar
 <a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a> AlabamA ABc AlaBamA <a class="missing wiki" href="/wiki/FooBar" rel="nofollow">FooBar?</a>
 </p>
 ==============================
-CamelCase,CamelCase.CamelCase:CamelCase
+CamelCase,CamelCase.CamelCase: CamelCase
 ------------------------------
 <p>
-<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>,<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>.<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>:<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>
+<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>,<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>.<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>: <a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>
 </p>
 ==============================
 !CamelCase
