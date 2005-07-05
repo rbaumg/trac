@@ -252,15 +252,28 @@ class Formatter(object):
             ref = wiki_to_oneliner(target, self.env.siblings[ns])
             return ref.replace('>%s' % target, '>%s' % label)
         else:
-            return match
+            url = self.env.config.get('intertrac', ns.upper()+'.url')
+            if url:
+                name = self.env.config.get('intertrac', ns.upper()+'.title',
+                                           'Trac project %s' % ns)
+                sep = target.find(':')
+                if sep != -1:
+                    url = '%s/%s/%s' % (url, target[:sep], target[sep+1:])
+                else: 
+                    url = '%s/search?q=%s' % (url, urllib.quote_plus(target))
+                return self._make_ext_link(url, label, '%s in %s' % (target, name))
+            else:                
+                return match
 
-    def _make_ext_link(self, url, text):
+    def _make_ext_link(self, url, text, title=''):
+        title_attr = title and ' title="%s"' % title or ''
         if Formatter.img_re.search(url) and self.flavor != 'oneliner':
-            return '<img src="%s" alt="%s" />' % (url, text)
+            return '<img src="%s" alt="%s"%s />' % (url, title or text)
         if not url.startswith(self._local):
-            return '<a class="ext-link" href="%s">%s</a>' % (url, text)
+            return '<a class="ext-link" href="%s"%s>%s</a>' \
+                   % (url, title_attr, text)
         else:
-            return '<a href="%s">%s</a>' % (url, text)
+            return '<a href="%s"%s>%s</a>' % (url, title_attr, text)
 
     def _bold_formatter(self, match, fullmatch):
         return self.simple_tag_handler('<strong>', '</strong>')
