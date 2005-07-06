@@ -536,6 +536,7 @@ class DiffChangeEditor(delta.Editor):
         return ('/', Changeset.EDIT)
 
     def add_directory(self, path, dir_baton, copyfrom_path, copyfrom_rev, dir_pool):
+        self.deltas.append((path, Node.DIRECTORY, Changeset.ADD))
         return (path, Changeset.ADD)
 
     def open_directory(self, path, dir_baton, base_revision, dir_pool):
@@ -543,7 +544,8 @@ class DiffChangeEditor(delta.Editor):
 
     def change_dir_prop(self, dir_baton, name, value, pool):
         path, change = dir_baton
-        self.deltas.append((path, Node.DIRECTORY, change))
+        if change != Changeset.ADD:
+            self.deltas.append((path, Node.DIRECTORY, change))
 
     def delete_entry(self, path, revision, dir_baton, pool):
         self.deltas.append((path, None, Changeset.DELETE))
