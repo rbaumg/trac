@@ -280,7 +280,8 @@ class MilestoneModule(Component):
             db = self.env.get_db_cnx()
             cursor = db.cursor()
             cursor.execute("SELECT completed,name,description FROM milestone "
-                           "WHERE completed>=%s AND completed<=%s", start, stop)
+                           "WHERE completed>=%s AND completed<=%s",
+                           (start, stop,))
             for completed,name,description in cursor:
                 title = 'Milestone <em>%s</em> completed' % escape(name)
                 if format == 'rss':
@@ -329,7 +330,7 @@ class MilestoneModule(Component):
         else:
             self._render_view(req, db, milestone)
 
-        add_stylesheet(req, 'roadmap.css')
+        add_stylesheet(req, 'css/roadmap.css')
         return 'milestone.cs', None
 
     # Internal methods
