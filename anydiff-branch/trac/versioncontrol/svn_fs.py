@@ -345,19 +345,11 @@ class SubversionRepository(Repository):
                     kind = _kindmap[fs.check_path(old_root, old_node.path, self.pool)]
                 yield  (old_node, new_node, kind, change)
         else:
-            if new_node and old_node:
-                old_root = fs.revision_root(self.fs_ptr, old_rev, self.pool)
-                new_root = fs.revision_root(self.fs_ptr, new_rev, self.pool)
-                if fs.contents_changed(old_root, old_path, new_root, new_path,
-                                       self.pool):
-                    change = Changeset.EDIT
-                else:
-                    return
-            elif new_node:
-                change = Changeset.ADD
-            elif old_node:
-                change = Changeset.DELETE
-            yield (old_node, new_node, Node.FILE, change)
+            old_root = fs.revision_root(self.fs_ptr, old_rev, self.pool)
+            new_root = fs.revision_root(self.fs_ptr, new_rev, self.pool)
+            if fs.contents_changed(old_root, old_path, new_root, new_path,
+                                   self.pool):
+                yield (old_node, new_node, Node.FILE, Changeset.EDIT)
 
 
 class SubversionNode(Node):
