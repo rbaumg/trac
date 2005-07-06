@@ -29,8 +29,7 @@ from trac.web.href import Href
 from trac.web.main import IRequestHandler
 
 def add_link(req, rel, href, title=None, mimetype=None, classname=None):
-    """
-    Add a link to the HDF data set that will be inserted as <link> element in
+    """Add a link to the HDF data set that will be inserted as <link> element in
     the <head> of the generated HTML
     """
     link = {'href': util.escape(href)}
@@ -46,31 +45,45 @@ def add_link(req, rel, href, title=None, mimetype=None, classname=None):
     req.hdf['chrome.links.%s.%d' % (rel, idx)] = link
 
 def add_stylesheet(req, filename, mimetype='text/css'):
-    """
-    Add a link to a style sheet to the HDF data set so that it gets included
+    """Add a link to a style sheet to the HDF data set so that it gets included
     in the generated HTML page.
     """
     href = Href(req.hdf['htdocs_location'])
-    add_link(req, 'stylesheet', href.css(filename), mimetype=mimetype)
+    add_link(req, 'stylesheet', href(filename), mimetype=mimetype)
 
 
 class INavigationContributor(Interface):
-    """
-    Extension point interface for components that contribute items to the
+    """Extension point interface for components that contribute items to the
     navigation.
     """
 
     def get_active_navigation_item(req):
-        """
-        This method is only called for the `IRequestHandler` processing the
-        request. It should return the name of the navigation item that should
-        be highlighted as active/current.
+        """This method is only called for the `IRequestHandler` processing the
+        request.
+        
+        It should return the name of the navigation item that should be
+        highlighted as active/current.
         """
 
     def get_navigation_items(req):
-        """
-        Should return an iterable object over the list of navigation items to
+        """Should return an iterable object over the list of navigation items to
         add, each being a tuple in the form (category, name, text).
+        """
+
+
+class ITemplateProvider(Interface):
+    """Extension point interface for components that provide their own
+    ClearSilver templates and accompanying static resources.
+    """
+
+    def get_htdocs_dir():
+        """Return the absolute path of a directory containing additional
+        static resources (such as images, style sheets, etc).
+        """
+
+    def get_templates_dir():
+        """Return the absolute path of the directory containing the provided
+        ClearSilver templates.
         """
 
 
@@ -81,6 +94,7 @@ class Chrome(Component):
     implements(IEnvironmentSetupParticipant, IRequestHandler)
 
     navigation_contributors = ExtensionPoint(INavigationContributor)
+    template_providers = ExtensionPoint(ITemplateProvider)
 
     # IEnvironmentSetupParticipant methods
 
@@ -130,22 +144,38 @@ class Chrome(Component):
     def match_request(self, req):
         m = re.match(r'/chrome/([/\w\-\.]+)', req.path_info)
         if m:
-            req.args['path'] = m.group(1)
+            req.args['filename'] = m.group(1)
             return True
 
     def process_request(self, req):
         from trac.config import default_dir
-        path = os.path.join(default_dir('htdocs'), req.args.get('path'))
-        if not os.path.isfile(path):
-            raise TracError, 'File not found'
-        req.send_file(path)
+
+        filename = req.args.get('filename')
+        dirs = [default_dir('htdocs')] + [provider.get_htdocs_dir() for provider
+                                          in self.template_providers]
+        for dir in [os.path.normpath(dir) for dir in dirs if dir is not None]:
+            abspath = os.path.normpath(os.path.join(dir, filename))
+            assert os.path.commonprefix([dir, abspath]) == dir
+
+            if os.path.isfile(abspath):
+                req.send_file(abspath)
+
+        # FIXME: Should return a 404 error
+        self.log.warning('File %s not found in any of %s', filename, dirs)
+        raise TracError, 'File not found'
 
     # Public API methods
 
+    def get_templates_dirs(self):
+        """Return a list of the names of all known templates directories."""
+        dirs = [self.env.get_templates_dir(),
+                self.config.get('trac', 'templates_dir')]
+        for provider in self.template_providers:
+            dirs.append(provider.get_templates_dir())
+        return dirs
+
     def populate_hdf(self, req, handler):
-        """
-        Add chrome-related data to the HDF.
-        """
+        """Add chrome-related data to the HDF."""
 
         # Provided for template customization
         req.hdf['HTTP.PathInfo'] = req.path_info
@@ -161,7 +191,7 @@ class Chrome(Component):
         add_link(req, 'start', self.env.href.wiki())
         add_link(req, 'search', self.env.href.search())
         add_link(req, 'help', self.env.href.wiki('TracGuide'))
-        add_stylesheet(req, 'trac.css')
+        add_stylesheet(req, 'css/trac.css')
         icon = self.config.get('project', 'icon')
         if icon:
             if icon[0] != '/' and icon.find('://') == -1:

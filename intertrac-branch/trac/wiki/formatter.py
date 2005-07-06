@@ -135,9 +135,10 @@ class Formatter(object):
                   r"(?P<subscript>,,)",
                   r"(?P<superscript>\^)",
                   r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
+                  r"(?P<inlinecode2>!?`(?P<inline2>.*?)`)",
                   r"(?P<htmlescapeentity>!?&#\d+;)"]
-    _post_rules = [r"(?P<shref>!?((?P<sns>\w+):(?P<stgt>(&#34;(.*?)&#34;|'(.*?)')|(([^ ][^ |]+)*[^|'~_\., \)]))))",
-                   r"(?P<lhref>!?\[(?P<lns>\w+):(?P<ltgt>[^ ]+) (?P<label>.*?)\])",
+    _post_rules = [r"(?P<shref>!?((?P<sns>\w+):(?P<stgt>'[^']+'|((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))",
+                   r"(?P<lhref>!?\[(?P<lns>\w+):(?P<ltgt>[^\] ]+)(?: (?P<label>.*?))?\])",
                    r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)(\]\]|\((?P<macroargs>.*?)\)\]\]))",
                    r"(?P<heading>^\s*(?P<hdepth>=+)\s.*\s(?P=hdepth)\s*$)",
                    r"(?P<list>^(?P<ldepth>\s+)(?:\*|\d+\.) )",
@@ -234,12 +235,16 @@ class Formatter(object):
     def _shref_formatter(self, match, fullmatch):
         ns = fullmatch.group('sns')
         target = fullmatch.group('stgt')
+        if target[0] == "'":
+            target = target[1:-1]
+        elif target[:5] == "&#34;":
+            target = target[5:-5]
         return self._make_link(ns, target, match, match)
 
     def _lhref_formatter(self, match, fullmatch):
         ns = fullmatch.group('lns')
         target = fullmatch.group('ltgt') 
-        label = fullmatch.group('label')
+        label = fullmatch.group('label') or target
         return self._make_link(ns, target, match, label)
 
     def _make_link(self, ns, target, match, label):
@@ -325,6 +330,9 @@ class Formatter(object):
 
     def _inlinecode_formatter(self, match, fullmatch):
         return '<tt>%s</tt>' % fullmatch.group('inline')
+
+    def _inlinecode2_formatter(self, match, fullmatch):
+        return '<tt>%s</tt>' % fullmatch.group('inline2')
 
     def _htmlescapeentity_formatter(self, match, fullmatch):
         #dummy function that match html escape entities in the format:

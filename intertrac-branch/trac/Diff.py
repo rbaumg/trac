@@ -162,8 +162,8 @@ class DiffMixin(object):
                  'text/plain', 'diff')
         add_link(req, 'alternate', '?format=zip&'+diff_params, 'Zip Archive',
                  'application/zip', 'zip')
-        add_stylesheet(req, 'changeset.css')
-        add_stylesheet(req, 'diff.css')
+        add_stylesheet(req, 'css/changeset.css')
+        add_stylesheet(req, 'css/diff.css')
         return 'diff.cs', None
 
 
