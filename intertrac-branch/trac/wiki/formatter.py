@@ -689,6 +689,7 @@ class InterWikiMap(Component):
 
     _page_name = 'InterMapTxt'
     _interwiki_re = re.compile(r"(\w+)[ \t]+(.*)[ \t]*$",re.UNICODE)
+    _argspec_re = re.compile(r"\$\d")
 
     def __init__(self):
         self._interwiki_map = None
@@ -699,8 +700,16 @@ class InterWikiMap(Component):
         return self._interwiki_map.has_key(ns.upper())
 
     def url(self, ns, target):
-        return self._interwiki_map[ns.upper()] + target
-        # FIXME: take $n arguments into account, according to #1414
+        url = self._interwiki_map[ns.upper()]
+        args = target.split(':')
+        def setarg(match):
+            num = int(match.group()[1:])
+            return 0 < num <= len(args) and args[num-1] or ''
+        url2 = re.sub(InterWikiMap._argspec_re, setarg, url)
+        if url2 == url: 
+            return url + target
+        else:
+            return url2
 
     # IWikiChangeListener methods
 
