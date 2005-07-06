@@ -304,37 +304,34 @@ class SubversionRepository(Repository):
         new_rev = self.normalize_rev(new_rev)
         if self.has_node(old_path, old_rev):
             old_node = self.get_node(old_path, old_rev)
+        else:
+            raise TracError, ('The Base for Diff is invalid: path %s'
+                              ' doesn\'t exist in revision %s' \
+                              % (old_path, old_rev))
         if self.has_node(new_path, new_rev):
             new_node = self.get_node(new_path, new_rev)
-        if not old_node and not new_node:
-            raise TracError, ('None of the Diff arguments are valid: '
-                              'neither %s in revision %s nor %s in revision %s exist '
-                              'in the repository' % (old_path, old_rev,
-                                                     new_path, new_rev))
-        elif old_node and new_node:
-            if new_node.kind != old_node.kind:
-                raise TracError, ('Diff mismatch: Trying to diff '
-                                  'a %s (%s in revision %s) '
-                                  'with a %s (%s in revision %s).' \
-                                  % (old_node.kind, old_path, old_rev,
-                                     new_node.kind, new_path, new_rev))
-        if new_node:
-            isdir = new_node.isdir
         else:
-            isdir = old_node.isdir
-        if isdir:
+            raise TracError, ('The Target for Diff is invalid: path %s'
+                              ' doesn\'t exist in revision %s' \
+                              % (new_path, new_rev))
+        if new_node.kind != old_node.kind:
+            raise TracError, ('Diff mismatch: Base is a %s (%s in revision %s) '
+                              'and Target is a %s (%s in revision %s).' \
+                              % (old_node.kind, old_path, old_rev,
+                                 new_node.kind, new_path, new_rev))
+        if new_node.isdir:
             editor = DiffChangeEditor()
             e_ptr, e_baton = delta.make_editor(editor, self.pool)
             old_root = fs.revision_root(self.fs_ptr, old_rev, self.pool)
             new_root = fs.revision_root(self.fs_ptr, new_rev, self.pool)
             def authz_cb(root, path, pool): return 1
-            text_deltas = 0 # as this is currently re-done in Diff.py...
+            text_deltas = 0 # as this is anyway re-done in Diff.py...
             entry_props = 0 # ("... typically used only for working copy updates")
             repos.svn_repos_dir_delta(old_root, old_path, '',
                                       new_root, new_path,
                                       e_ptr, e_baton, authz_cb,
                                       text_deltas,
-                                      isdir and 1 or 0,
+                                      1, # directory
                                       entry_props,
                                       ignore_ancestry,
                                       self.pool)
