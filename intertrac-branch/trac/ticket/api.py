@@ -155,7 +155,8 @@ class TicketSystem(Component):
                lambda x, y, z: self._format_link(x, 'ticket', y[1:], y, z))
 
     def _format_link(self, formatter, ns, target, label, fullmatch=None):
-        intertrac = formatter.intertrac_helper(ns, target, label, fullmatch)
+        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
+                                                         fullmatch)
         if intertrac:
             return intertrac
         cursor = formatter.db.cursor()

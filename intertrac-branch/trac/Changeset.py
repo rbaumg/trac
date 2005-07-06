@@ -111,7 +111,8 @@ class ChangesetModule(Component,DiffMixin):
         yield ('changeset', self._format_link)
 
     def _format_link(self, formatter, ns, rev, label, fullmatch=None):
-        intertrac = formatter.intertrac_helper(ns, rev, label, fullmatch)
+        intertrac = formatter.shorthand_intertrac_helper(ns, rev, label,
+                                                         fullmatch)
         if intertrac:
             return intertrac
         cursor = formatter.db.cursor()

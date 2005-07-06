@@ -254,9 +254,6 @@ class Formatter(object):
             return self.link_resolvers[ns](self, ns, target, label)
         elif target[:2] == '//' or ns == "mailto":
             return self._make_ext_link(ns+':'+target, label)
-        elif self.env.siblings.has_key(ns):
-            ref = wiki_to_oneliner(target, self.env.siblings[ns])
-            return ref.replace('>%s' % target, '>%s' % label)
         else:
             intertrac = self._make_intertrac_link(ns, target, label)
             if intertrac:
@@ -269,6 +266,9 @@ class Formatter(object):
                     return match
 
     def _make_intertrac_link(self, ns, target, label):
+        if self.env.siblings.has_key(ns):
+            ref = wiki_to_oneliner(target, self.env.siblings[ns])
+            return ref.replace('>%s' % target, '>%s' % label)
         url = self.env.config.get('intertrac', ns.upper()+'.url')
         if url:
             name = self.env.config.get('intertrac', ns.upper()+'.title',
@@ -282,7 +282,7 @@ class Formatter(object):
         else:
             return None
 
-    def intertrac_helper(self, ns, target, label, fullmatch):
+    def shorthand_intertrac_helper(self, ns, target, label, fullmatch):
         if fullmatch: # short form
             alias = fullmatch.group('it_%s' % ns)
             if alias:
