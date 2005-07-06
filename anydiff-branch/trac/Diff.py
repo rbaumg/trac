@@ -41,6 +41,15 @@ class DiffArgs(dict):
         return self[str]
     
 
+class ChangesPermission(Component):
+    """Simple permission provider for changes related modules."""
+    
+    implements(IPermissionRequestor)
+    
+    def get_permission_actions(self):
+        return ['CHANGESET_VIEW']
+    
+
 class DiffMixin(object):
     def process_request(self, req):
         """
@@ -453,12 +462,7 @@ class DiffMixin(object):
 
 class DiffModule(Component,DiffMixin):
 
-    implements(IPermissionRequestor, IRequestHandler, IWikiSyntaxProvider)
-
-    # IPermissionRequestor methods
-
-    def get_permission_actions(self):
-        return ['CHANGESET_VIEW']
+    implements(IRequestHandler, IWikiSyntaxProvider)
 
     # IRequestHandler methods
 
