@@ -24,15 +24,17 @@
 from __future__ import generators
 import re
 import os
-import imp
-import string
-import StringIO
 import urllib
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from trac import util
 from trac.core import *
 from trac.mimeview import *
-from trac.wiki.api import WikiSystem, IWikiChangeListener
+from trac.wiki.api import WikiSystem, IWikiChangeListener, IWikiMacroProvider
 
 __all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline']
 
@@ -674,17 +676,17 @@ class OutlineFormatter(Formatter):
 
 
 def wiki_to_html(wikitext, env, req, db=None, absurls=0, escape_newlines=False):
-    out = StringIO.StringIO()
+    out = StringIO()
     Formatter(env, req, absurls, db).format(wikitext, out, escape_newlines)
     return out.getvalue()
 
 def wiki_to_oneliner(wikitext, env, db=None, absurls=0):
-    out = StringIO.StringIO()
+    out = StringIO()
     OneLinerFormatter(env, absurls, db).format(wikitext, out)
     return out.getvalue()
 
 def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
-    out = StringIO.StringIO()
+    out = StringIO()
     OutlineFormatter(env, absurls ,db).format(wikitext, out, max_depth)
     return out.getvalue()
 
@@ -693,7 +695,7 @@ def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
 
 class InterWikiMap(Component):
 
-    implements(IWikiChangeListener)
+    implements(IWikiChangeListener, IWikiMacroProvider)
 
     _page_name = 'InterMapTxt'
     _interwiki_re = re.compile(r"(\w+)[ \t]+(.*)[ \t]*$",re.UNICODE)
@@ -708,7 +710,7 @@ class InterWikiMap(Component):
         return self._interwiki_map.has_key(ns.upper())
 
     def url(self, ns, target):
-        url = self._interwiki_map[ns.upper()]
+        url = self._interwiki_map[ns.upper()][1]
         args = target.split(':')
         def setarg(match):
             num = int(match.group()[1:])
@@ -745,9 +747,30 @@ class InterWikiMap(Component):
                 else:
                     m = re.match(InterWikiMap._interwiki_re, line)
                     if m:
-                        interwiki = m.group(1).upper()
-                        url = m.group(2)
-                        self._interwiki_map[interwiki] = url
+                        prefix, url = m.groups()
+                        self._interwiki_map[prefix.upper()] = (prefix, url.strip())
             elif line.startswith('----'):
                 in_map = True
 
+    # IWikiMacroProvider
+
+    def get_macros(self):
+        yield 'InterWiki'
+
+    def get_macro_description(self, name): 
+        yield 'Provide a description list for the known InterWiki prefixes.'
+
+    def render_macro(self, req, name, content):
+        if not self._interwiki_map:
+            self._update()
+        keys = self._interwiki_map.keys()
+        keys.sort()
+        buf = StringIO()
+        buf.write('<dl>')
+        for k in keys:
+            prefix, url = self._interwiki_map[k]
+            buf.write('<dt><a href="%(url)sRecentChanges">%(prefix)s</a></dt>'
+                      '<dd><a href="%(url)s">%(url)s</a></dd>' \
+                      % {'url':url, 'prefix':prefix})
+        buf.write('</dl>')
+        return buf.getvalue()
