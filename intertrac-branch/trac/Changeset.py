@@ -36,13 +36,7 @@ from trac.Diff import DiffMixin
 
 class ChangesetModule(Component,DiffMixin):
 
-    implements(IPermissionRequestor, IRequestHandler, ITimelineEventProvider,
-               IWikiSyntaxProvider)
-
-    # IPermissionRequestor methods
-
-    def get_permission_actions(self):
-        return ['CHANGESET_VIEW']
+    implements(IRequestHandler, ITimelineEventProvider, IWikiSyntaxProvider)
 
     # IRequestHandler methods
 

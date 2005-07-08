@@ -345,19 +345,11 @@ class SubversionRepository(Repository):
                     kind = _kindmap[fs.check_path(old_root, old_node.path, self.pool)]
                 yield  (old_node, new_node, kind, change)
         else:
-            if new_node and old_node:
-                old_root = fs.revision_root(self.fs_ptr, old_rev, self.pool)
-                new_root = fs.revision_root(self.fs_ptr, new_rev, self.pool)
-                if fs.contents_changed(old_root, old_path, new_root, new_path,
-                                       self.pool):
-                    change = Changeset.EDIT
-                else:
-                    return
-            elif new_node:
-                change = Changeset.ADD
-            elif old_node:
-                change = Changeset.DELETE
-            yield (old_node, new_node, Node.FILE, change)
+            old_root = fs.revision_root(self.fs_ptr, old_rev, self.pool)
+            new_root = fs.revision_root(self.fs_ptr, new_rev, self.pool)
+            if fs.contents_changed(old_root, old_path, new_root, new_path,
+                                   self.pool):
+                yield (old_node, new_node, Node.FILE, Changeset.EDIT)
 
 
 class SubversionNode(Node):
@@ -544,6 +536,7 @@ class DiffChangeEditor(delta.Editor):
         return ('/', Changeset.EDIT)
 
     def add_directory(self, path, dir_baton, copyfrom_path, copyfrom_rev, dir_pool):
+        self.deltas.append((path, Node.DIRECTORY, Changeset.ADD))
         return (path, Changeset.ADD)
 
     def open_directory(self, path, dir_baton, base_revision, dir_pool):
@@ -551,7 +544,8 @@ class DiffChangeEditor(delta.Editor):
 
     def change_dir_prop(self, dir_baton, name, value, pool):
         path, change = dir_baton
-        self.deltas.append((path, Node.DIRECTORY, change))
+        if change != Changeset.ADD:
+            self.deltas.append((path, Node.DIRECTORY, change))
 
     def delete_entry(self, path, revision, dir_baton, pool):
         self.deltas.append((path, None, Changeset.DELETE))
