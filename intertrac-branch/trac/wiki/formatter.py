@@ -140,7 +140,7 @@ class Formatter(object):
                   r"(?P<inlinecode2>!?`(?P<inline2>.*?)`)",
                   r"(?P<htmlescapeentity>!?&#\d+;)"]
     _post_rules = [r"(?P<shref>!?((?P<sns>\w+):(?P<stgt>'[^']+'|((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))",
-                   r"(?P<lhref>!?\[(?P<lns>\w+):(?P<ltgt>[^\] ]+)(?: (?P<label>.*?))?\])",
+                   r"(?P<lhref>(?<![\[!])\[(?:(?P<lns>\w+):(?P<ltgt>[^\] ]+)|(?P<rel>[/.][^ [\]]*))(?: (?P<label>.*?))?\])",
                    r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)(\]\]|\((?P<macroargs>.*?)\)\]\]))",
                    r"(?P<heading>^\s*(?P<hdepth>=+)\s.*\s(?P=hdepth)\s*$)",
                    r"(?P<list>^(?P<ldepth>\s+)(?:\*|\d+\.) )",
@@ -247,7 +247,11 @@ class Formatter(object):
         ns = fullmatch.group('lns')
         target = fullmatch.group('ltgt') 
         label = fullmatch.group('label') or target
-        return self._make_link(ns, target, match, label)
+        rel = fullmatch.group('rel')
+        if rel:
+            return self._make_relative_link(rel, label or rel)
+        else:
+            return self._make_link(ns, target, match, label)
 
     def _make_link(self, ns, target, match, label):
         # check first for an alias defined in trac.ini
@@ -311,6 +315,14 @@ class Formatter(object):
                    % (url, title_attr, text)
         else:
             return '<a href="%s"%s>%s</a>' % (url, title_attr, text)
+
+    def _make_relative_link(self, url, text):
+        if Formatter.img_re.search(url) and self.flavor != 'oneliner':
+            return '<img src="%s" alt="%s" />' % (url, text)
+        if url.startswith('//'): # only the protocol will be kept
+            return '<a class="ext-link" href="%s">%s</a>' % (url, text)
+        else:
+            return '<a href="%s">%s</a>' % (url, text)
 
     def _bold_formatter(self, match, fullmatch):
         return self.simple_tag_handler('<strong>', '</strong>')
