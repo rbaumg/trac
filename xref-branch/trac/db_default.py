@@ -22,7 +22,7 @@
 from trac.config import default_dir
 
 # Database version identifier. Used for automatic upgrades.
-db_version = 13
+db_version = 14
 
 def __mkreports(reports):
     """Utility function used to create report data in same syntax as the
@@ -82,6 +82,17 @@ schema = [
         Column('var_name'),
         Column('var_value'),
         Index(['sid', 'var_name'])],
+    Table('xref')[
+        Column('src_type'),
+        Column('src_id'),
+        Column('facet'),
+        Column('context'),
+        Column('time', type='int'),
+        Column('relation'),
+        Column('dest_type'),
+        Column('dest_id'),
+        Index(['src_type', 'src_id']),
+        Index(['dest_type', 'dest_id'])],
 
     # Attachments
     Table('attachment', key=('type', 'id', 'filename'))[

@@ -208,9 +208,11 @@ class SQLiteConnection(ConnectionWrapper):
         if len(table.key) > 1:
             coldefs.append("    UNIQUE (%s)" % ','.join(table.key))
         sql.append(',\n'.join(coldefs) + '\n);')
+        i = 0
         for index in table.indexes:
-            sql.append("CREATE INDEX %s_idx ON %s (%s);"
-                       % (table.name, table.name, ','.join(index.columns)))
+            i += 1
+            sql.append("CREATE INDEX %s_idx%d ON %s (%s);"
+                       % (table.name, i, table.name, ','.join(index.columns)))
         return '\n'.join(sql)
     to_sql = classmethod(to_sql)
 
@@ -265,9 +267,11 @@ class PostgreSQLConnection(ConnectionWrapper):
             coldefs.append("    CONSTRAINT %s_pk PRIMARY KEY (%s)"
                            % (table.name, ','.join(table.key)))
         sql.append(',\n'.join(coldefs) + '\n);')
+        i = 0
         for index in table.indexes:
-            sql.append("CREATE INDEX %s_idx ON %s (%s);"
-                       % (table.name, table.name, ','.join(index.columns)))
+            i += 1
+            sql.append("CREATE INDEX %s_idx%d ON %s (%s);"
+                       % (table.name, i, table.name, ','.join(index.columns)))
         return '\n'.join(sql)
     to_sql = classmethod(to_sql)
 
