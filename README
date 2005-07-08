@@ -3,40 +3,53 @@ cboos on #trac
 
 See the wiki page ChristianBoos for more info.
 
+
+== TODO ==
+
+=== Anydiff Branch ===
+
+ * to be integrated in trunk
+
+=== InterTrac Branch ===
+ 
+ * to be integrated in trunk
+
+=== TracCrossReferences Branch ===
+
+ * phase out old version
+   (see log:branches/cboos-dev/patches/xref-branch#1659)
+ * copied from the latest InterTrac branch
+ * will introduce a new `xref` table:
+   {{{
+   CREATE TABLE xref (
+         src_type        text,   -- source type
+         src_id          text,   -- source id
+         facet           text,   -- where the relation was defined
+         context         text,   -- (excerpt of the context of definition)
+         time            integer,-- when the relation was defined
+
+         relation        text,   -- optional relation
+
+         dest_type       text,   -- destination type
+         dest_id         text,   -- destination id
+   );
+   }}}
+
+
+=== Trac Object Branch ===
+
+ * Based on the (old) TracCrossReferences branch
+ * badly out of sync...
+
+
 == DONE ==
 
 === Category Branch ===
 
 The TicketTypes feature was integrated in the trunk in r1691. 
 
-
-== TODO ==
-
-=== InterTrac Branch ===
-
-Turned out to lead to a big refactoring of the Wiki engine, 
-waiting for completion...
-
-This will separate the parsing logic and the formatting logic,
-as well as introducing pluggable parsers and wiki links.
-
-
-=== XRef Branch ===
-
-Functional as it is, but not perfect:
- * badly out-of-sync...
- * should introduce a {{{time}}} field in the {{{xref}}} table,
-   for being able to present the cross-references by time
- * will greatly benefit from the InterTrac wiki refactoring
-   (dedicated XRefFormatter)
-
-
-=== Trac Object Branch ===
-
-Depends on the XRef branch...
-
-
 === Anydiff Branch ===
 
  * The link syntax described in #199 will be done
    using an IWikiLinkProvider (depends on InterTrac branch).
+
