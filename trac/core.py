@@ -407,7 +407,7 @@ def dispatch_request(path_info, args, req, env, database=None):
 
     authenticator = auth.Authenticator(database, req)
     if path_info == '/logout':
-        authenticator.logout()
+        authenticator.logout(req)
         referer = req.get_header('Referer')
         if referer and referer[0:len(req.base_url)] != req.base_url:
             # only redirect to referer if the latter is from the same instance
