@@ -160,16 +160,14 @@ class TicketSystem(Component):
         if intertrac:
             return intertrac
         cursor = formatter.db.cursor()
-        cursor.execute("SELECT summary,status FROM ticket WHERE id=%s", (target,))
+        cursor.execute("SELECT summary,status FROM ticket WHERE id=%s",
+                       (target,))
         row = cursor.fetchone()
         if row:
             summary = util.escape(util.shorten_line(row[0]))
-            if row[1] in ('new', 'closed'):
-                return '<a class="%s ticket" href="%s" title="%s (%s)">%s</a>' \
-                       % (row[1], formatter.href.ticket(target), summary, row[1], label)
-            else:
-                return '<a class="ticket" href="%s" title="%s">%s</a>' \
-                       % (formatter.href.ticket(target), summary, label)
+            return '<a class="%s ticket" href="%s" title="%s (%s)">%s</a>' \
+                   % (row[1], formatter.href.ticket(target), summary, row[1],
+                      label)
         else:
             return '<a class="missing ticket" href="%s" rel="nofollow">%s</a>' \
                    % (formatter.href.ticket(target), label)

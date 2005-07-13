@@ -32,7 +32,7 @@ except ImportError:
 from trac.core import *
 from trac.util import enum, escape
 
-__all__ = ['get_charset', 'get_mimetype', 'is_binary', 'Mimeview']
+__all__ = ['get_charset', 'get_mimetype', 'is_binary', 'detect_unicode', 'Mimeview']
 
 MIME_MAP = {
     'css':'text/css',
@@ -120,10 +120,24 @@ def get_mimetype(filename):
 
 def is_binary(str):
     """Detect binary content by checking the first thousand bytes for zeroes."""
+    if detect_unicode(str):
+        return False
     for i in range(0, min(len(str), 1000)):
         if str[i] == '\0':
             return True
     return False
+
+def detect_unicode(data):
+    """Detect different unicode charsets by looking for BOM's (Byte Order Marks)"""
+    if data[:2] == '\xff\xfe':
+        return 'utf-16-le'
+    elif data[:2] == '\xfe\xff':
+        return 'utf-16-be'
+    elif data[:3] == '\xef\xbb\xbf':
+        return 'utf-8'
+    else:
+        return None
+
 
 class IHTMLPreviewRenderer(Interface):
     """Extension point interface for components that add HTML renderers of
@@ -214,13 +228,14 @@ class Mimeview(Component):
                 else:
                     buf = StringIO()
                     buf.write('<div class="code-block"><pre>')
+                    tab_width = int(self.config.get('mimeviewer', 'tab_width'))
                     for line in result:
-                        buf.write(line.expandtabs(8) + '\n')
+                        buf.write(line.expandtabs(tab_width) + '\n')
                     buf.write('</pre></div>')
                     return buf.getvalue()
             except Exception, e:
                 self.log.warning('HTML preview using %s failed (%s)'
-                                 % (renderer, e))
+                                 % (renderer, e), exc_info=True)
 
     def _annotate(self, lines, annotations):
         buf = StringIO()
@@ -238,13 +253,14 @@ class Mimeview(Component):
         def htmlify(match):
             div, mod = divmod(len(match.group(0)), 2)
             return div * '&nbsp; ' + mod * '&nbsp;'
+        tab_width = int(self.config.get('mimeviewer', 'tab_width'))
 
         for num, line in enum(_html_splitlines(lines)):
             cells = []
             for annotator in annotators:
                 cells.append(annotator.annotate_line(num + 1, line))
-            cells.append('<td>%s</td>\n' % space_re.sub(htmlify,
-                                                        line.expandtabs(8)))
+            cells.append('<td>%s</td>\n'
+                         % space_re.sub(htmlify, line.expandtabs(tab_width)))
             buf.write('<tr>' + '\n'.join(cells) + '</tr>')
         buf.write('</tbody></table>')
         return buf.getvalue()

@@ -483,3 +483,7 @@ Relative links are supported:
 = "Test" =
 ------------------------------
 <h1 id="Test">"Test"</h1>
+==============================
+= Foo <Bar> Baz =
+------------------------------
+<h1 id="FooltBargtBaz">Foo &lt;Bar&gt; Baz</h1>

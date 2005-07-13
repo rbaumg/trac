@@ -375,20 +375,20 @@ class Formatter(object):
 
         depth = min(len(fullmatch.group('hdepth')), 5)
         heading = match[depth + 1:len(match) - depth - 1]
-        anchor = anchor_base = self._anchor_re.sub('', heading.decode('utf-8'))
+        anchor = self._anchor_re.sub('', heading.decode('utf-8'))
         if not anchor or not anchor[0].isalpha():
             # an ID must start with a letter in HTML
             anchor = 'a' + anchor
         i = 1
-        anchor = anchor.encode('utf-8')
+        anchor = anchor_base = anchor.encode('utf-8')
         while anchor in self._anchors:
             anchor = anchor_base + str(i)
             i += 1
         self._anchors.append(anchor)
         self.out.write('<h%d id="%s">%s</h%d>' % (depth, anchor,
-                                                  wiki_to_oneliner(heading,
-                                                      self.env, self._db,
-                                                      self._absurls),
+                                                  wiki_to_oneliner(util.unescape(heading),
+                                                  self.env, self._db,
+                                                  self._absurls),
                                                   depth))
 
     def _indent_formatter(self, match, fullmatch):

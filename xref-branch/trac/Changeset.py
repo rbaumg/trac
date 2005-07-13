@@ -27,16 +27,25 @@ import re
 
 from trac import mimeview, util
 from trac.core import *
-from trac.perm import IPermissionRequestor
 from trac.Timeline import ITimelineEventProvider
 from trac.versioncontrol import Changeset, Node
+from trac.web.chrome import INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.Diff import DiffMixin
 
 class ChangesetModule(Component,DiffMixin):
 
-    implements(IRequestHandler, ITimelineEventProvider, IWikiSyntaxProvider)
+    implements(INavigationContributor, IRequestHandler,
+               ITimelineEventProvider, IWikiSyntaxProvider)
+
+    # INavigationContributor methods
+
+    def get_active_navigation_item(self, req):
+        return 'browser'
+
+    def get_navigation_items(self, req):
+        return []
 
     # IRequestHandler methods
 
@@ -69,15 +78,17 @@ class ChangesetModule(Component,DiffMixin):
                 if chgset.date < start:
                     return
                 if chgset.date < stop:
-                    title = 'Changeset <em>[%s]</em> by %s' % (
-                            util.escape(chgset.rev), util.escape(chgset.author))
+                    excerpt = util.shorten_line(chgset.message or '--')
                     if format == 'rss':
+                        title = 'Changeset <em>[%s]</em>: %s' % (
+                            util.escape(chgset.rev), util.escape(excerpt))
                         href = self.env.abs_href.changeset(chgset.rev)
                         message = wiki_to_html(chgset.message or '--', self.env,
                                                db, absurls=True)
                     else:
+                        title = 'Changeset <em>[%s]</em> by %s' % (
+                            util.escape(chgset.rev), util.escape(chgset.author))
                         href = self.env.href.changeset(chgset.rev)
-                        excerpt = util.shorten_line(chgset.message or '--')
                         message = wiki_to_oneliner(excerpt, self.env, db)
                     if show_files:
                         files = []

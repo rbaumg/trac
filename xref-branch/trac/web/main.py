@@ -392,9 +392,11 @@ def dispatch_request(path_info, req, env):
             from trac.web.auth import Authenticator
             check_ip = env.config.get('trac', 'check_auth_ip')
             check_ip = check_ip.strip().lower() in TRUE
-            authenticator = Authenticator(db, req, check_ip)
+            ignore_case = env.config.get('trac', 'ignore_auth_case')
+            ignore_case = ignore_case.strip().lower() in TRUE
+            authenticator = Authenticator(db, req, check_ip, ignore_case)
             if path_info == '/logout':
-                authenticator.logout()
+                authenticator.logout(req)
                 referer = req.get_header('Referer')
                 if referer and not referer.startswith(req.base_url):
                     # only redirect to referer if the latter is from the same
