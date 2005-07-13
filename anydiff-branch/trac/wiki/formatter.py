@@ -265,21 +265,18 @@ class Formatter(object):
         target = fullmatch.group('stgt')
         if target[0] in "'\"":
             target = target[1:-1]
-        
-        if ns in self.link_resolvers:
-            return self._link_resolvers[ns](self, ns, target, match)
-        elif target[:2] == '//':
-            return self._make_ext_link(match, match)
-        else:
-            return match
+        return self._make_link(ns, target, match, match)
 
     def _lhref_formatter(self, match, fullmatch):
         ns = fullmatch.group('lns')
         target = fullmatch.group('ltgt') 
         label = fullmatch.group('label') or target
+        return self._make_link(ns, target, match, label)
+
+    def _make_link(self, ns, target, match, label):
         if ns in self.link_resolvers:
             return self._link_resolvers[ns](self, ns, target, label)
-        elif target[:2] == '//':
+        elif target[:2] == '//' or ns == "mailto":
             return self._make_ext_link(ns+':'+target, label)
         else:
             return match
@@ -345,20 +342,20 @@ class Formatter(object):
 
         depth = min(len(fullmatch.group('hdepth')), 5)
         heading = match[depth + 1:len(match) - depth - 1]
-        anchor = anchor_base = self._anchor_re.sub('', heading.decode('utf-8'))
+        anchor = self._anchor_re.sub('', heading.decode('utf-8'))
         if not anchor or not anchor[0].isalpha():
             # an ID must start with a letter in HTML
             anchor = 'a' + anchor
         i = 1
-        anchor = anchor.encode('utf-8')
+        anchor = anchor_base = anchor.encode('utf-8')
         while anchor in self._anchors:
             anchor = anchor_base + str(i)
             i += 1
         self._anchors.append(anchor)
         self.out.write('<h%d id="%s">%s</h%d>' % (depth, anchor,
-                                                  wiki_to_oneliner(heading,
-                                                      self.env, self._db,
-                                                      self._absurls),
+                                                  wiki_to_oneliner(util.unescape(heading),
+                                                  self.env, self._db,
+                                                  self._absurls),
                                                   depth))
 
     def _indent_formatter(self, match, fullmatch):

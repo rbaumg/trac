@@ -29,11 +29,10 @@ from trac.web.chrome import INavigationContributor
 
 
 class Authenticator:
-    """
-    Provides user authentication based on HTTP authentication provided by the
-    web-server, combined with cookies for communicating the login information
-    across the whole site.
-
+    """Implements user authentication based on HTTP authentication provided by
+    the web-server, combined with cookies for communicating the login
+    information across the whole site.
+    
     Expects that the web-server is setup so that a request to the path '/login'
     requires authentication (such as Basic or Digest). The login name is then
     stored in the database and associated with a unique key that gets passed
@@ -41,9 +40,11 @@ class Authenticator:
     to identify the user in subsequent requests to non-protected resources.
     """
 
-    def __init__(self, db, req, check_ip=1):
+    def __init__(self, db, req, check_ip=True, ignore_case=False):
         self.db = db
         self.authname = 'anonymous'
+        self.ignore_case = ignore_case
+
         if req.incookie.has_key('trac_auth'):
             cookie = req.incookie['trac_auth'].value
             cursor = db.cursor()
@@ -57,16 +58,32 @@ class Authenticator:
             row = cursor.fetchone()
             if row:
                 self.authname = row[0]
+            else:
+                # Tell the user to drop any auth_cookie for which no
+                # corresponding entry in our cookie table exists.
+                self.expire_auth_cookie(req)
 
     def login(self, req):
-        """
-        Logs the remote user in. This function expects to be called when the
-        remote user name is available. The user name is inserted into the
-        auth_cookie table and a cookie identifying the user on subsequent
-        requests is sent back to the client.
+        """Log the remote user in.
+        
+        This function expects to be called when the remote user name is
+        available. The user name is inserted into the `auth_cookie` table and a
+        cookie identifying the user on subsequent requests is sent back to the
+        client.
+        
+        If the Authenticator was created with `ignore_case` set to true, then 
+        the authentication name passed from the web server in req.remote_user
+        will be converted to lower case before being used. This is to avoid
+        problems on installations authenticating against Windows which is not
+        case sensitive regarding user names and domain names
         """
         assert req.remote_user, 'Authentication information not available.'
-        if self.authname == req.remote_user:
+        
+        remote_user = req.remote_user
+        if self.ignore_case:
+            remote_user = remote_user.lower()
+
+        if self.authname == remote_user:
             # Already logged in with the same user name
             return
         assert self.authname == 'anonymous', \
@@ -76,25 +93,36 @@ class Authenticator:
         cursor = self.db.cursor()
         cursor.execute("INSERT INTO auth_cookie (cookie,name,ipnr,time) "
                        "VALUES (%s, %s, %s, %s)",
-                       (cookie, req.remote_user, req.remote_addr,
-                        int(time.time())));
+                       (cookie, remote_user, req.remote_addr, int(time.time())))
         self.db.commit()
-        self.authname = req.remote_user
+        self.authname = remote_user
         req.outcookie['trac_auth'] = cookie
         req.outcookie['trac_auth']['path'] = util.quote_cookie_value(req.cgi_location)
 
-    def logout(self):
-        """
-        Logs the user out. Simply deletes the corresponding record from the
-        auth_cookie table.
+    def logout(self, req):
+        """Log the user out.
+        
+        Simply deletes the corresponding record from the auth_cookie table.
         """
         if self.authname == 'anonymous':
             # Not logged in
             return
 
         cursor = self.db.cursor()
-        cursor.execute("DELETE FROM auth_cookie WHERE name=%s", self.authname)
+        # While deleting this cookie we also take the opportunity to delete
+        # cookies older than 10 days
+        cursor.execute("DELETE FROM auth_cookie WHERE name=%s OR time < %s",
+                       (self.authname, int(time.time()) - 86400 * 10))
         self.db.commit()
+        self.expire_auth_cookie(req)
+
+    def expire_auth_cookie(self, req):
+        """Instruct the user agent to drop the auth cookie by setting the
+        "expires" property to a date in the past.
+        """
+        req.outcookie['trac_auth'] = ''
+        req.outcookie['trac_auth']['path'] = util.quote_cookie_value(req.cgi_location)
+        req.outcookie['trac_auth']['expires'] = -10000
 
 
 class LoginModule(Component):
