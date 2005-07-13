@@ -27,7 +27,7 @@ import urllib
 
 from trac import util
 from trac.core import *
-from trac.mimeview import get_mimetype, is_binary, Mimeview
+from trac.mimeview import get_mimetype, is_binary, detect_unicode, Mimeview
 from trac.perm import IPermissionRequestor
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.web.main import IRequestHandler
@@ -84,6 +84,15 @@ def _get_path_links(href, path, rev, old_path=None, old_rev=None):
             'href': href.browser(path, rev=rev, old_path=old_path, old_rev=old_rev)
         })
     return links
+
+def _get_path_rev(path):
+    rev = None
+    match = rev_re.search(path)
+    if match:
+        path = match.group(1)
+        rev = match.group(2)
+    path = urllib.unquote(path)
+    return (path, rev)
 
 
 class BrowserModule(Component):
@@ -241,7 +250,7 @@ class BrowserModule(Component):
         if ctpos >= 0:
             charset = mime_type[ctpos + 8:]
         else:
-            charset = self.config.get('trac', 'default_charset')
+            charset = None
 
         format = req.args.get('format')
         if format in ['raw', 'txt']:
@@ -262,6 +271,9 @@ class BrowserModule(Component):
         else:
             # Generate HTML preview
             content = node.get_content().read(DISP_MAX_FILE_SIZE)
+            if not charset:
+                charset = detect_unicode(content) or \
+                          self.config.get('trac', 'default_charset')
             if not is_binary(content):
                 content = util.to_utf8(content, charset)
                 if mime_type != 'text/plain':
@@ -298,28 +310,20 @@ class BrowserModule(Component):
                 ('browser', self._format_link)]
 
     def _format_link(self, formatter, ns, path, label):
-        rev = None
         match = img_re.search(path)
         if formatter.flavor != 'oneliner' and match:
             return '<img src="%s" alt="%s" />' % \
                    (formatter.href.file(path, format='raw'), label)
-        match = rev_re.search(path)
-        if match:
-            path = match.group(1)
-            rev = match.group(2)
+        path, rev = _get_path_rev(path)
         label = urllib.unquote(label)
-        path = urllib.unquote(path)
-        if rev:
-            return '<a class="source" href="%s">%s</a>' \
-                   % (formatter.href.browser(path, rev=rev), label)
-        else:
-            return '<a class="source" href="%s">%s</a>' \
-                   % (formatter.href.browser(path), label)
+        return '<a class="source" href="%s">%s</a>' \
+               % (formatter.href.browser(path, rev=rev), label)
 
 
 class LogModule(Component):
 
-    implements(INavigationContributor, IPermissionRequestor, IRequestHandler)
+    implements(INavigationContributor, IPermissionRequestor, IRequestHandler,
+               IWikiSyntaxProvider)
 
     # INavigationContributor methods
 
@@ -434,7 +438,10 @@ class LogModule(Component):
                             % (path, rev), 'Nonexistent path')
 
         def make_log_href(path, **args):
-            params = {'rev': rev, 'mode': mode, 'limit': limit}
+            link_rev = rev
+            if rev == str(repos.youngest_rev):
+                link_rev = None
+            params = {'rev': link_rev, 'mode': mode, 'limit': limit}
             params.update(args)
             if verbose:
                 params['verbose'] = verbose
@@ -454,9 +461,23 @@ class LogModule(Component):
         changes = _get_changes(self.env, repos, [i['rev'] for i in info],
                                verbose, req, format)
         if format == 'rss':
+            # Get the email addresses of all known users
+            email_map = {}
+            for username,name,email in self.env.get_known_users():
+                if email:
+                    email_map[username] = email
             for cs in changes.values():
                 cs['message'] = util.escape(cs['message'])
-                cs['shortlog'] = util.escape(cs['shortlog'])
+                cs['shortlog'] = util.escape(cs['shortlog'].replace('\n', ' '))
+                # For RSS, author must be an email address
+                author = cs['author']
+                author_email = ''
+                if '@' in author:
+                    author_email = author
+                elif author in email_map.keys():
+                    author_email = email_map[author]
+                cs['author'] = author_email
+                cs['date'] = util.http_date(cs['date_seconds'])
         elif format == 'changelog':
             for cs in changes.values():
                 cs['message'] = '\n'.join(['\t' + m for m in
@@ -479,3 +500,20 @@ class LogModule(Component):
         add_link(req, 'alternate', changelog_href, 'ChangeLog', 'text/plain')
 
         return 'log.cs', None
+
+    # IWikiSyntaxProvider methods
+    
+    def get_wiki_syntax(self):
+        return []
+
+    def get_link_resolvers(self):
+        yield ('log', self._format_link)
+
+    def _format_link(self, formatter, ns, path, label):
+        path, rev = _get_path_rev(path)
+        stop_rev = None
+        if rev and ':' in rev:
+            stop_rev, rev = rev.split(':',1)
+        label = urllib.unquote(label)
+        return '<a class="source" href="%s">%s</a>' \
+               % (formatter.href.log(path, rev=rev, stop_rev=stop_rev), label)
