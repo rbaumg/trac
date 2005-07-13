@@ -29,9 +29,7 @@ from trac.mimeview.api import IHTMLPreviewRenderer
 
 
 class TextileRenderer(Component):
-    """
-    Renders plain text in Textile format as HTML.
-    """
+    """Render plain text in Textile format as HTML."""
     implements(IHTMLPreviewRenderer)
 
     def get_quality_ratio(self, mimetype):
@@ -39,6 +37,6 @@ class TextileRenderer(Component):
             return 8
         return 0
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
         import textile
-        return textile.textile(content)
+        return textile.textile(obj.get_content().read())

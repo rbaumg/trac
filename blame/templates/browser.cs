@@ -10,14 +10,6 @@
 <div id="content" class="browser">
  <h1><?cs call:browser_path_links(browser.path, browser) ?></h1>
 
- <div id="jumprev">
-  <form action="" method="get"><div>
-   <label for="rev">View revision:</label>
-   <input type="text" id="rev" name="rev" value="<?cs
-     var:browser.revision ?>" size="4" />
-  </div></form>
- </div>
-
  <?cs if:browser.is_dir ?>
   <table class="listing" id="dirlist">
    <thead>
@@ -71,31 +63,51 @@
       </td>
      </tr>
     <?cs /each ?>
-   </tbody>
-  </table><?cs
- /if ?><?cs
-
- if:len(browser.props) || !browser.is_dir ?>
-  <table id="info" summary="Revision info"><?cs
-   if:!browser.is_dir ?><tr>
-    <th scope="row">
-     Revision <a href="<?cs var:file.changeset_href ?>"><?cs var:file.rev ?></a>
-     (checked in by <?cs var:file.author ?>, <?cs var:file.age ?> ago)
-    </th>
-    <td class="message"><?cs var:file.message ?></td>
-   </tr><?cs /if ?><?cs
-   if:len(browser.props) ?><tr>
-    <td colspan="2"><ul class="props"><?cs
-     each:prop = browser.props ?>
-      <li>Property <strong><?cs var:name(prop) ?></strong> set to <em><code><?cs
+   </tbody><?cs
+   if:len(browser.props) ?><tbody><tr><td class="props" colspan="5"><ul><?cs
+    each:prop = browser.props ?><li>Property <strong><?cs
+      var:name(prop) ?></strong> set to <em><code><?cs
       var:prop ?></code></em></li><?cs
-     /each ?>
-    </ul></td><?cs
-   /if ?></tr>
+    /each ?></ul></td></tr></tbody><?cs
+   /if ?>
   </table><?cs
- /if ?><?cs
- 
- if:!browser.is_dir ?>
+
+ else ?>
+  <form method="get" id="prefs" action=""><div>
+    <label>View revision:
+    <input type="text" id="rev" name="rev" value="<?cs
+      var:browser.revision ?>" size="5" /></label>
+    <fieldset id="annotations"><legend>Show annotations:</legend><?cs
+     each:annotation = file.annotations ?>
+      <label><input name="<?cs var:annotation.name ?>" type="checkbox"<?cs
+        if:annotation.enabled ?> checked="checked"<?cs /if ?> <?cs
+        if:annotation.name == 'lineno' ?> disabled="disabled"<?cs /if ?>> <?cs 
+        var:annotation.label ?></label> <?cs
+     /each ?></fieldset>
+    <div class="buttons"><input type="submit" value="Update" /></div>
+  </div></form>
+  <dl id="overview">
+   <dt class="time">Last Modified:</dt>
+   <dd class="time"><?cs var:file.modified.age ?> ago (<?cs
+     var:file.modified.date ?>) by <?cs
+     var:file.modified.author ?> in <a href="<?cs
+     var:file.modified.changeset_href ?>" title="<?cs 
+     var:file.modified.message ?>">[<?cs var:file.modified.rev ?>]</a></dd>
+   <dt class="time">Created:</dt>
+   <dd class="time"><?cs var:file.created.age ?> ago (<?cs
+     var:file.created.date ?>) by <?cs
+     var:file.created.author ?> in <a href="<?cs
+     var:file.created.changeset_href ?>" title="<?cs 
+     var:file.created.message ?>">[<?cs var:file.created.rev ?>]</a></dd><?cs
+   if:len(browser.props) ?>
+    <dt class="props">Properties:</dt>
+    <dd class="props"><ul><?cs
+    each:prop = browser.props ?><li><code><em><?cs
+      var:name(prop) ?></code></em> set to <q><code><?cs
+      var:prop ?></code></q></li><?cs
+    /each ?></ul></dd><?cs
+   /if ?>
+  </dl>
   <div id="preview"><?cs
    if:file.preview ?><?cs
     var:file.preview ?><?cs

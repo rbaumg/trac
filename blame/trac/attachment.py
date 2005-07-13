@@ -40,35 +40,34 @@ from trac.wiki.api import IWikiSyntaxProvider
 
 class Attachment(object):
 
-    def __init__(self, env, parent_type, parent_id, filename=None, db=None):
+    def __init__(self, env, parent_type, parent_id, name=None, db=None):
         self.env = env
         self.parent_type = parent_type
         self.parent_id = str(parent_id)
-        if filename:
-            self._fetch(filename, db)
+        if name:
+            self._fetch(name, db)
         else:
-            self.filename = None
+            self.name = None
             self.description = None
             self.size = None
             self.time = None
             self.author = None
             self.ipnr = None
 
-    def _fetch(self, filename, db=None):
+    def _fetch(self, name, db=None):
         if not db:
             db = self.env.get_db_cnx()
         cursor = db.cursor()
-        cursor.execute("SELECT filename,description,size,time,author,ipnr "
+        cursor.execute("SELECT description,size,time,author,ipnr "
                        "FROM attachment WHERE type=%s AND id=%s "
-                       "AND filename=%s ORDER BY time",
-                       (self.parent_type, self.parent_id, filename))
+                       "AND name=%s ORDER BY time",
+                       (self.parent_type, self.parent_id))
         row = cursor.fetchone()
         cursor.close()
         if not row:
-            self.filename = filename
             raise TracError('Attachment %s does not exist.' % (self.title),
                             'Invalid Attachment')
-        self.filename = row[0]
+        self.name = name
         self.description = row[1]
         self.size = row[2] and int(row[2]) or 0
         self.time = row[3] and int(row[3]) or 0
@@ -78,18 +77,18 @@ class Attachment(object):
     def _get_path(self):
         path = os.path.join(self.env.path, 'attachments', self.parent_type,
                             urllib.quote(self.parent_id))
-        if self.filename:
-            path = os.path.join(path, urllib.quote(self.filename))
+        if self.name:
+            path = os.path.join(path, urllib.quote(self.name))
         return os.path.normpath(path)
     path = property(_get_path)
 
     def href(self,*args,**dict):
         return self.env.href.attachment(self.parent_type, self.parent_id,
-                                        self.filename, *args, **dict)
+                                        self.name, *args, **dict)
 
     def _get_title(self):
         return '%s%s: %s' % (self.parent_type == 'ticket' and '#' or '',
-                             self.parent_id, self.filename)
+                             self.parent_id, self.name)
     title = property(_get_title)
 
     def _get_parent_href(self):
@@ -97,7 +96,7 @@ class Attachment(object):
     parent_href = property(_get_parent_href)
 
     def delete(self, db=None):
-        assert self.filename, 'Cannot delete non-existent attachment'
+        assert self.name, 'Cannot delete non-existent attachment'
         if not db:
             db = self.env.get_db_cnx()
             handle_ta = True
@@ -107,7 +106,7 @@ class Attachment(object):
         cursor = db.cursor()
         cursor.execute("DELETE FROM attachment WHERE type=%s AND id=%s "
                        "AND filename=%s", (self.parent_type, self.parent_id,
-                       self.filename))
+                       self.name))
         if os.path.isfile(self.path):
             try:
                 os.unlink(self.path)
@@ -122,7 +121,7 @@ class Attachment(object):
         if handle_ta:
             db.commit()
 
-    def insert(self, filename, fileobj, size, t=None, db=None):
+    def insert(self, name, fileobj, size, t=None, db=None):
         if not db:
             db = self.env.get_db_cnx()
             handle_ta = True
@@ -146,20 +145,20 @@ class Attachment(object):
 
         if not os.access(self.path, os.F_OK):
             os.makedirs(self.path)
-        filename = urllib.quote(filename)
+        name = urllib.quote(name)
         try:
             path, targetfile = util.create_unique_file(os.path.join(self.path,
-                                                                    filename))
-            filename = urllib.unquote(os.path.basename(path))
+                                                                    name))
+            name = urllib.unquote(os.path.basename(path))
 
             cursor = db.cursor()
             cursor.execute("INSERT INTO attachment "
                            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                           (self.parent_type, self.parent_id, filename,
+                           (self.parent_type, self.parent_id, name,
                             self.size, self.time, self.description, self.author,
                             self.ipnr))
             shutil.copyfileobj(fileobj, targetfile)
-            self.filename = filename
+            self.name = name
 
             self.env.log.info('New attachment: %s by %s', self.title,
                               self.author)
@@ -175,9 +174,9 @@ class Attachment(object):
         cursor.execute("SELECT filename,description,size,time,author,ipnr "
                        "FROM attachment WHERE type=%s AND id=%s ORDER BY time",
                        (parent_type, parent_id))
-        for filename,description,size,time,author,ipnr in cursor:
+        for name,description,size,time,author,ipnr in cursor:
             attachment = Attachment(env, parent_type, parent_id)
-            attachment.filename = filename
+            attachment.name = name
             attachment.description = description
             attachment.size = size
             attachment.time = time
@@ -192,7 +191,7 @@ class Attachment(object):
         try:
             fd = open(self.path, 'rb')
         except IOError:
-            raise TracError('Attachment %s not found', self.filename)
+            raise TracError('Attachment %s not found', self.name)
         return fd
 
 
@@ -201,7 +200,7 @@ def attachment_to_hdf(env, db, req, attachment):
     if not db:
         db = env.get_db_cnx()
     hdf = {
-        'filename': attachment.filename,
+        'filename': attachment.name,
         'description': wiki_to_oneliner(attachment.description, env, db),
         'author': util.escape(attachment.author),
         'ipnr': attachment.ipnr,
@@ -264,8 +263,8 @@ class AttachmentModule(Component):
         else:
             segments = path.split('/')
             parent_id = '/'.join(segments[:-1])
-            filename = segments[-1]
-            attachment = Attachment(self.env, parent_type, parent_id, filename)
+            name = segments[-1]
+            attachment = Attachment(self.env, parent_type, parent_id, name)
 
         if req.method == 'POST':
             if action == 'new':
@@ -309,18 +308,17 @@ class AttachmentModule(Component):
         if size == 0:
             raise TracError, 'No file uploaded'
 
-        filename = upload.filename.replace('\\', '/').replace(':', '/')
-        filename = os.path.basename(filename)
-        assert filename, 'No file uploaded'
+        name = upload.filename.replace('\\', '/').replace(':', '/')
+        name = os.path.basename(name)
+        assert name, 'No file uploaded'
 
         # We try to normalize the filename to utf-8 NFC if we can.
         # Files uploaded from OS X might be in NFD.
         import sys, unicodedata
         if sys.version_info[0] > 2 or \
            (sys.version_info[0] == 2 and sys.version_info[1] >= 3):
-           filename = unicodedata.normalize('NFC',
-                                            unicode(filename,
-                                                    'utf-8')).encode('utf-8')
+           name = unicodedata.normalize('NFC',
+                                        unicode(name, 'utf-8')).encode('utf-8')
 
         attachment.description = req.args.get('description', '')
         attachment.author = req.args.get('author', '')
@@ -328,7 +326,7 @@ class AttachmentModule(Component):
         if req.args.get('replace'):
             try:
                 old_attachment = Attachment(self.env, attachment.parent_type,
-                                            attachment.parent_id, filename)
+                                            attachment.parent_id, name)
                 if not (old_attachment.author and req.authname \
                         and old_attachment.author == req.authname):
                     perm_map = {'ticket': perm.TICKET_ADMIN,
@@ -337,8 +335,8 @@ class AttachmentModule(Component):
                 old_attachment.delete()
             except TracError:
                 pass # don't worry if there's nothing to replace
-            attachment.filename = None
-        attachment.insert(filename, upload.file, size)
+            attachment.name = None
+        attachment.insert(name, upload.file, size)
 
         # Redirect the user to the newly created attachment
         req.redirect(attachment.href())
@@ -369,8 +367,7 @@ class AttachmentModule(Component):
         req.hdf['title'] = '%s (delete)' % attachment.title
         text, link = self._get_parent_link(attachment)
         req.hdf['attachment'] = {
-            'filename': attachment.filename,
-            'mode': 'delete',
+            'filename': attachment.name, 'mode': 'delete',
             'parent': {'type': attachment.parent_type,
                        'id': attachment.parent_id, 'name': text, 'href': link}
         }
@@ -390,10 +387,6 @@ class AttachmentModule(Component):
     def _render_view(self, req, attachment):
         perm_map = {'ticket': 'TICKET_VIEW', 'wiki': 'WIKI_VIEW'}
         req.perm.assert_permission(perm_map[attachment.parent_type])
-
-        fmt = req.args.get('format')
-        mimetype = fmt == 'txt' and 'text/plain' or \
-                   get_mimetype(attachment.filename) or 'application/octet-stream'
 
         req.check_modified(attachment.time)
 
@@ -416,18 +409,26 @@ class AttachmentModule(Component):
         if req.perm.has_permission(perm_map[attachment.parent_type]):
             req.hdf['attachment.can_delete'] = 1
 
+        format = req.args.get('format')
+        if format == 'txt':
+            mimetype = 'text/plain'
+        else:
+            mimetype = get_mimetype(attachment.name) or \
+                       'application/octet-stream'
+
         self.log.debug("Rendering preview of file %s with mime-type %s"
-                       % (attachment.filename, mimetype))
+                       % (attachment.name, mimetype))
         fd = attachment.open()
         try:
             data = fd.read(self.DISP_MAX_FILE_SIZE)
-            charset = detect_unicode(data) or self.config.get('trac', 'default_charset')
-            
-            if fmt in ('raw', 'txt'):
+            charset = detect_unicode(data) or self.config.get('trac',
+                                                              'default_charset')
+
+            if format in ('raw', 'txt'):
                 # Send raw file
                 req.send_file(attachment.path, mimetype + ';charset=' + charset)
                 return
-            
+
             if not is_binary(data):
                 data = util.to_utf8(data, charset)
                 add_link(req, 'alternate', attachment.href(format='txt'),
@@ -439,7 +440,7 @@ class AttachmentModule(Component):
             else:
                 mimeview = Mimeview(self.env)
                 vdata = mimeview.render(req, mimetype, data,
-                                        attachment.filename)
+                                        attachment.name, annotations=['lineno'])
             req.hdf['attachment.preview'] = vdata
         finally:
             fd.close()
@@ -447,16 +448,16 @@ class AttachmentModule(Component):
     def _format_link(self, formatter, ns, link, label):
         ids = link.split(':', 2)
         if len(ids) == 3:
-            parent_type, parent_id, filename = ids
+            parent_type, parent_id, name = ids
         else:
             # FIXME: the formatter should know to which object belongs
             #        the text being formatted
             #        (this info will also be required for TracCrossReferences)
             path_info = formatter.req.path_info.split('/',2)
             parent_type, parent_id = path_info[1], path_info[2] # Kludge for now
-            filename = link
+            name = link
         try:
-            attachment = Attachment(self.env, parent_type, parent_id, filename)
+            attachment = Attachment(self.env, parent_type, parent_id, name)
             return '<a class="attachment" title="%s" href="%s">%s</a>' \
                    % ('Attachment ' + attachment.title,
                       attachment.href(), label)

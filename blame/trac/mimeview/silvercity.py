@@ -61,9 +61,7 @@ types = {
 
 
 class SilverCityRenderer(Component):
-    """
-    Syntax highlighting based on SilverCity.
-    """
+    """Syntax highlighting based on SilverCity."""
 
     implements(IHTMLPreviewRenderer)
 
@@ -72,7 +70,7 @@ class SilverCityRenderer(Component):
             return 3
         return 0
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
         import SilverCity
         try:
             typelang = types[mimetype]
@@ -91,7 +89,7 @@ class SilverCityRenderer(Component):
             raise Exception, err
 
         buf = StringIO()
-        generator().generate_html(buf, content)
+        generator().generate_html(buf, obj.get_content().read())
 
         br_re = re.compile(r'<br\s*/?>$', re.MULTILINE)
         span_default_re = re.compile(r'<span class="p_default">(.*?)</span>',

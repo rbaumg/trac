@@ -48,8 +48,7 @@ def _get_change_extent(str1, str2):
 
 def _get_opcodes(fromlines, tolines, ignore_blank_lines=0, ignore_case=0,
                  ignore_space_changes=0):
-    """
-    Generator built on top of SequenceMatcher.get_opcodes().
+    """Generator built on top of SequenceMatcher.get_opcodes().
     
     This function detects line changes that should be ignored and emits them
     as tagged as 'equal', possibly joined with the preceding and/or following

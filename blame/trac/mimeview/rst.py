@@ -69,9 +69,7 @@ LINKS = [(TICKET_LINK, _ticket),
          (WIKI_LINK, _wikipage)]
 
 class ReStructuredTextRenderer(Component):
-    """
-    Renders plain text in reStructuredText format as HTML.
-    """
+    """Renders plain text in reStructuredText format as HTML."""
     implements(IHTMLPreviewRenderer)
 
     def get_quality_ratio(self, mimetype):
@@ -79,7 +77,7 @@ class ReStructuredTextRenderer(Component):
             return 8
         return 0
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
         try:
             from docutils import nodes
             from docutils.core import publish_string
@@ -227,6 +225,7 @@ class ReStructuredTextRenderer(Component):
         _inliner = rst.states.Inliner()
         _parser = rst.Parser(inliner=_inliner)
 
-        html = publish_string(content, writer_name='html', parser=_parser,
+        html = publish_string(obj.get_content().read(),
+                              writer_name='html', parser=_parser,
                               settings_overrides={'halt_level': 6})
         return html[html.find('<body>') + 6:html.find('</body>')].strip()

@@ -30,9 +30,8 @@ __all__ = ['PatchRenderer']
 
 
 class PatchRenderer(Component):
-    """
-    Structured display of patches in unified diff format, similar to the layout
-    provided by the changeset view.
+    """Structured display of patches in unified diff format, similar to the
+    layout provided by the changeset view.
     """
 
     implements(IHTMLPreviewRenderer)
@@ -69,11 +68,11 @@ class PatchRenderer(Component):
             return 8
         return 0
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
         from trac.web.clearsilver import HDFWrapper
 
         tabwidth = int(self.config.get('diff', 'tab_width'))
-        d = self._diff_to_hdf(content.splitlines(), tabwidth)
+        d = self._diff_to_hdf(obj.get_content().read().splitlines(), tabwidth)
         if not d:
             raise TracError, 'Invalid unified diff content'
         hdf = HDFWrapper(loadpaths=[self.env.get_templates_dir(),

@@ -48,9 +48,7 @@ class PhpDeuglifier(Deuglifier):
     rules = classmethod(rules)
 
 class PHPRenderer(Component):
-    """
-    Syntax highlighting using the PHP executable if available.
-    """
+    """Syntax highlighting using the PHP CLI executable if available."""
 
     implements(IHTMLPreviewRenderer)
 
@@ -59,13 +57,13 @@ class PHPRenderer(Component):
             return 4
         return 0
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
         cmdline = self.config.get('mimeviewer', 'php_path')
         # -n to ignore php.ini so we're using default colors
         cmdline += ' -sn'
         self.env.log.debug("PHP command line: %s" % cmdline)
 
-        np = NaivePopen(cmdline, content, capturestderr=1)
+        np = NaivePopen(cmdline, obj.get_content().read(), capturestderr=1)
         if np.errorlevel or np.err:
             err = 'Running (%s) failed: %s, %s.' % (cmdline, np.errorlevel,
                                                     np.err)

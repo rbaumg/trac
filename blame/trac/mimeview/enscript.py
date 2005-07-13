@@ -98,9 +98,7 @@ class EnscriptDeuglifier(Deuglifier):
 
 
 class EnscriptRenderer(Component):
-    """
-    Syntax highlighting using GNU Enscript.
-    """
+    """Syntax highlighting using GNU Enscript."""
 
     implements(IHTMLPreviewRenderer)
 
@@ -109,12 +107,12 @@ class EnscriptRenderer(Component):
             return 2
         return 0
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
         cmdline = self.config.get('mimeviewer', 'enscript_path')
         cmdline += ' --color -h -q --language=html -p - -E' + types[mimetype]
         self.env.log.debug("Enscript command line: %s" % cmdline)
 
-        np = NaivePopen(cmdline, content, capturestderr=1)
+        np = NaivePopen(cmdline, obj.get_content().read(), capturestderr=1)
         if np.errorlevel or np.err:
             err = 'Running (%s) failed: %s, %s.' % (cmdline, np.errorlevel,
                                                     np.err)

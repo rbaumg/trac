@@ -30,9 +30,10 @@ except ImportError:
     from StringIO import StringIO
 
 from trac.core import *
-from trac.util import enum, escape
+from trac.util import enum, escape, to_utf8
 
-__all__ = ['get_charset', 'get_mimetype', 'is_binary', 'detect_unicode', 'Mimeview']
+__all__ = ['get_charset', 'get_mimetype', 'is_binary', 'detect_unicode',
+           'Mimeview']
 
 MIME_MAP = {
     'css':'text/css',
@@ -118,17 +119,18 @@ def get_mimetype(filename):
     except:
         return None
 
-def is_binary(str):
+def is_binary(string):
     """Detect binary content by checking the first thousand bytes for zeroes."""
-    if detect_unicode(str):
+    if detect_unicode(string):
         return False
-    for i in range(0, min(len(str), 1000)):
-        if str[i] == '\0':
+    for i in range(0, min(len(string), 1000)):
+        if string[i] == '\0':
             return True
     return False
 
 def detect_unicode(data):
-    """Detect different unicode charsets by looking for BOM's (Byte Order Marks)"""
+    """Detect different unicode charsets by looking for BOM's (Byte Order
+    Marks)."""
     if data[:2] == '\xff\xfe':
         return 'utf-16-le'
     elif data[:2] == '\xfe\xff':
@@ -150,17 +152,16 @@ class IHTMLPreviewRenderer(Interface):
         and 9, where 0 means no support and 9 means "perfect" support.
         """
 
-    def render(req, mimetype, content, filename=None, rev=None):
-        """Render an XHTML preview of the given content of the specified MIME
-        type.
+    def render(req, obj, mimetype):
+        """Render an XHTML preview of the given object.
         
         Can return the generated XHTML text as a single string or as an iterable
         that yields strings. In the latter case, the list will be considered to
         correspond to lines of text in the original content.
-
-        The `filename` and `rev` parameters are provided for renderers that
-        embed objects (using <object> or <img>) instead of included the content
-        inline.
+        
+        @param req: The HTTP request
+        @param obj: The object to render, an instance of either
+                    `trac.attachment.Attachment` or `trac.versioncontrol.Node`
         """
 
 class IHTMLPreviewAnnotator(Interface):
@@ -175,9 +176,16 @@ class IHTMLPreviewAnnotator(Interface):
         let the user toggle the appearance of the annotation type.
         """
 
-    def annotate_line(number, content):
-        """Return the XHTML markup for the table cell that contains the
-        annotation data."""
+    def get_line_annotator(req, obj):
+        """Return an annotator function that is called for every line of the
+        content of the object.
+
+        The returned function must take two positional arguments:
+         * the line number, starting at zero
+         * the text of the line
+
+        The annotator function must return the XHTML markup for the table cell
+        that contains the annotation data for the line."""
 
 
 class Mimeview(Component):
@@ -193,19 +201,30 @@ class Mimeview(Component):
         for annotator in self.annotators:
             yield annotator.get_annotation_type()
 
-    def render(self, req, mimetype, content, filename=None, rev=None,
-               annotations=None):
+    def render(self, req, obj, annotations=None):
         """Render an XHTML preview of the given content of the specified MIME
         type, selecting the most appropriate `IHTMLPreviewRenderer`
         implementation available for the given MIME type.
 
-        Return a string containing the XHTML text.
+        @param req: The HTTP request
+        @param obj: An object that represents the file to display. This might
+                    be an instance of `trac.attachment.Attachment` or
+                    `trac.versioncontrol.Node`, for example. The object is
+                    required to have a `name` property containing the name of
+                    the file, and a `get_content()` method. It may also have
+                    `rev` and `content_type` properties.
+        @param annotations: A sequence of names of annotations to be added to
+                            the preview. If omitted or `None`, no annotations
+                            are added.
+        @return: a string containing the XHTML text.
         """
-        if not content:
-            return ''
-
-        if filename and not mimetype:
-            mimetype = get_mimetype(filename)
+        # Determine the MIME type of the file
+        mimetype = None
+        if hasattr(obj, 'content_type'):
+            mimetype = obj.content_type
+        if not mimetype or mimetype == 'application/octet-stream':
+            mimetype = get_mimetype(obj.name) or mimetype or 'text/plain'
+        charset = get_charset(mimetype)
 
         candidates = []
         for renderer in self.renderers:
@@ -218,26 +237,31 @@ class Mimeview(Component):
             try:
                 self.log.debug('Trying to render HTML preview using %s'
                                % renderer.__class__.__name__)
-                result = renderer.render(req, mimetype, content, filename, rev)
+                result = renderer.render(req, obj, mimetype)
                 if not result:
                     continue
-                elif isinstance(result, (str, unicode)):
-                    return result
-                elif annotations:
-                    return self._annotate(result, annotations)
+                if not isinstance(result, (str, unicode)):
+                    if annotations:
+                        result = self._annotate(req, obj, result, annotations)
+                    else:
+                        buf = StringIO()
+                        buf.write('<div class="code-block"><pre>')
+                        tab_width = int(self.config.get('mimeviewer',
+                                                        'tab_width'))
+                        for line in result:
+                            buf.write(line.expandtabs(tab_width) + '\n')
+                        buf.write('</pre></div>')
+                        result = buf.getvalue()
+                if charset:
+                    result = to_utf8(result, charset)
                 else:
-                    buf = StringIO()
-                    buf.write('<div class="code-block"><pre>')
-                    tab_width = int(self.config.get('mimeviewer', 'tab_width'))
-                    for line in result:
-                        buf.write(line.expandtabs(tab_width) + '\n')
-                    buf.write('</pre></div>')
-                    return buf.getvalue()
+                    result = to_utf8(result)
+                return result
             except Exception, e:
                 self.log.warning('HTML preview using %s failed (%s)'
                                  % (renderer, e), exc_info=True)
 
-    def _annotate(self, lines, annotations):
+    def _annotate(self, req, obj, lines, annotations):
         buf = StringIO()
         buf.write('<table class="code-block listing"><thead><tr>')
         annotators = []
@@ -245,7 +269,7 @@ class Mimeview(Component):
             atype, alabel, adesc = annotator.get_annotation_type()
             if atype in annotations:
                 buf.write('<th class="%s">%s</th>' % (atype, alabel))
-                annotators.append(annotator)
+                annotators.append(annotator.get_line_annotator(req, obj))
         buf.write('<th class="content">&nbsp;</th>')
         buf.write('</tr></thead><tbody>')
 
@@ -257,9 +281,9 @@ class Mimeview(Component):
 
         for num, line in enum(_html_splitlines(lines)):
             cells = []
-            for annotator in annotators:
-                cells.append(annotator.annotate_line(num + 1, line))
-            cells.append('<td>%s</td>\n'
+            for annotate in annotators:
+                cells.append(annotate(num, line))
+            cells.append('<td class="code">%s</td>\n'
                          % space_re.sub(htmlify, line.expandtabs(tab_width)))
             buf.write('<tr>' + '\n'.join(cells) + '</tr>')
         buf.write('</tbody></table>')
@@ -306,8 +330,10 @@ class LineNumberAnnotator(Component):
     def get_annotation_type(self):
         return 'lineno', 'Line', 'Line numbers'
 
-    def annotate_line(self, number, content):
-        return '<th id="l%s">%s</th>' % (number, number)
+    def get_line_annotator(self, req, obj):
+        def _add_line_no(number, content):
+            return '<th id="l%s">%s</th>' % (number + 1, number + 1)
+        return _add_line_no
 
 
 class PlainTextRenderer(Component):
@@ -319,13 +345,13 @@ class PlainTextRenderer(Component):
     def get_quality_ratio(self, mimetype):
         return 1
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
+        content = obj.get_content().read()
         if is_binary(content):
             self.env.log.debug("Binary data; no preview available")
             return
 
         self.env.log.debug("Using default plain text mimeviewer")
-        from trac.util import escape
         for line in content.splitlines():
             yield escape(line)
 
@@ -339,10 +365,10 @@ class ImageRenderer(Component):
             return 8
         return 0
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
         src = '?'
-        if rev:
-            src += 'rev=%d&' % rev
+        if hasattr(obj, 'rev'):
+            src += 'rev=%d&' % obj.rev
         src += 'format=raw'
         return '<div class="image-file"><img src="%s" alt="" /></div>' % src
 
@@ -356,6 +382,6 @@ class WikiTextRenderer(Component):
             return 8
         return 0
 
-    def render(self, req, mimetype, content, filename=None, rev=None):
+    def render(self, req, obj, mimetype):
         from trac.wiki import wiki_to_html
-        return wiki_to_html(content, self.env, req)
+        return wiki_to_html(obj.get_content().read(), self.env, req)

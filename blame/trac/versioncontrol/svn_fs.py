@@ -357,7 +357,7 @@ class SubversionNode(Node):
 
     def get_properties(self):
         props = fs.node_proplist(self.root, self.scoped_path, self.pool)
-        for name,value in props.items():
+        for name, value in props.items():
             props[name] = str(value) # Make sure the value is a proper string
         return props
 

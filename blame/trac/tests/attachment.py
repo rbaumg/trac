@@ -27,24 +27,24 @@ class AttachmentTestCase(unittest.TestCase):
 
     def test_get_path(self):
         attachment = Attachment(self.env, 'ticket', 42)
-        attachment.filename = 'foo.txt'
+        attachment.name = 'foo.txt'
         self.assertEqual(os.path.join(self.attachments_dir, 'ticket', '42',
                                       'foo.txt'),
                          attachment.path)
         attachment = Attachment(self.env, 'wiki', 'SomePage')
-        attachment.filename = 'bar.jpg'
+        attachment.name = 'bar.jpg'
         self.assertEqual(os.path.join(self.attachments_dir, 'wiki', 'SomePage',
                                       'bar.jpg'),
                          attachment.path)
 
     def test_get_path_encoded(self):
         attachment = Attachment(self.env, 'ticket', 42)
-        attachment.filename = 'Teh foo.txt'
+        attachment.name = 'Teh foo.txt'
         self.assertEqual(os.path.join(self.attachments_dir, 'ticket', '42',
                                       'Teh%20foo.txt'),
                          attachment.path)
         attachment = Attachment(self.env, 'wiki', '\xdcberSicht')
-        attachment.filename = 'Teh bar.jpg'
+        attachment.name = 'Teh bar.jpg'
         self.assertEqual(os.path.join(self.attachments_dir, 'wiki',
                                       '%DCberSicht', 'Teh%20bar.jpg'),
                          attachment.path)
@@ -62,17 +62,17 @@ class AttachmentTestCase(unittest.TestCase):
         attachment.insert('bar.jpg', tempfile.TemporaryFile(), 0)
 
         attachments = Attachment.select(self.env, 'ticket', 42)
-        self.assertEqual('foo.txt', attachments.next().filename)
-        self.assertEqual('bar.jpg', attachments.next().filename)
+        self.assertEqual('foo.txt', attachments.next().name)
+        self.assertEqual('bar.jpg', attachments.next().name)
         self.assertRaises(StopIteration, attachments.next)
 
     def test_insert_unique(self):
         attachment = Attachment(self.env, 'ticket', 42)
         attachment.insert('foo.txt', tempfile.TemporaryFile(), 0)
-        self.assertEqual('foo.txt', attachment.filename)
+        self.assertEqual('foo.txt', attachment.name)
         attachment = Attachment(self.env, 'ticket', 42)
         attachment.insert('foo.txt', tempfile.TemporaryFile(), 0)
-        self.assertEqual('foo.2.txt', attachment.filename)
+        self.assertEqual('foo.2.txt', attachment.name)
 
     def test_insert_outside_attachments_dir(self):
         attachment = Attachment(self.env, '../../../../../sth/private', 42)

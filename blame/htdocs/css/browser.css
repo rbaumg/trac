@@ -1,9 +1,3 @@
-#prefs { margin-top: -1.6em }
-* html #prefs { width: 34em } /* Set width only for IE */
-#prefs fieldset label { display: block }
-#prefs .buttons { margin-top: -1.6em }
-#prefs .choice { margin-top: -0.6em }
-
 #legend { clear: right; }
 
 /* Browser */
@@ -44,13 +38,30 @@ h1 .sep { color: #666; padding: 0 .1em }
 #dirlist td.name span.file { background-image: url(../filedeny.png) }
 #dirlist td.name a, #dirlist td.rev a { border-bottom: none; display: block }
 #dirlist td.change * { font-size: 9px }
+#dirlist td.props {
+ background: #f7f7f0;
+ color: #666;
+ font-size: 85%;
+ list-style: square;
+ margin: 0 0 .4em 1.6em;
+ padding: 0;
+}
+#dirlist td.props ul { margin: .3em; padding-left: 2em }
+#dirlist td.props li { padding: 0 }
+
+table.code-block tbody td.blame {
+ background: #f7f7f0;
+ color: #666;
+ padding-left: .3em;
+ padding-right: .3em;
+ white-space: nowrap;
+}
+table.code-block tbody td.blame .author { float: right; }
 
 /* Styles for the revision log table
    (extends the styles for "table.listing") */
 #chglist { margin-top: 0 }
-#chglist td.change { 
- white-space: nowrap; 
-}
+#chglist td.change {  white-space: nowrap }
 #chglist td.change div { 
  border: 1px solid #999;
  margin: .2em .5em 0 0;
@@ -66,30 +77,45 @@ h1 .sep { color: #666; padding: 0 .1em }
 
 #paging { margin: 1em 0 }
 
+#content.log #prefs { margin-top: -1.6em }
+#content.log * html #prefs { width: 34em } /* Set width only for IE */
+#content.log #prefs fieldset label { display: block }
+#content.log #prefs .buttons { margin-top: -1.6em }
+#content.log #prefs .choice { margin-top: -0.6em }
+
 /* Styles for the revision info in the file view */
-#info {
- background: #f7f7f0;
- border: 1px solid #d7d7d7;
- border-collapse: collapse;
- border-spacing: 0;
- clear: both;
- width: 100%;
+#overview { line-height: 130%; margin-top: 1em; padding: .5em }
+#overview dt {
+ font-weight: bold;
+ padding-right: .25em;
+ position: absolute;
+ left: 0;
+ text-align: right;
+ white-space: nowrap;
+ width: 8.25em;
 }
-#info th, #info td { font-size: 85%; padding: 2px .5em; vertical-align: top }
-#info th { font-weight: bold; white-space: nowrap; }
-#info td.message { width: 100%; }
-#info .message ul { padding: 0; margin: 0 2em }
-#info .message p { margin: 0; padding: 0 }
-#info .props {
- color: #666;
- list-style: square;
- margin: 0 0 .4em 1.6em;
- padding: 0;
+#overview dd { margin-left: 8.5em }
+#overview dd.message p, #overview dd.message ul, #overview dd.message ol {
+ font-size: 80%; 
+ margin-bottom: 1em;
+ margin-top: 0;
 }
-#info .props li { padding: 0 }
+#overview .props { padding: 1em 0 1px }
+#overview dd.props ul { margin: 0; padding-left: 2em; list-style: square }
+
+#content.browser #prefs fieldset { margin: 1em .5em .5em; padding: .5em 1em 0 }
 
 /* Styles for the HTML preview */
 #preview { background: #fff; clear: both; margin: 0 }
 #preview .code-block { border-top: 1px solid #999; margin: 0 }
 #preview .image-file { overflow: hidden }
 #preview .image-file img { max-width: 100% }
+#preview .props {
+ background: #f7f7f0;
+ color: #666;
+ font-size: 85%;
+ list-style: square;
+ margin: .3em;
+ padding-left: 2em;
+}
+#preview .props li { padding: 0 }

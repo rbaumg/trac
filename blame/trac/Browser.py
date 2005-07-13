@@ -27,12 +27,14 @@ import urllib
 
 from trac import util
 from trac.core import *
-from trac.mimeview import get_mimetype, is_binary, detect_unicode, Mimeview
+from trac.mimeview import get_charset, get_mimetype, is_binary, detect_unicode,\
+                          Mimeview
+from trac.mimeview.api import IHTMLPreviewAnnotator
 from trac.perm import IPermissionRequestor
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
-from trac.versioncontrol import Changeset
+from trac.versioncontrol import Changeset, Node, diff
 
 CHUNK_SIZE = 4096
 DISP_MAX_FILE_SIZE = 256 * 1024
@@ -41,10 +43,10 @@ rev_re = re.compile(r"([^#]+)#(.+)")
 img_re = re.compile(r"\.(gif|jpg|jpeg|png)(\?.*)?$", re.IGNORECASE)
 
 
-def _get_changes(env, repos, revs, full=None, req=None, format=None):
+def _get_changes(env, repos, revs, full=False, req=None, format=None):
     db = env.get_db_cnx()
     changes = {}
-    for rev in revs:
+    for rev in [rev for rev in revs if rev not in changes.keys()]:
         changeset = repos.get_changeset(rev)
         message = changeset.message
         shortlog = util.shorten_line(message)        
@@ -206,27 +208,35 @@ class BrowserModule(Component):
     def _render_file(self, req, repos, node, rev=None):
         req.perm.assert_permission('FILE_VIEW')
 
-        changeset = repos.get_changeset(node.rev)  
-        req.hdf['file'] = {  
-            'rev': node.rev,  
-            'changeset_href': self.env.href.changeset(node.rev),  
-            'date': time.strftime('%x %X', time.localtime(changeset.date)),  
-            'age': util.pretty_timedelta(changeset.date),  
-            'author': changeset.author or 'anonymous',  
-            'message': wiki_to_html(changeset.message or '--', self.env, req,  
-                                    escape_newlines=True)  
-        } 
+        mod_chgset = repos.get_changeset(node.rev)
+        req.hdf['file.modified'] = {
+            'rev': node.rev,
+            'changeset_href': self.env.href.changeset(node.rev),
+            'date': time.strftime('%x %X', time.localtime(mod_chgset.date)),
+            'age': util.pretty_timedelta(mod_chgset.date),
+            'author': mod_chgset.author or 'anonymous',
+            'message': util.shorten_line(mod_chgset.message or '--')
+        }
+
+        created = None
+        for hist_path, hist_rev, hist_chg in node.get_history():
+            if hist_chg == Changeset.ADD:
+                created = repos.get_node(hist_path, hist_rev)
+                break
+        created_chgset = repos.get_changeset(created.rev)
+        req.hdf['file.created'] = {
+            'rev': created.rev,  
+            'changeset_href': self.env.href.changeset(created.rev),
+            'date': time.strftime('%x %X', time.localtime(created_chgset.date)),
+            'age': util.pretty_timedelta(created_chgset.date),
+            'author': created_chgset.author or 'anonymous',
+            'message': util.shorten_line(created_chgset.message or '--')
+        }
+
         mime_type = node.content_type
         if not mime_type or mime_type == 'application/octet-stream':
             mime_type = get_mimetype(node.name) or mime_type or 'text/plain'
-
-        # We don't have to guess if the charset is specified in the
-        # svn:mime-type property
-        ctpos = mime_type.find('charset=')
-        if ctpos >= 0:
-            charset = mime_type[ctpos + 8:]
-        else:
-            charset = None
+        charset = get_charset(mime_type)
 
         format = req.args.get('format')
         if format in ['raw', 'txt']:
@@ -263,9 +273,17 @@ class BrowserModule(Component):
                 req.hdf['file.max_file_size'] = DISP_MAX_FILE_SIZE
                 preview = ' '
             else:
-                preview = Mimeview(self.env).render(req, mime_type, content,
-                                                    node.name, node.rev,
-                                                    annotations=['lineno'])
+                mimeview = Mimeview(self.env)
+                annotations = []
+                for idx, ann in util.enum(mimeview.get_annotation_types()):
+                    name, label, description = ann
+                    enabled = name in req.args.keys() or name == 'lineno'
+                    if enabled:
+                        annotations.append(name)
+                    req.hdf['file.annotations.%s' % idx] = {
+                        'name': name, 'label': description, 'enabled': enabled
+                    }
+                preview = mimeview.render(req, node, annotations=annotations)
             req.hdf['file.preview'] = preview
 
             raw_href = self.env.href.browser(node.path, rev=rev and node.rev,
@@ -294,6 +312,51 @@ class BrowserModule(Component):
         label = urllib.unquote(label)
         return '<a class="source" href="%s">%s</a>' \
                % (formatter.href.browser(path, rev=rev), label)
+
+
+class BlameAnnotator(Component):
+    """Text annotator that adds a column with line numbers."""
+    implements(IHTMLPreviewAnnotator)
+
+    # ITextAnnotator methods
+
+    def get_annotation_type(self):
+        return 'blame', 'Latest change', 'Blame info'
+
+    def get_line_annotator(self, req, obj):
+        assert isinstance(obj, Node)
+
+        blame_info = {}
+        repos = self.env.get_repository(req.authname)
+        history = list(obj.get_history())
+        history.reverse()
+
+        prev = ''
+        for path, rev, chg in [item for item in history
+                               if item[2] in (Changeset.ADD, Changeset.EDIT)]:
+            node = repos.get_node(path, rev)
+            curr = node.get_content().read()
+            for tag, i1, i2, j1, j2 in diff._get_opcodes(prev.splitlines(),
+                                                         curr.splitlines()):
+                if tag == 'equal':
+                    for line in range(j1, j2):
+                        if line not in blame_info.keys():
+                            blame_info[line] = rev
+                else:
+                    for line in range(j1, j2):
+                        blame_info[line] = rev
+            prev = curr
+
+        changes = _get_changes(self.env, repos, blame_info.values())
+
+        def _add_blame_info(number, content):
+            rev = blame_info[number]
+            href = self.env.href.changeset(rev)
+            change = changes[rev]
+            return '<td class="blame"><a href="%s" title="%s">[%s]</a> ' \
+                   '<span class="author">%s</span></td>' % (href,
+                   change['shortlog'], rev, change['author'])
+        return _add_blame_info
 
 
 class LogModule(Component):
