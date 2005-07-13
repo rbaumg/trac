@@ -25,14 +25,17 @@ from __future__ import generators
 import time
 
 from trac.core import *
+from trac.object import TracObject
 from trac.wiki.api import WikiSystem
 
 
-class WikiPage(object):
+class WikiPage(TracObject):
     """Represents a wiki page (new or existing)."""
 
+    type = 'wiki'
+
     def __init__(self, env, name=None, version=None, db=None):
-        self.env = env
+        TracObject.__init__(self, env, name)
         self.name = name
         if name:
             self._fetch(name, version, db)
@@ -42,6 +45,9 @@ class WikiPage(object):
             self.readonly = 0
         self.old_text = self.text
         self.old_readonly = self.readonly
+
+    def shortname(self):
+        return self.name # FIXME: only if name matches pagename rules...
 
     def _fetch(self, name, version=None, db=None):
         if not db:

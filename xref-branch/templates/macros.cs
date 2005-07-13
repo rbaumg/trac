@@ -176,4 +176,14 @@ def:sortable_th(order, desc, class, title, href) ?>
   <a title="Sort by <?cs var:class ?><?cs if:order == class && !desc ?> (descending)<?cs /if ?>"
      href="<?cs var:href ?>&order=<?cs var:class ?><?cs if:order == class && !desc ?>&desc=1<?cs /if ?>"><?cs var:title ?></a>
  </th><?cs
+/def ?><?cs 
+
+def:backlinks(type,id) ?><?cs 
+ if:xref.count.all > #0 ?>
+  <li><a href="<?cs var:trac.href.xref ?>/<?cs var:type ?>/<?cs var:id ?>"
+	 title="<?cs var:xref.count.backlinks ?> backlinks, <?cs var:xref.count.all ?> relations">Cross-references</a></li><?cs
+ /if ?><?cs
+/def ?><?cs 
+
+def:relation(rel) ?><span class="relation"><?cs var:rel ?></span><?cs 
 /def ?>

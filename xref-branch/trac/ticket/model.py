@@ -25,16 +25,18 @@ from __future__ import generators
 import time
 
 from trac.core import TracError
+from trac.object import TracObject
 from trac.ticket import TicketSystem
 
 __all__ = ['Ticket', 'Type', 'Status', 'Resolution', 'Priority', 'Severity',
            'Component', 'Version']
 
 
-class Ticket(object):
-
+class Ticket(TracObject):
+    type = 'ticket'
+    
     def __init__(self, env, tkt_id=None, db=None):
-        self.env = env
+        TracObject.__init__(self, env, tkt_id)
         self.fields = TicketSystem(self.env).get_ticket_fields()
         self.values = {}
         if tkt_id:
@@ -43,6 +45,9 @@ class Ticket(object):
             self._init_defaults(db)
             self.id = self.time_created = self.time_changed = None
         self._old = {}
+
+    def shortname(self): return '#%s' % self.id
+    def htmlclass(self): return 'newticket' # FIXME (should depend on the status)
 
     exists = property(fget=lambda self: self.id is not None)
 

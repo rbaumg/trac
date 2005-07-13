@@ -24,6 +24,7 @@ from __future__ import generators
 from trac import util
 from trac.core import *
 from trac.perm import IPermissionRequestor
+from trac.object import ITracObjectManager
 from trac.wiki import IWikiSyntaxProvider
 
 class MyLinkResolver(Component):
@@ -35,7 +36,7 @@ class MyLinkResolver(Component):
 
 
 class TicketSystem(Component):
-    implements(IPermissionRequestor, IWikiSyntaxProvider)
+    implements(IPermissionRequestor, IWikiSyntaxProvider, ITracObjectManager)
 
     # Public API
 
@@ -147,12 +148,13 @@ class TicketSystem(Component):
     # IWikiSyntaxProvider methods
 
     def get_link_resolvers(self):
-        return [('bug', self._format_link),
-                ('ticket', self._format_link)]
+        return [('bug', self._format_link, self._parse_link),
+                ('ticket', self._format_link, self._parse_link)]
 
     def get_wiki_syntax(self):
         yield (r"!?#(?P<it_ticket>[a-zA-Z_-]{0,3})\d+",
-               lambda x, y, z: self._format_link(x, 'ticket', y[1:], y, z))
+               lambda x, y, z: self._format_link(x, 'ticket', y[1:], y, z),
+               lambda x, y, z: self._parse_link(x, 'ticket', y[1:], y, z))
 
     def _format_link(self, formatter, ns, target, label, fullmatch=None):
         intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
@@ -172,4 +174,42 @@ class TicketSystem(Component):
             return '<a class="missing ticket" href="%s" rel="nofollow">%s</a>' \
                    % (formatter.href.ticket(target), label)
 
+    def _parse_link(self, formatter, ns, target, label, fullmatch=None):
+        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
+                                                         fullmatch)
+        if not intertrac:
+            from trac.ticket import Ticket
+            ticket = Ticket(self.env)
+            ticket.id = target
+            return ticket
     
+    # ITracObjectManager methods
+
+    def get_object_types(self):
+        from trac.ticket.model import Ticket
+        yield ('ticket', lambda id: Ticket(self.env, id))
+
+    def rebuild_xrefs(self, db):
+        from trac.ticket.model import Ticket
+        from trac.xref import Facet
+        cursor = db.cursor()
+        cursor.execute("SELECT id,description,time,reporter FROM ticket")
+        for id,description,time,reporter in cursor:
+            src = Ticket(self.env, None)
+            src.id = id
+            descr_facet = Facet(src, 'description', time, reporter)
+            chg_cursor = db.cursor()
+            chg_cursor.execute("SELECT field,oldvalue,newvalue,time,author"
+                               "  FROM ticket_change"
+                               " WHERE ticket=%s"
+                               "   AND field IN ('comment','description')"
+                               " ORDER BY time", (id,))
+            for field,n,value,time,author in chg_cursor:
+                if field == 'description':
+                    descr_facet.time = time
+                    descr_facet.author = author
+                    description = value
+                elif field == 'comment':
+                    yield (Facet(src, 'comment:%s' % n, time, author), value)
+                # TODO: custom fields?
+            yield (descr_facet, description)

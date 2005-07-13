@@ -27,6 +27,7 @@ import urllib
 import re
 
 from trac.core import *
+from trac.object import ITracObjectManager
 from trac.util import to_utf8
 
 
@@ -90,7 +91,7 @@ class WikiSystem(Component):
     """
     Represents the wiki system.
     """
-    implements(IWikiChangeListener, IWikiSyntaxProvider)
+    implements(IWikiChangeListener, IWikiSyntaxProvider, ITracObjectManager)
 
     change_listeners = ExtensionPoint(IWikiChangeListener)
     macro_providers = ExtensionPoint(IWikiMacroProvider)
@@ -99,9 +100,11 @@ class WikiSystem(Component):
     def __init__(self):
         self._pages = None
         self._compiled_rules = None
-        self._link_resolvers = None
         self._helper_patterns = None
+        self._link_resolvers = None
         self._external_handlers = None
+        self._xref_link_resolvers = None
+        self._xref_external_handlers = None
 
     def _load_pages(self):
         self._pages = {}
@@ -140,16 +143,26 @@ class WikiSystem(Component):
         return self._external_handlers
     external_handlers = property(_get_external_handlers)
     
+    def _get_xref_external_handlers(self):
+        self._prepare_rules()
+        return self._xref_external_handlers
+    xref_external_handlers = property(_get_xref_external_handlers)
+    
     def _prepare_rules(self):
         from trac.wiki.formatter import Formatter
         if not self._compiled_rules:
             helpers = []
             handlers = {}
+            xref_handlers = {}
             syntax = Formatter._pre_rules[:]
             i = 0
             for resolver in self.syntax_providers:
-                for regexp, handler in resolver.get_wiki_syntax():
-                    handlers['i'+str(i)] = handler
+                for data in resolver.get_wiki_syntax():
+                    regexp, handler = data[:2]
+                    key = 'i'+str(i)
+                    handlers[key] = handler
+                    if len(data) > 2:
+                        xref_handlers[key] = data[2]
                     syntax.append('(?P<i%d>%s)' % (i, regexp))
                     i += 1
             syntax += Formatter._post_rules[:]
@@ -158,18 +171,32 @@ class WikiSystem(Component):
                 helpers += helper_re.findall(rule)[1:]
             rules = re.compile('(?:' + '|'.join(syntax) + ')')
             self._external_handlers = handlers
+            self._xref_external_handlers = xref_handlers
             self._helper_patterns = helpers
             self._compiled_rules = rules
 
     def _get_link_resolvers(self):
-        if not self._link_resolvers:
-            resolvers = {}
-            for resolver in self.syntax_providers:
-                for namespace, handler in resolver.get_link_resolvers():
-                    resolvers[namespace] = handler
-            self._link_resolvers = resolvers
+        self._prepare_resolvers()
         return self._link_resolvers
     link_resolvers = property(_get_link_resolvers)
+
+    def _get_xref_link_resolvers(self):
+        self._prepare_resolvers()
+        return self._xref_link_resolvers
+    xref_link_resolvers = property(_get_xref_link_resolvers)
+
+    def _prepare_resolvers(self):
+        if not self._link_resolvers:
+            resolvers = {}
+            xref_resolvers = {}
+            for resolver in self.syntax_providers:
+                for data in resolver.get_link_resolvers():
+                    namespace, handler = data[:2]
+                    resolvers[namespace] = data[1]
+                    if len(data) > 2:
+                        xref_resolvers[namespace] = data[2]
+            self._link_resolvers = resolvers
+            self._xref_link_resolvers = xref_resolvers
 
     # IWikiChangeListener methods
 
@@ -195,7 +222,8 @@ class WikiSystem(Component):
                r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
                r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end
                r"(?!:\S)",                 # InterWiki support               
-               lambda x, y, z: self._format_link(x, 'wiki', y, y))
+               lambda x, y, z: self._format_link(x, 'wiki', y, y),
+               lambda x, y, z: self._parse_link(x, 'wiki', y, y))
 
     def get_link_resolvers(self):
         yield ('wiki', self._format_link)
@@ -214,4 +242,33 @@ class WikiSystem(Component):
         else:
             return '<a class="wiki" href="%s">%s</a>' \
                    % (formatter.href.wiki(page) + anchor, label)
+
+    def _parse_link(self, formatter, ns, target, label):
+        from trac.wiki import WikiPage
+        wiki = WikiPage(self.env)
+        wiki.id = wiki.name = target
+        return wiki
+
+    # ITracObjectManager methods
+
+    def get_object_types(self):
+        from trac.wiki.model import WikiPage
+        yield ('wiki', lambda id: WikiPage(self.env, id))
+
+    def rebuild_xrefs(self, db):
+        from trac.wiki.model import WikiPage
+        from trac.xref import Facet
+        cursor = db.cursor()
+        cursor.execute("SELECT name,time,author,text"
+                       "  FROM wiki ORDER BY name,version DESC")
+        src = previous = None
+        for name,time,author,text in cursor:
+            if name != previous:
+                previous = name
+                src = WikiPage(self.env, None) # no _fetch
+                src.id = name
+                src.name = name
+                yield (Facet(src, 'content', time, author), text)
+            # Note: wiki edit comments are not yet modifiable
+            #       therefore it's not condidered to be a facet.
 

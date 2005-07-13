@@ -175,14 +175,6 @@ class Formatter(object):
         return self._db
     db = property(fget=_get_db)
 
-    def _get_rules(self):
-        return WikiSystem(self.env).rules
-    rules = property(_get_rules)
-
-    def _get_link_resolvers(self):
-        return WikiSystem(self.env).link_resolvers
-    link_resolvers = property(_get_link_resolvers)
-
     def replace(self, fullmatch):
         wiki = WikiSystem(self.env)        
         for itype, match in fullmatch.groupdict().items():
@@ -252,10 +244,11 @@ class Formatter(object):
             return self._make_link(ns, target, match, label)
 
     def _make_link(self, ns, target, match, label):
+        wiki = WikiSystem(self.env)
         # check first for an alias defined in trac.ini
         ns = self.env.config.get('intertrac', ns.upper(), ns)
-        if ns in self.link_resolvers:
-            return self.link_resolvers[ns](self, ns, target, label)
+        if ns in wiki.link_resolvers:
+            return wiki.link_resolvers[ns](self, ns, target, label)
         elif target[:2] == '//' or ns == "mailto":
             return self._make_ext_link(ns+':'+target, label)
         else:
@@ -563,6 +556,8 @@ class Formatter(object):
         self.indent_level = 0
         self.paragraph_open = 0
 
+        wiki = WikiSystem(self.env)
+
         for line in text.splitlines():
             # Handle code block
             if self.in_code_block or line.strip() == '{{{':
@@ -590,7 +585,7 @@ class Formatter(object):
                 line += ' [[BR]]'
             self.in_list_item = False
             # Throw a bunch of regexps on the problem
-            result = re.sub(self.rules, self.replace, line)
+            result = re.sub(wiki.rules, self.replace, line)
 
             if not self.in_list_item:
                 self.close_list()
@@ -637,7 +632,8 @@ class OneLinerFormatter(Formatter):
         self.out = out
         self._open_tags = []
 
-        result = re.sub(self.rules, self.replace, util.escape(text.strip(), False))
+        result = re.sub(WikiSystem(self.env).rules,
+                        self.replace, util.escape(text.strip(), False))
         # Close all open 'one line'-tags
         result += self.close_tag(None)
         out.write(result)

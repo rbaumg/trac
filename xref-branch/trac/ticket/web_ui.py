@@ -153,6 +153,8 @@ class TicketModule(Component):
         ticket = Ticket(self.env, id, db=db)
         reporter_id = util.get_reporter_id(req)
 
+        ticket.xref_count_to_hdf(req, db)
+        
         if req.method == 'POST':
             if 'preview' not in req.args.keys():
                 self._do_save(req, db, ticket)

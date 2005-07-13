@@ -311,6 +311,7 @@ def populate_hdf(hdf, env, req=None):
         'query': env.href.query(),
         'newticket': env.href.newticket(),
         'search': env.href.search(),
+        'xref': env.href.xref(),
         'about': env.href.about(),
         'about_config': env.href.about('config'),
         'login': env.href.login(),

@@ -326,6 +326,8 @@ class WikiModule(Component):
     def _render_view(self, req, db, page):
         req.perm.assert_permission('WIKI_VIEW')
 
+        page.xref_count_to_hdf(req, db)
+        
         if page.name == 'WikiStart':
             req.hdf['title'] = ''
         else:

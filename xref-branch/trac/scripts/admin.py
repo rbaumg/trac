@@ -302,6 +302,7 @@ class TracAdmin(cmd.Cmd):
             docs = (self._help_about + self._help_help +
                     self._help_initenv + self._help_hotcopy +
                     self._help_resync + self._help_upgrade +
+                    self._help_xref +
                     self._help_wiki +
 #                    self._help_config + self._help_wiki +
                     self._help_permission + self._help_component +
@@ -650,7 +651,19 @@ class TracAdmin(cmd.Cmd):
             
         print 'done.'
 
-
+    _help_xref = [('xref',
+                   'Rebuild the cross-reference information'
+                   ' between Trac objects')]
+    
+    ## XRef
+    def do_xref(self, line):
+        from trac.xref import XRefSystem
+        env = self.env_open()
+        env.href = env.abs_href = None
+        print 'cross-referencing... (for changesets, use \'resync\')'
+        XRefSystem(env).rebuild_xrefs(env.get_db_cnx(), do_changesets=False)
+        print 'done.'
+        
     ## Wiki
     _help_wiki = [('wiki list', 'List wiki pages'),
                   ('wiki remove <name>', 'Remove wiki page'),

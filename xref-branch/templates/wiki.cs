@@ -3,7 +3,8 @@
 
 <div id="ctxtnav" class="nav">
  <h2>Wiki Navigation</h2>
- <ul>
+ <ul><?cs
+  call:backlinks("wiki", wiki.page_name) ?>
   <li><a href="<?cs var:trac.href.wiki ?>">Start Page</a></li>
   <li><a href="<?cs var:trac.href.wiki ?>/TitleIndex">Title Index</a></li>
   <li><a href="<?cs var:trac.href.wiki ?>/RecentChanges">Recent Changes</a></li>
