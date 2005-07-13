@@ -6,6 +6,7 @@ CREATE TABLE xref (
          facet           text,
          context         text,
          time            integer,
+         author          text,
          relation        text,
          dest_type       text,
          dest_id         text

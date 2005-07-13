@@ -88,6 +88,7 @@ schema = [
         Column('facet'),
         Column('context'),
         Column('time', type='int'),
+        Column('author'),
         Column('relation'),
         Column('dest_type'),
         Column('dest_id'),
