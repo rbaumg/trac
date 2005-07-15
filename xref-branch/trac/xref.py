@@ -76,87 +76,17 @@
 
 """
 
+from StringIO import StringIO
 
 from trac.core import *
 from trac.object import TracObject, ITracObjectManager
 from trac.wiki.formatter import Formatter
-from trac.wiki.api import WikiSystem
+from trac.wiki.api import WikiSystem, IWikiMacroProvider
 from trac.web.main import IRequestHandler
 from trac.web.chrome import add_stylesheet
 from trac.util import escape, TracError, pretty_timedelta
 
-__all__ = ['XRefSystem', 'Facet']
-
-
-
-class Facet(object):
-    """
-    A facet encapsulates the context in which link information,
-    in the form of a reference written in a Wiki text,
-    is entered in the system.
-
-    A facet is not (yet?) directly persistent, but rather composed of
-    data attached to other objects.
-    """
-    
-    def __init__(self, src, name, time, author):
-        self.src = src
-        self.name = name
-        self.author = author
-        self.time = time
-
-    def add_xref(self, db, dest, context=None, relation=None):
-        """
-        Add a new cross-reference from this facet to the given `target`,
-        annotating it with the given `context`.
-        """
-        print ("+ %s:%s --[%s]--> %s:%s" % (self.src.type, self.src.id, 
-                                            relation,
-                                            dest.type, dest.id) +
-               " (in %s at %s by %s %s)" % (self.name, self.time, self.author,
-                                            context))
-        cursor = db.cursor()
-        cursor.execute("INSERT INTO xref VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                       (self.src.type, self.src.id,
-                        self.name, context, self.time, self.author,
-                        relation, dest.type, dest.id))
-
-    def update_relation(self, db, relation, dest, context=None):
-        """
-        Delete any outgoing `relation` and recreate it.
-        The `facet` and `context` are only used to recreate the new relation.
-        """
-        if not relation:
-            raise TracError, 'No relation specified'
-        self.delete_links(db, relation) # ?
-        self.add_xref(db, relation, dest, context)
-
-    def update_links(self, db, wikitext, relation=None):
-        """
-        The facet's content has changed and the corresponding cross-references
-        must be updated.
-        A default `relation` can be given, which will be added for all
-        the implicit links found in `wikitext`. *** FIXME
-        """
-        self.delete_links(db)
-        self._parse(wikitext)
-#        self._parse(wikitext.replace('\n', ' '))
-
-    def _parse(self, wikitext, relation=None, xf=None): # FIXME integrate in the above?
-        if not xf:
-            xf = XRefParser(env, db, relation=relation)
-        xf.parse(self, wikitext)
-
-    def delete_links(self, db):
-        """
-        Remove all the cross-references originating from this facet.
-        """
-        print ("- -- %s:%s --[*]--> *:*" % (self.src.type, self.src.id) +
-               " (in %s at %s by %s)" % (self.name, self.time, self.author))
-        cursor = db.cursor()
-        cursor.execute("DELETE FROM xref"
-                       " WHERE src_type=%s AND src_id=%s"
-                       "   AND facet=%s", (self.src.type, self.src.id, self.name))
+__all__ = ['XRefSystem', 'XRefParser']
 
 
 class XRefParser(Formatter):
@@ -175,11 +105,14 @@ class XRefParser(Formatter):
         Formatter.__init__(self, env, db=db)
         self.relation = relation
 
-    def parse(self, facet, text):
+    def parse(self, src, facet, time, author, wikitext):
+        self.src = src
         self.facet = facet
+        self.time = time
+        self.author = author
         class NullOut:
             def write(self,*args): pass
-        self.format(text, NullOut())
+        self.format(wikitext, NullOut())
 
     # Reimplemented methods and helpers
     
@@ -201,8 +134,13 @@ class XRefParser(Formatter):
                         target = self._lhref_formatter(match, fullmatch)
                     # ignore the rest...
                 if target and issubclass(target.__class__, TracObject):
-                    self.facet.add_xref(self.db, target,
-                                        self._extract_context(fullmatch))
+                    self.src.create_xref(self.db, self.facet,
+                                         self.time, self.author, target,
+                                         self._extract_context(fullmatch),
+                                         self.relation)
+
+    def _macro_formatter(self, match, fullmatch):
+        pass
                     
     def _make_link(self, ns, target, match, label):
         wiki = WikiSystem(self.env)
@@ -243,9 +181,9 @@ class XRefSystem(Component):
         """
         xf = XRefParser(self.env, db)
         for mgr in self.object_managers:
-            for facet, text in mgr.rebuild_xrefs(db):
-                facet.delete_links(db)
-                xf.parse(facet, text)
+            for src, facet, time, author, wikitext in mgr.rebuild_xrefs(db):
+                src.delete_links(db, facet=facet)
+                xf.parse(src, facet, time, author, wikitext)
         db.commit()
 
     def _get_object_factories(self):
@@ -255,7 +193,9 @@ class XRefSystem(Component):
                 for type, fn in mgr.get_object_types():
                     self._object_factories[type] = fn
         return self._object_factories
-    object_factories = property(_get_object_factories)
+
+    def object_factory(self, type, id):
+        return self._get_object_factories()[type](id)
 
 
 
@@ -280,10 +220,10 @@ class XRefModule(Component):
         id = req.args.get('id', 'WikiStart')
 
         xref = XRefSystem(self.env)
-        me = xref.object_factories[type](id)
+        me = xref.object_factory(type, id)
 
         def link_to_dict(type, id, facet, context, time, author, relation):
-            obj = xref.object_factories[type](id)
+            obj = xref.object_factory(type, id)
             return {'type': type,
                     'id': escape(id), 
                     'fqname': obj.fqname(),
@@ -332,3 +272,105 @@ class XRefModule(Component):
 
         add_stylesheet(req, 'css/timeline.css')
         return 'xref.cs', None
+
+
+# -- Macros (focus on WikiPage objects)
+
+class OrphanedPagesMacro(Component):
+    """
+    Lists Wiki pages that are not referenced by another Trac object.
+    """
+    implements(IWikiMacroProvider)
+
+    def get_macros(self):
+        yield 'OrphanedPages'
+
+    def get_macro_description(self, name):
+        return inspect.getdoc(OrphanedPagesMacro)
+
+    def render_macro(self, req, name, content):
+        from trac.wiki.model import WikiPage
+
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("SELECT DISTINCT(name) FROM wiki"
+                       " WHERE name NOT IN ("
+                       "   SELECT DISTINCT(dest_id) FROM xref"
+                       "    WHERE dest_type='wiki'"
+                       "      AND (src_type='wiki' AND dest_id!=src_id"
+                       "           OR src_type!='wiki'))")
+        buf = StringIO()
+        first = True
+        for id, in cursor:
+            if not first:
+                buf.write(', ')
+            else:
+                first = False
+            page = WikiPage(self.env, id)
+            buf.write('<a class="%s" href="%s">%s</a>' \
+                          % (page.htmlclass(), page.href(), page.shortname()))
+        return buf.getvalue()
+
+
+class MissingLinksMacro(Component):
+    """
+    Lists Wiki pages that are referenced but don't exist.
+
+    FIXME: That macro has an additional ''feature'': it shows
+    all the ''false positive'' Wiki page names that are identified
+    by the XRefFormatter(CommonFormatter) but shouldn't...
+    (macros names, wiki page names in URLs, etc.)
+    """
+    implements(IWikiMacroProvider)
+
+    def get_macros(self):
+        yield 'MissingLinks'
+
+    def get_macro_description(self, name):
+        return inspect.getdoc(MissingLinksMacro)
+
+    def render_macro(self, req, name, content):
+        from trac.wiki.model import WikiPage
+
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("SELECT dest_id,src_type,src_id FROM xref "
+                       " WHERE dest_type='wiki' "
+                       " AND dest_id NOT IN (SELECT DISTINCT(name) FROM wiki) "
+                       " ORDER BY dest_id,src_type,src_id ")
+        missing = []
+        previous_page = None
+        previous_src = None
+        for page,src_type,src_id in cursor:
+            src = (src_type, src_id)
+            if page != previous_page:
+                missing.append((WikiPage(self.env, page),[src]))
+                previous_page = page
+            else:
+                if src != previous_src:
+                    missing[-1][1].append(src)
+            previous_src = src
+
+        xref = XRefSystem(self.env)
+
+        buf = StringIO()
+        buf.write('<dl>')
+        def format_link(obj, missing=None): # FIXME: method of TracObject?
+            return ('<a class="%s%s" href="%s">%s</a>' %
+                    (missing and 'missing ' or '', obj.htmlclass(),
+                     obj.href(), obj.shortname()))
+        for page,refs in missing:
+            buf.write('<dt>%s, referenced in:<dt>' \
+                      % format_link(page, missing=True))
+            buf.write('<dd>')
+            first = True
+            for type, id in refs:
+                if not first:
+                    buf.write(', ')
+                else:
+                    first = False
+                buf.write(format_link(xref.object_factory(type, id)))
+            buf.write('</dd>')
+        buf.write('</dl>')
+        return buf.getvalue()
+

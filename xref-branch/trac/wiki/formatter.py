@@ -356,6 +356,8 @@ class Formatter(object):
             macro = WikiProcessor(self.env, name)
             return macro.process(self.req, args, 1)
         except Exception, e:
+            self.env.log.error('Macro %s(%s) failed' % (name, args),
+                               exc_info=True)
             return system_message('Error: Macro %s(%s) failed' % (name, args), e)
 
     def _heading_formatter(self, match, fullmatch):

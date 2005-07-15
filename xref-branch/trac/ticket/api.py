@@ -191,13 +191,13 @@ class TicketSystem(Component):
 
     def rebuild_xrefs(self, db):
         from trac.ticket.model import Ticket
-        from trac.xref import Facet
         cursor = db.cursor()
         cursor.execute("SELECT id,description,time,reporter FROM ticket")
         for id,description,time,reporter in cursor:
             src = Ticket(self.env, None)
             src.id = id
-            descr_facet = Facet(src, 'description', time, reporter)
+            descr_time = time
+            descr_author = reporter
             chg_cursor = db.cursor()
             chg_cursor.execute("SELECT field,oldvalue,newvalue,time,author"
                                "  FROM ticket_change"
@@ -206,10 +206,10 @@ class TicketSystem(Component):
                                " ORDER BY time", (id,))
             for field,n,value,time,author in chg_cursor:
                 if field == 'description':
-                    descr_facet.time = time
-                    descr_facet.author = author
+                    descr_time = time
+                    descr_author = author
                     description = value
                 elif field == 'comment':
-                    yield (Facet(src, 'comment:%s' % n, time, author), value)
+                    yield (src, 'comment:%s' % n, time, author, value)
                 # TODO: custom fields?
-            yield (descr_facet, description)
+            yield (src, 'description', descr_time, descr_author, description)

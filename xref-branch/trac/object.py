@@ -30,15 +30,16 @@ class ITracObjectManager(Interface):
 
     def get_object_types():
         """
-        Return pair of managed object type and its corresponding
-        factory method: a method taking an `id` argument, returning
-        the TracObject of the appropriate subclass, with the given `id`.
+        Return a pair consisting of the name of the managed object type
+        and its corresponding factory method: a method which takes an `id`
+        argument and returns an instance of the appropriate subclass of
+        TracObject which has the given `id`.
         """
 
     def rebuild_xrefs():
         """
-        Clear and re-create all the cross-references originating
-        from the objects controlled by this Object Manager.
+        Generator that yields (src, facet, time, author, wikitext) tuples,
+        one for each facet of each object controlled by this Object Manager.
         """
 
 
@@ -122,14 +123,41 @@ class TracObject:
                        "   AND relation=%s " + other_clause, tuple)
         return cursor.fetchone()[0]
 
-    def delete_links(self, db, relation=None): ### FIXME: keep it at all?
+    def create_xref(self, db, facet, time, author, target, context,
+                    relation=None):
+        """
+        Create a cross-reference from this object to the given `target` object.
+        """
+        print ("(+) %s:%s --[%s]--> %s:%s" % (self.type, self.id, relation,
+                                              target.type, target.id) +
+               " (in %s at %s by %s %s)" % (facet, time, author, context))
+        cursor = db.cursor()
+        cursor.execute("INSERT INTO xref VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                       (self.type, self.id, facet, context, time, author,
+                        relation, target.type, target.id))
+
+    def update_links(self, db, facet, time, author, wikitext, relation=None):
+        """
+        Update the cross-references originating from this object,
+        in the specified `facet` containing the given `wikitext`.
+        An optional `relation` can be given, which will be used for all
+        links created.
+        """
+        from trac.xref import XRefParser
+        self.delete_links(db, facet=facet)
+        XRefParser(self.env, db, relation=relation
+                   ).parse(self, facet, time, author, wikitext)
+
+    def delete_links(self, db, relation=None, facet=None):
         cursor = db.cursor()
         tuple = (self.type, self.id)
         tuple, relation_clause = self._relation_clause(tuple, relation)
+        tuple, facet_clause = self._facet_clause(tuple, facet)
         cursor.execute("DELETE FROM xref"
-                       " WHERE src_type=%s AND src_id=%s" + relation_clause,
+                       " WHERE src_type=%s AND src_id=%s"
+                       + relation_clause + facet_clause,
                        tuple)
-        print "- -- %s:%s --[%s]--> *:*" % (self.type, self.id, relation)
+        print "(-) -- %s:%s --[%s]--> *:*" % (self.type, self.id, relation)
     
     ## XRef helper methods
 

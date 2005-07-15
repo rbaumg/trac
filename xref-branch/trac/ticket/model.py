@@ -168,9 +168,13 @@ class Ticket(TracObject):
                            "VALUES (%s,%s,%s)", [(tkt_id, name, self[name])
                                                  for name in custom_fields])
 
+        # Handle initial xrefs
+        self.id = tkt_id
+        self.update_links(db, 'description', now, self['reporter'],
+                          self['description'])
+
         if handle_ta:
             db.commit()
-        self.id = tkt_id
         self._old = {}
         return self.id
 
@@ -225,16 +229,24 @@ class Ticket(TracObject):
             else:
                 cursor.execute("UPDATE ticket SET %s=%%s WHERE id=%%s" % name,
                                (self[name], self.id))
+                if name == 'description':
+                    self.update_links(db, 'description', when, author,
+                                      self['description'])
             cursor.execute("INSERT INTO ticket_change "
                            "(ticket,time,author,field,oldvalue,newvalue) "
                            "VALUES (%s, %s, %s, %s, %s, %s)",
                            (self.id, when, author, name, self._old[name],
                             self[name]))
         if comment:
+            cursor.execute("SELECT count(*) FROM ticket_change"
+                           " WHERE ticket=%s AND field='comment'",
+                           (self.id,))
+            n = cursor.fetchone()[0]+1
             cursor.execute("INSERT INTO ticket_change "
                            "(ticket,time,author,field,oldvalue,newvalue) "
-                           "VALUES (%s,%s,%s,'comment','',%s)",
-                           (self.id, when, author, comment))
+                           "VALUES (%s,%s,%s,'comment',%s,%s)",
+                           (self.id, when, author, n, comment))
+            self.update_links(db, 'comment:%s' % n, when, author, comment)
 
         cursor.execute("UPDATE ticket SET changetime=%s WHERE id=%s",
                        (when, self.id))

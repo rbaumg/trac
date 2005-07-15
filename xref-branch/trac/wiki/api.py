@@ -257,7 +257,6 @@ class WikiSystem(Component):
 
     def rebuild_xrefs(self, db):
         from trac.wiki.model import WikiPage
-        from trac.xref import Facet
         cursor = db.cursor()
         cursor.execute("SELECT name,time,author,text"
                        "  FROM wiki ORDER BY name,version DESC")
@@ -268,7 +267,7 @@ class WikiSystem(Component):
                 src = WikiPage(self.env, None) # no _fetch
                 src.id = name
                 src.name = name
-                yield (Facet(src, 'content', time, author), text)
+                yield (src, 'content', time, author, text)
             # Note: wiki edit comments are not yet modifiable
             #       therefore it's not condidered to be a facet.
 

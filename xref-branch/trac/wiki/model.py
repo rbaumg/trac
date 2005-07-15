@@ -101,6 +101,7 @@ class WikiPage(TracObject):
                 page_deleted = True
 
         if page_deleted:
+            self.delete_links(db)
             from trac.attachment import Attachment
             # Delete orphaned attachments
             for attachment in Attachment.select(self.env, 'wiki', self.name, db):
@@ -131,6 +132,7 @@ class WikiPage(TracObject):
                            "%s,%s)", (self.name, self.version + 1, t, author,
                            remote_addr, self.text, comment, self.readonly))
             self.version += 1
+            self.update_links(db, 'content', t, author, self.text)
         elif self.readonly != self.old_readonly:
             cursor = db.cursor()
             cursor.execute("UPDATE wiki SET readonly=%s WHERE name=%s",
