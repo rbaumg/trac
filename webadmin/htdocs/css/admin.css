@@ -1,0 +1,51 @@
+ul.vtabs, .vtabs ul {
+ list-style: none;
+ margin: 0;
+ padding: 0;
+}
+ul.vtabs {
+ float: left;
+ padding: 0.2em 0;
+ border: 1px solid black;
+ border-color: gray black black gray;
+}
+
+.vtabs li {
+ padding-left: 0.5em;
+ width: 9.5em;
+}
+
+.vtabs ul li {
+ padding-left: 2em;
+ width: 8em;
+}
+
+.vtabs, .vtabs ul {
+}
+
+ul.active, li.active {
+ background: #eee;
+}
+
+.tabcontents {
+ padding: 0.4em 2em;
+ margin-left: 10em;
+ min-height: 300px;
+}
+
+.float-left {
+ float: left;
+}
+.align-right {
+ text-align: right;
+}
+
+.checkboxcol {
+ width: 1%;
+}
+
+/* for trac.admin.ticket */
+.listing#verlist, .listing#complist {
+ width: 50%;
+}
+
