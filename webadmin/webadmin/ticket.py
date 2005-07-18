@@ -21,7 +21,6 @@
 
 from trac import ticket
 from trac.core import *
-from trac.util import TracError
 from trac.perm import IPermissionRequestor
 from webadmin.web_ui import IAdminPageProvider
 
@@ -44,31 +43,43 @@ class ComponentAdminPage(Component):
         # Detail view?
         if component:
             comp = ticket.Component(self.env, component)
-            if req.args.get('save'):
-                comp.name = req.args.get('name')
-                comp.owner = req.args.get('owner')
-                comp.update()
-                req.redirect(self.env.href.admin(cat, page))
-            elif req.args.get('remove'):
-                comp.delete()
-                req.redirect(self.env.href.admin(cat, page))
-            elif req.args.get('cancel'):
-                req.redirect(self.env.href.admin(cat, page))
+            if req.method == 'POST':
+                if req.args.get('save'):
+                    comp.name = req.args.get('name')
+                    comp.owner = req.args.get('owner')
+                    comp.update()
+                    req.redirect(self.env.href.admin(cat, page))
+                elif req.args.get('cancel'):
+                    req.redirect(self.env.href.admin(cat, page))
 
             req.hdf['admin.component'] = {
                 'name': comp.name,
                 'owner': comp.owner
             }
         else:
-            # Add Component
-            if req.args.get('add') and req.args.get('name'):
-                comp = ticket.Component(self.env)
-                comp.name = req.args.get('name')
-                if req.args.get('owner'):
-                    comp.owner = req.args.get('owner')
-                comp.insert()
-                req.redirect(self.env.href.admin(cat, page))
-                         
+            if req.method == 'POST':
+                # Add Component
+                if req.args.get('add') and req.args.get('name'):
+                    comp = ticket.Component(self.env)
+                    comp.name = req.args.get('name')
+                    if req.args.get('owner'):
+                        comp.owner = req.args.get('owner')
+                    comp.insert()
+                    req.redirect(self.env.href.admin(cat, page))
+
+                # Remove components
+                elif req.args.get('remove') and req.args.get('sel'):
+                    sel = req.args.get('sel')
+                    sel = isinstance(sel, list) and sel or [sel]
+                    if not sel:
+                        raise TracError, 'No component selected'
+                    db = self.env.get_db_cnx()
+                    for name in sel:
+                        comp = ticket.Component(self.env, name, db=db)
+                        comp.delete(db=db)
+                    db.commit()
+                    req.redirect(self.env.href.admin(cat, page))
+
             req.hdf['admin.components'] = \
                 [{'name': c.name,
                   'owner': c.owner,
@@ -93,17 +104,18 @@ class VersionsAdminPage(Component):
         # Detail view?
         if version:
             ver = ticket.Version(self.env, version)
-            if req.args.get('save'):
-                ver.name = req.args.get('name')
-                # FIXME: parse the "time" field
-                ver.description = req.args.get('description')
-                ver.update()
-                req.redirect(self.env.href.admin(cat, page))
-            elif req.args.get('remove'):
-                ver.delete()
-                req.redirect(self.env.href.admin(cat, page))
-            elif req.args.get('cancel'):
-                req.redirect(self.env.href.admin(cat, page))
+            if req.method == 'POST':
+                if req.args.get('save'):
+                    ver.name = req.args.get('name')
+                    # FIXME: parse the "time" field
+                    ver.description = req.args.get('description')
+                    ver.update()
+                    req.redirect(self.env.href.admin(cat, page))
+                elif req.args.get('remove'):
+                    ver.delete()
+                    req.redirect(self.env.href.admin(cat, page))
+                elif req.args.get('cancel'):
+                    req.redirect(self.env.href.admin(cat, page))
 
             req.hdf['admin.version'] = {
                 'name': ver.name,
@@ -111,13 +123,27 @@ class VersionsAdminPage(Component):
                 'description': ver.description
             }
         else:
-            # Add Version
-            if req.args.get('add') and req.args.get('name'):
-                ver = ticket.Version(self.env)
-                ver.name = req.args.get('name')
-                ver.insert()
-                req.redirect(self.env.href.admin(cat, page))
+            if req.method == 'POST':
+                # Add Version
+                if req.args.get('add') and req.args.get('name'):
+                    ver = ticket.Version(self.env)
+                    ver.name = req.args.get('name')
+                    ver.insert()
+                    req.redirect(self.env.href.admin(cat, page))
                          
+                # Remove versions
+                elif req.args.get('remove') and req.args.get('sel'):
+                    sel = req.args.get('sel')
+                    sel = isinstance(sel, list) and sel or [sel]
+                    if not sel:
+                        raise TracError, 'No version selected'
+                    db = self.env.get_db_cnx()
+                    for name in sel:
+                        ver = ticket.Version(self.env, name, db=db)
+                        ver.delete(db=db)
+                    db.commit()
+                    req.redirect(self.env.href.admin(cat, page))
+
             req.hdf['admin.versions'] = \
                 [{'name': c.name,
                   'time': c.time,

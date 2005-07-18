@@ -1,31 +1,16 @@
-ul.vtabs, .vtabs ul {
- list-style: none;
- margin: 0;
- padding: 0;
-}
-ul.vtabs {
- float: left;
- padding: 0.2em 0;
+.tabs {
  border: 1px solid black;
  border-color: gray black black gray;
+ margin: 2em 0;
+ float: left;
+ width: 10em;
 }
-
-.vtabs li {
- padding-left: 0.5em;
- width: 9.5em;
-}
-
-.vtabs ul li {
- padding-left: 2em;
- width: 8em;
-}
-
-.vtabs, .vtabs ul {
-}
-
-ul.active, li.active {
- background: #eee;
-}
+.tabs ul { list-style: none; margin: 0; padding: 0 }
+.tabs li { margin: 0; padding: 0.1em 0.5em }
+.tabs li li { padding-left: 2em }
+.tabs ul.active, .tabs li.active { background: #eee }
+.tabs li li.active { font-weight: bold }
+.tabs :link, .tabs :visited { border: none }
 
 .tabcontents {
  padding: 0.4em 2em;
@@ -33,19 +18,7 @@ ul.active, li.active {
  min-height: 300px;
 }
 
-.float-left {
- float: left;
-}
-.align-right {
- text-align: right;
-}
-
-.checkboxcol {
- width: 1%;
-}
-
-/* for trac.admin.ticket */
-.listing#verlist, .listing#complist {
- width: 50%;
-}
-
+form.addnew { float: right; margin-top: -2em; width: 30% }
+form.mod { margin-top: 1em; }
+table.listing { clear: none; width: 60% }
+th.sel { width: 1%; }
