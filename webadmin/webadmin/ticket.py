@@ -19,7 +19,7 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
-from trac import ticket
+from trac import ticket, util
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from webadmin.web_ui import IAdminPageProvider
@@ -80,12 +80,27 @@ class ComponentAdminPage(Component):
                     db.commit()
                     req.redirect(self.env.href.admin(cat, page))
 
+                # Set default component
+                elif req.args.get('setdefault') and req.args.get('default'):
+                    name = req.args.get('default')
+                    self.log.info('Setting default component to %s', name)
+                    self.config.set('ticket', 'default_component', name)
+                    self.config.save()
+                    req.redirect(self.env.href.admin(cat, page))
+
+            default = self.config.get('ticket', 'default_component')
             req.hdf['admin.components'] = \
-                [{'name': c.name,
-                  'owner': c.owner,
+                [{'name': c.name, 'owner': c.owner,
+                  'is_default': c.name == default,
                   'href': self.env.href.admin(cat, page, c.name)
                  } for c in ticket.Component.select(self.env)]
             
+
+        restrict_owner = self.config.get('ticket', 'restrict_owner')
+        if restrict_owner in util.TRUE:
+            req.hdf['admin.owners'] = [username for username, name, email
+                                       in self.env.get_known_users()]
+
         return 'admin_component.cs', None
 
 
@@ -144,10 +159,18 @@ class VersionsAdminPage(Component):
                     db.commit()
                     req.redirect(self.env.href.admin(cat, page))
 
+                # Set default version
+                elif req.args.get('setdefault') and req.args.get('default'):
+                    name = req.args.get('default')
+                    self.log.info('Setting default version to %s', name)
+                    self.config.set('ticket', 'default_version', name)
+                    self.config.save()
+                    req.redirect(self.env.href.admin(cat, page))
+
+            default = self.config.get('ticket', 'default_version')
             req.hdf['admin.versions'] = \
-                [{'name': c.name,
-                  'time': c.time,
-                  'description': c.description,
+                [{'name': c.name, 'time': c.time,
+                  'is_default': c.name == default,
                   'href': self.env.href.admin(cat, page, c.name)
                  } for c in ticket.Version.select(self.env)]
             

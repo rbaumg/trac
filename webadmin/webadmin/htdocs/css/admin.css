@@ -21,4 +21,4 @@
 form.addnew { float: right; margin-top: -2em; width: 30% }
 form.mod { margin-top: 1em; }
 table.listing { clear: none; width: 60% }
-th.sel { width: 1%; }
+table.listing .sel, table.listing .default { text-align: center; width: 1% }

@@ -11,7 +11,7 @@ if:admin.version.name ?>
    <div class="field">
     <label>Time: <input type="text" name="time" value="<?cs
       var:admin.version.time ?>"></label>
-   </dv>
+   </div>
    <div class="field">
     <label>Description: <input type="text" name="description" value="<?cs
       var:admin.version.description ?>"></label>
@@ -31,6 +31,10 @@ else ?>
    <div class="field">
     <label>Name:<input type="text" name="name" id="name"></label>
    </div>
+   <div class="field">
+    <label>Time: <input type="text" name="time" value="<?cs
+      var:admin.version.time ?>"></label>
+   </div>
    <div class="buttons">
     <input type="submit" name="add" value="Add">
    </div>
@@ -41,19 +45,22 @@ else ?>
   <table class="listing" id="verlist">
    <thead>
     <tr><th class="sel">&nbsp;</th><th>Name</th>
-    <th>Description</th><th>Time</th></tr>
+    <th>Time</th><th>Default</th></tr>
    </thead><tbody><?cs
    each:ver = admin.versions ?>
    <tr>
     <td><input type="checkbox" name="sel" value="<?cs var:ver.name ?>" /></td>
     <td><a href="<?cs var:ver.href ?>"><?cs var:ver.name ?></a></td>
-    <td><?cs var:ver.description ?></td>
     <td><?cs var:ver.time ?></td>
+     <td class="default"><input type="radio" name="default" value="<?cs
+       var:ver.name ?>"<?cs
+       if:ver.is_default ?> checked="checked" <?cs /if ?>></td>
    </tr><?cs
    /each ?></tbody>
   </table>
   <div class="buttons">
-   <input type="submit" name="remove" value="Remove selected versions" />
+   <input type="submit" name="remove" value="Remove selected" />
+   <input type="submit" name="setdefault" value="Set default version" />
   </div>
  </form><?cs
 
