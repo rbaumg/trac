@@ -85,6 +85,18 @@ class IWikiSyntaxProvider(Interface):
         Return an iterable over (namespace, formatter) tuples.
         """
  
+class IWikiPageNameSyntaxProvider(Interface):
+ 
+    def get_wiki_page_names_syntax():
+        """
+        Return an iterable that provides a regular expression for
+        matching wiki page names (see WikiPageNames)
+
+        Be careful to only allow __one__ implementation
+        (others should be listed in the ![disabled_components]
+        section of the TracIni)
+        """
+ 
 
 class WikiSystem(Component):
     """
@@ -95,6 +107,7 @@ class WikiSystem(Component):
     change_listeners = ExtensionPoint(IWikiChangeListener)
     macro_providers = ExtensionPoint(IWikiMacroProvider)
     syntax_providers = ExtensionPoint(IWikiSyntaxProvider)
+    wikipagenames_providers = ExtensionPoint(IWikiPageNameSyntaxProvider)
 
     def __init__(self):
         self._pages = None
@@ -189,13 +202,16 @@ class WikiSystem(Component):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        yield (r"!?(^|(?<=[^A-Za-z]))"     # where to start
-               r"[A-Z][a-z]+"              # initial WikiPageNames component
-               r"(?:[A-Z][a-z]*[a-z/])+"   # additional WikiPageNames components
-               r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
-               r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end
-               r"(?!:\S)",                 # InterWiki support               
-               lambda x, y, z: self._format_link(x, 'wiki', y, y))
+        only_one = True
+        for wikipagenames in self.wikipagenames_providers:
+            if not only_one:
+                self.log.warning('More than one IWikiPageNameSyntaxProvider '
+                                 'implementation available: %s' %
+                                 wikipagenames.__class__.__name__)
+            else:
+                yield (wikipagenames.get_wiki_page_names_syntax(),
+                       lambda x, y, z: self._format_link(x, 'wiki', y, y))
+                only_one = False
 
     def get_link_resolvers(self):
         yield ('wiki', self._format_link)
@@ -215,3 +231,60 @@ class WikiSystem(Component):
             return '<a class="wiki" href="%s">%s</a>' \
                    % (formatter.href.wiki(page) + anchor, label)
 
+
+class StandardWikiPageNames(Component):
+    """
+    Standard Trac WikiPageNames rule
+    """
+
+    implements(IWikiPageNameSyntaxProvider)
+
+    def get_wiki_page_names_syntax(self):
+        return (r"!?(^|(?<=[^A-Za-z]))"     # where to start
+                r"[A-Z][a-z]+"              # initial WikiPageNames word
+                r"(?:[A-Z][a-z]*[a-z/])+"   # additional WikiPageNames word
+                r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
+                r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end
+                r"(?!:\S)")                 # InterWiki support 
+
+class FlexibleWikiPageNames(Component):
+    """
+    Standard Trac WikiPageNames rule, with digits
+    and consecutive upper-case characters allowed.
+
+    More precisely, WikiPageNames are:
+     * either 2 or more starting upper case letter or digits,
+       followed by lower case letters
+     * either 1 or more starting upper case letter or digits,
+       followed by lower case letters, repeated at least 2 times
+       (with optionally '/' between repetitions)
+    """
+
+    implements(IWikiPageNameSyntaxProvider)
+
+    def get_wiki_page_names_syntax(self):
+        return (r"!?(^|(?<=[^A-Za-z\d]))"   # where to start
+                r"(?:[A-Z\d]{2,}[a-z]+"                  # 1st way
+                r"|[A-Z\d]+[a-z]+(?:/?[A-Z\d]+[a-z]*)+)" # 2nd way
+                r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
+                r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end 
+                r"(?!:\S)")                 # InterWiki support 
+
+class SubWikiPageNames(Component):
+    """
+    SubWiki-like rules.
+    
+    See http://www.webdav.org/wiki/projects/TextFormattingRules
+
+    Note that '/' in this style of WikiPageNames are not supported.
+    """
+
+    implements(IWikiPageNameSyntaxProvider)
+
+    def get_wiki_page_names_syntax(self):
+        return (r"!?(^|(?<=[^A-Za-z]))"     # where to start
+                r"(?:[A-Z][A-Z]+[a-z\d]+[A-Z]*"  # 1st and 3rd way
+                r"|[A-Z][a-z]+(?:[A-Z][a-z]+)+)" # 2nd way
+                r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
+                r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end 
+                r"(?!:\S)")                 # InterWiki support 
