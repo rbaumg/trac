@@ -6,6 +6,7 @@
   <div class="field">
    <label>File: <input type="file" name="egg_file" /></label>
   </div>
+  <p class="help">Upload a plugin packaged as Python egg.</p>
   <div class="buttons">
    <input type="submit" name="install" value="Install">
   </div>
@@ -43,7 +44,7 @@
  </table>
  <div class="update buttons">
   <input type="hidden" name="plugin" value="<?cs var:name(plugin) ?>" />
-  <input type="submit" name="update" value="Update enablement" />
+  <input type="submit" name="update" value="Apply changes" />
  </div></div><script type="text/javascript">
    enableFolding("no<?cs var:name(plugin) ?>");
  </script></form><?cs

@@ -26,7 +26,6 @@ import sys
 
 from trac import ticket, util, __version__ as TRAC_VERSION
 from trac.core import *
-from trac.perm import IPermissionRequestor
 from webadmin.web_ui import IAdminPageProvider
 
 try:
@@ -48,8 +47,9 @@ def _find_base_path(path, module_name):
 TRAC_PATH = _find_base_path(sys.modules['trac.core'].__file__, 'trac.core')
 
 # Ideally, this wouldn't be hard-coded like this
-required_components = ('Environment', 'EnvironmentSetup', 'PermissionSystem',
-    'RequestDispatcher', 'Mimeview', 'Chrome')
+required_components = ('AboutModule', 'DefaultPermissionGroupProvider',
+    'Environment', 'EnvironmentSetup', 'PermissionSystem', 'RequestDispatcher',
+    'Mimeview', 'Chrome')
 
 
 class PluginAdminPage(Component):
@@ -60,7 +60,7 @@ class PluginAdminPage(Component):
 
     def get_admin_pages(self, req):
         if req.perm.has_permission('TRAC_ADMIN'):
-            yield ('general', 'General', 'plugins', 'Plugins')
+            yield ('general', 'General', 'plugin', 'Plugins')
 
     def process_admin_request(self, req, cat, page, _):
         req.perm.assert_permission('TRAC_ADMIN')
@@ -97,9 +97,12 @@ class PluginAdminPage(Component):
             raise TracError, 'No file uploaded'
         if not egg_filename.endswith('.egg'):
             raise TracError, 'Uploaded file is not a python egg'
-        self.log.info('Installing plugin %s', egg_filename)
 
         target_path = os.path.join(self.env.path, 'plugins', egg_filename)
+        if os.path.isfile(target_path):
+            raise TracError, 'Plugin %s already installed' % egg_filename
+
+        self.log.info('Installing plugin %s', egg_filename)
         flags = os.O_CREAT + os.O_WRONLY + os.O_EXCL
         try:
             flags += os.O_BINARY
@@ -134,9 +137,10 @@ class PluginAdminPage(Component):
         for component in components:
             is_enabled = self._is_component_enabled(component)
             if is_enabled != (component in enabled):
-                # Enable component
-                self.config.set('disabled_components', component,
-                                is_enabled and 'yes' or 'no')
+                if is_enabled:
+                    self.config.set('disabled_components', component, 'yes')
+                else:
+                    self.config.remove('disabled_components', component)
                 self.log.info('%sabling component %s',
                               is_enabled and 'Dis' or 'En', component)
                 changes = True
@@ -205,6 +209,7 @@ class PluginAdminPage(Component):
         for category in plugins:
             plugins[category]['components'].sort(component_order)
 
+        req.hdf['title'] = 'Manage Plugins'
         req.hdf['admin.plugins.0'] = plugins['Trac']
         addons = [key for key in plugins.keys() if key != 'Trac']
         addons.sort()

@@ -12,10 +12,12 @@
     if:name(page) != 0 ?></ul></li><?cs /if ?><li<?cs
      if:page.cat_id == admin.active_cat ?> class="active"<?cs
      /if ?>><?cs var:page.cat_label ?><ul><?cs
-   /if ?><li<?cs
-   if:page.page_id == admin.active_page ?> class="active"<?cs
-   /if ?>><a href="<?cs var:page.href ?>"><?cs
-     var:page.page_label ?></a></li><?cs
+   /if ?><?cs
+   if:page.page_id == admin.active_page ?><li class="active"><?cs
+    var:page.page_label ?></li><?cs
+   else ?><li><a href="<?cs var:page.href ?>"><?cs
+    var:page.page_label ?></a></li><?cs
+   /if ?><?cs
    set:cur_cat_id = page.cat_id ?><?cs
   /each ?></ul><li/></ul></div>
 

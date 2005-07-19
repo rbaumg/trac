@@ -256,7 +256,7 @@ class TicketTypeAdminPage(EnumAdminPageBase):
     implements(IAdminPageProvider)
 
     _page_id = 'type'
-    _page_label = 'Types'
+    _page_label = 'Ticket Types'
     _enum_cls = ticket.Type
     _heading = 'Manage Ticket Types'
     _add_label = 'Add Ticket Type'

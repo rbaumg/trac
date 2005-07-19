@@ -35,19 +35,26 @@ class PermAdminPage(Component):
     # IAdminPageProvider
     def get_admin_pages(self, req):
         if req.perm.has_permission('TRAC_ADMIN'):
-            yield ('security', 'Security', 'perm', 'Permissions')
+            yield ('general', 'General', 'perm', 'Permissions')
 
     def process_admin_request(self, req, cat, page, path_info):
         perm = PermissionSystem(self.env)
         perms = perm.get_all_permissions()
         subject = req.args.get('subject')
         action = req.args.get('action')
+        group = req.args.get('group')
 
         if req.method == 'POST':
+            # Grant permission to subject
             if req.args.get('add') and subject and action:
                 if action not in perm.get_actions():
                     raise TracError('Unknown action')
                 perm.grant_permission(subject, action)
+                req.redirect(self.env.href.admin(cat, page))
+
+            # Add subject to group
+            elif req.args.get('add') and subject and group:
+                perm.grant_permission(subject, group)
                 req.redirect(self.env.href.admin(cat, page))
 
             # Remove permissions action
@@ -60,6 +67,7 @@ class PermAdminPage(Component):
                         perm.revoke_permission(subject, action)
                 req.redirect(self.env.href.admin(cat, page))
         
+        perms.sort(lambda a, b: cmp(a[0], b[0]))
         req.hdf['admin.actions'] = perm.get_actions()
         req.hdf['admin.perms'] = [{'subject': p[0],
                                    'action': p[1],

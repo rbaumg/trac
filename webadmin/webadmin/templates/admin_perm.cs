@@ -2,13 +2,31 @@
 
 <form id="addperm" class="addnew" method="post">
  <fieldset>
-  <legend>Add Permission:</legend>
+  <legend>Grant Permission:</legend>
   <div class="field">
    <label>Subject: <input type="text" name="subject" /></label>
   </div>
   <div class="field">
    <label>Action: <?cs call:hdf_select(admin.actions, "action", "", 0) ?></label>
   </div>
+  <p class="help">Grant permission for an action to a subject, which can be
+  either a user or a group.</p>
+  <div class="buttons">
+   <input type="submit" name="add" value=" Add ">
+  </div>
+ </fieldset>
+</form>
+
+<form id="addsubj" class="addnew" method="post">
+ <fieldset>
+  <legend>Add Subject to Group:</legend>
+  <div class="field">
+   <label>Subject: <input type="text" name="subject" /></label>
+  </div>
+  <div class="field">
+   <label>Group: <input type="text" name="group" /></label>
+  </div>
+  <p class="help">Add a user or group to an existing permission group.</p>
   <div class="buttons">
    <input type="submit" name="add" value=" Add ">
   </div>
