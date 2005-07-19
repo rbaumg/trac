@@ -65,7 +65,7 @@
    * Milestone `trac.Milestone`
      * title facet
      * description facet
-   * Source `?`
+   * Source `trac.versioncontrol.Node`
      * (no facet, only as a target)
 
   A cross-reference is also called a relation if a specific semantic is
@@ -275,6 +275,46 @@ class XRefModule(Component):
 
 
 # -- Macros (focus on WikiPage objects)
+
+class BacklinksMacro(Component):
+    """
+    Inline a list of backlinks to the current object
+    """
+    implements(IWikiMacroProvider)
+
+    def get_macros(self):
+        yield 'Backlinks'
+
+    def get_macro_description(self, name):
+        return inspect.getdoc(BacklinksMacro)
+
+    def render_macro(self, req, name, content):
+        # Kludge: `src` should be known by the formatter and forwarded
+        #         to the macro
+        type, id = 'wiki', 'WikiStart'
+        if req:
+            path_info = req.path_info.split('/', 2)
+            if len(path_info) > 1:
+                type = path_info[1]
+            if len(path_info) > 2:
+                id = path_info[2]
+        xref = XRefSystem(self.env)
+        src = xref.object_factory(type, id)
+        db = self.env.get_db_cnx()
+        buf = StringIO()
+        first = True
+        for backlink in src.find_backlinks(db):
+            print backlink
+            dst_type,dst_id,facet,context,time,author,relation = backlink
+            if not first:
+                buf.write(', ')
+            else:
+                first = False
+            dst = xref.object_factory(dst_type, dst_id)
+            buf.write('<a class="%s" href="%s">%s</a>' \
+                          % (dst.htmlclass(), dst.href(), dst.shortname()))
+        return buf.getvalue()
+
 
 class OrphanedPagesMacro(Component):
     """
