@@ -126,9 +126,6 @@ class VersionsAdminPage(Component):
                     ver.description = req.args.get('description')
                     ver.update()
                     req.redirect(self.env.href.admin(cat, page))
-                elif req.args.get('remove'):
-                    ver.delete()
-                    req.redirect(self.env.href.admin(cat, page))
                 elif req.args.get('cancel'):
                     req.redirect(self.env.href.admin(cat, page))
 
@@ -175,3 +172,94 @@ class VersionsAdminPage(Component):
                  } for c in ticket.Version.select(self.env)]
             
         return 'admin_version.cs', None
+
+class EnumAdminPageBase(Component):
+
+    _page_id = 'unknown'
+    _page_label = 'Unknown'
+    _enum_cls = None
+    _heading = 'Default Heading'
+    _add_label = 'Add Undefined'
+    _remove_label = 'Remove selected Undefined'
+    _modify_label = 'Modify Undefined'
+
+    # IAdminPageProvider
+    def get_admin_pages(self, req):
+        if req.perm.has_permission('TICKET_ADMIN'):
+            yield ('ticket', 'Ticket System', self._page_id, self._page_label)
+
+    def process_admin_request(self, req, cat, page, path_info):
+        req.perm.assert_permission('TICKET_ADMIN')
+        req.hdf['admin.enum'] = {
+            'heading': self._heading,
+            'add_label': self._add_label,
+            'remove_label': self._remove_label,
+            'modify_label': self._modify_label
+        }
+        # Detail view?
+        if path_info:
+            enum = self._enum_cls(self.env, path_info)
+            if req.method == 'POST':
+                if req.args.get('save'):
+                    enum.name = req.args.get('name')
+                    enum.update()
+                    req.redirect(self.env.href.admin(cat, page))
+                elif req.args.get('cancel'):
+                    req.redirect(self.env.href.admin(cat, page))
+
+            req.hdf['admin.enum'] = {
+                'name': enum.name,
+                'value': enum.value
+            }
+        else:
+            if req.method == 'POST':
+                # Add Enum
+                if req.args.get('add') and req.args.get('name'):
+                    enum = self._enum_cls(self.env)
+                    enum.name = req.args.get('name')
+                    enum.insert()
+                    req.redirect(self.env.href.admin(cat, page))
+                         
+                # Remove Enums
+                elif req.args.get('remove') and req.args.get('sel'):
+                    sel = req.args.get('sel')
+                    sel = isinstance(sel, list) and sel or [sel]
+                    if not sel:
+                        raise TracError, 'No enum selected'
+                    db = self.env.get_db_cnx()
+                    for name in sel:
+                        enum = self._enum_cls(self.env, name, db=db)
+                        enum.delete(db=db)
+                    db.commit()
+                    req.redirect(self.env.href.admin(cat, page))
+
+            req.hdf['admin.enums'] = \
+                [{'name': e.name,
+                  'value': e.value,
+                  'href': self.env.href.admin(cat, page, e.name)
+                 } for e in self._enum_cls.select(self.env)]
+            
+        return 'admin_enum.cs', None
+
+class PriorityAdminPage(EnumAdminPageBase):
+    implements(IAdminPageProvider)
+
+    _page_id = 'priority'
+    _page_label = 'Priorities'
+    _enum_cls = ticket.Priority
+    _heading = 'Manage Priorities'
+    _add_label = 'Add Priority'
+    _remove_label = 'Remove selected priorities'
+    _modify_label = 'Modify Priority'
+
+class TicketTypeAdminPage(EnumAdminPageBase):
+    implements(IAdminPageProvider)
+
+    _page_id = 'type'
+    _page_label = 'Types'
+    _enum_cls = ticket.Type
+    _heading = 'Manage Ticket Types'
+    _add_label = 'Add Ticket Type'
+    _remove_label = 'Remove selected ticket types'
+    _modify_label = 'Modify Ticket Type'
+
