@@ -179,9 +179,9 @@ def:sortable_th(order, desc, class, title, href) ?>
 /def ?><?cs 
 
 def:backlinks(type,id) ?><?cs 
- if:xref.count.all > #0 ?>
+ if:#xref.count.backlinks + #xref.count.relations > #0 ?>
   <li><a href="<?cs var:trac.href.xref ?>/<?cs var:type ?>/<?cs var:id ?>"
-	 title="<?cs var:xref.count.backlinks ?> backlinks, <?cs var:xref.count.all ?> relations">Cross-references</a></li><?cs
+	 title="<?cs var:xref.count.backlinks ?> backlinks, <?cs var:xref.count.relations ?> relations">Cross-references</a></li><?cs
  /if ?><?cs
 /def ?><?cs 
 

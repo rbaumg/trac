@@ -80,8 +80,8 @@ class TracObject:
         """Setup the HDF with the count of backlinks and relations"""
         req.hdf['xref.count'] = {
             'backlinks': self.count_backlinks(db, relation=False),
-            'all': self.count_backlinks(db) + self.count_links(db,
-                                                               relation=True)
+            'relations': (self.count_backlinks(db, relation=True) +
+                          self.count_links(db, relation=True))
             } 
 
     # TODO: disguard the facet argument?
@@ -173,7 +173,7 @@ class TracObject:
         if relation == True:
             relation_clause = " AND relation!=''"
         elif relation == False:
-            relation_clause = " AND relation=''"
+            relation_clause = " AND COALESCE(relation,'')=''"
         elif relation:
             relation_clause = " AND relation=%s"
             tuple += (relation,)
