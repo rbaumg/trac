@@ -21,21 +21,25 @@
 
 from __future__ import generators
 
-from trac.util import TracError
-
 import os
-import os.path
 import time
 import urllib
-from threading import Condition, Lock
+try:
+    import threading
+except ImportError:
+    import dummy_threading as threading
+    threading._get_ident = lambda: 0
+
+from trac.core import TracError
+from trac.util import enum
 
 __all__ = ['get_cnx_pool', 'init_db']
 
 
 class IterableCursor(object):
-    """
-    Wrapper for DB-API cursor objects that makes the cursor iterable. Iteration
-    will generate the rows of a SELECT query one by one.
+    """Wrapper for DB-API cursor objects that makes the cursor iterable.
+    
+    Iteration will generate the rows of a SELECT query one by one.
     """
     __slots__ = ['cursor']
 
@@ -54,9 +58,10 @@ class IterableCursor(object):
 
 
 class ConnectionWrapper(object):
-    """
-    Generic wrapper around connection objects. This wrapper makes cursor
-    produced by the connection iterable using IterableCursor.
+    """Generic wrapper around connection objects.
+    
+    This wrapper makes cursors produced by the connection iterable using
+    `IterableCursor`.
     """
     __slots__ = ['cnx']
 
@@ -73,7 +78,8 @@ class ConnectionWrapper(object):
 
 
 class TimeoutError(Exception):
-    pass
+    """Exception raised by the connection pool when no connection has become
+    available after a given timeout."""
 
 
 class PooledConnection(ConnectionWrapper):
@@ -83,10 +89,12 @@ class PooledConnection(ConnectionWrapper):
 
     def __init__(self, pool, cnx):
         ConnectionWrapper.__init__(self, cnx)
-        self.__pool = pool
+        self._pool = pool
 
     def close(self):
-        self.__pool._return_cnx(self.cnx)
+        if self.cnx:
+            self._pool._return_cnx(self.cnx)
+            self.cnx = None
 
     def __del__(self):
         self.close()
@@ -96,10 +104,11 @@ class ConnectionPool(object):
     """A very simple connection pool implementation."""
 
     def __init__(self, maxsize, cnx_class, **args):
-        self._cnxs = []
-        self._available = Condition(Lock())
-        self._maxsize = maxsize
-        self._cursize = 0
+        self._dormant = [] # inactive connections in pool
+        self._active = {} # active connections by thread ID
+        self._available = threading.Condition(threading.RLock())
+        self._maxsize = maxsize # maximum pool size
+        self._cursize = 0 # current pool size, includes active connections
         self._cnx_class = cnx_class
         self._args = args
 
@@ -107,9 +116,13 @@ class ConnectionPool(object):
         start = time.time()
         self._available.acquire()
         try:
+            tid = threading._get_ident()
+            if tid in self._active:
+                self._active[tid][0] += 1
+                return PooledConnection(self, self._active[tid][1])
             while True:
-                if self._cnxs:
-                    cnx = self._cnxs.pop()
+                if self._dormant:
+                    cnx = self._dormant.pop()
                     break
                 elif self._maxsize and self._cursize < self._maxsize:
                     cnx = self._cnx_class(**self._args)
@@ -119,10 +132,12 @@ class ConnectionPool(object):
                     if timeout:
                         self._available.wait(timeout)
                         if (time.time() - start) >= timeout:
-                            raise TimeoutError, "Unable to get connection " \
-                                                "within %d seconds" % timeout
+                            raise TimeoutError, 'Unable to get database ' \
+                                                'connection within %d seconds' \
+                                                % timeout
                     else:
                         self._available.wait()
+            self._active[tid] = [1, cnx]
             return PooledConnection(self, cnx)
         finally:
             self._available.release()
@@ -130,20 +145,46 @@ class ConnectionPool(object):
     def _return_cnx(self, cnx):
         self._available.acquire()
         try:
-            if cnx not in self._cnxs:
-                cnx.rollback()
-                self._cnxs.append(cnx)
-                self._available.notify()
+            tid = threading._get_ident()
+            if tid in self._active:
+                num, cnx_ = self._active.get(tid)
+                assert cnx is cnx_
+                if num > 1:
+                    self._active[tid][0] = num - 1
+                else:
+                    del self._active[tid]
+                    if cnx not in self._dormant:
+                        cnx.rollback()
+                        self._dormant.append(cnx)
+                        self._available.notify()
         finally:
             self._available.release()
 
     def shutdown(self):
         self._available.acquire()
         try:
-            for con in self._cnxs:
-                con.cnx.close()
+            for cnx in self._dormant:
+                cnx.cnx.close()
         finally:
             self._available.release()
+
+
+try:
+    import pysqlite2.dbapi2 as sqlite
+    using_pysqlite2 = True
+
+    class PyFormatCursor(sqlite.Cursor):
+        def execute(self, sql, args=None):
+            if args:
+                sql = sql % tuple(['?'] * len(args))
+            sqlite.Cursor.execute(self, sql, args or [])
+        def executemany(self, sql, args=None):
+            if args:
+                sql = sql % tuple(['?'] * len(args[0]))
+            sqlite.Cursor.executemany(self, sql, args or [])
+
+except ImportError:
+    using_pysqlite2 = False
 
 
 class SQLiteConnection(ConnectionWrapper):
@@ -152,6 +193,7 @@ class SQLiteConnection(ConnectionWrapper):
     __slots__ = ['cnx']
 
     def __init__(self, path, params={}):
+        global using_pysqlite2
         self.cnx = None
         if path != ':memory:':
             if not os.access(path, os.F_OK):
@@ -165,9 +207,28 @@ class SQLiteConnection(ConnectionWrapper):
                                  'the directory this file is located in.' \
                                  % path
 
-        import sqlite
-        cnx = sqlite.connect(path, timeout=int(params.get('timeout', 10000)))
+        timeout = int(params.get('timeout', 10000))
+        if using_pysqlite2:
+            global sqlite
+
+            # Convert unicode to UTF-8 bytestrings. This is case-sensitive, so
+            # we need two converters
+            sqlite.register_converter('text', str)
+            sqlite.register_converter('TEXT', str)
+
+            cnx = sqlite.connect(path, detect_types=sqlite.PARSE_DECLTYPES,
+                                 check_same_thread=False, timeout=timeout)
+        else:
+            import sqlite
+            cnx = sqlite.connect(path, timeout=timeout)
         ConnectionWrapper.__init__(self, cnx)
+
+    if using_pysqlite2:
+        def cursor(self):
+            return self.cnx.cursor(PyFormatCursor)
+    else:
+        def cursor(self):
+            return self.cnx.cursor()
 
     def cast(self, column, type):
         return column
@@ -175,8 +236,12 @@ class SQLiteConnection(ConnectionWrapper):
     def like(self):
         return 'LIKE'
 
-    def get_last_id(self, table, column='id'):
-        return self.cnx.db.sqlite_last_insert_rowid()
+    if using_pysqlite2:
+        def get_last_id(self, cursor, table, column='id'):
+            return cursor.lastrowid
+    else:
+        def get_last_id(self, cursor, table, column='id'):
+            return self.cnx.db.sqlite_last_insert_rowid()
 
     def init_db(cls, path, params={}):
         if path != ':memory:':
@@ -189,7 +254,8 @@ class SQLiteConnection(ConnectionWrapper):
         cursor = cnx.cursor()
         from trac.db_default import schema
         for table in schema:
-            cursor.execute(cls.to_sql(table))
+            for stmt in cls.to_sql(table):
+                cursor.execute(stmt)
         cnx.commit()
     init_db = classmethod(init_db)
 
@@ -197,23 +263,21 @@ class SQLiteConnection(ConnectionWrapper):
         sql = ["CREATE TABLE %s (" % table.name]
         coldefs = []
         for column in table.columns:
-            ctype = column.type.upper()
+            ctype = column.type.lower()
             if column.auto_increment:
-                ctype = "INTEGER PRIMARY KEY"
+                ctype = "integer PRIMARY KEY"
             elif len(table.key) == 1 and column.name in table.key:
                 ctype += " PRIMARY KEY"
-            elif ctype == "INT":
-                ctype = "INTEGER"
+            elif ctype == "int":
+                ctype = "integer"
             coldefs.append("    %s %s" % (column.name, ctype))
         if len(table.key) > 1:
             coldefs.append("    UNIQUE (%s)" % ','.join(table.key))
         sql.append(',\n'.join(coldefs) + '\n);')
-        i = 0
-        for index in table.indexes:
-            i += 1
-            sql.append("CREATE INDEX %s_idx%d ON %s (%s);"
-                       % (table.name, i, table.name, ','.join(index.columns)))
-        return '\n'.join(sql)
+        yield '\n'.join(sql)
+        for i, index in enum(table.indexes):
+            yield ("CREATE INDEX %s_idx%d ON %s (%s);"
+                   % (table.name, i, table.name, ','.join(index.columns)))
     to_sql = classmethod(to_sql)
 
 
@@ -239,8 +303,7 @@ class PostgreSQLConnection(ConnectionWrapper):
         # search module
         return 'ILIKE'
 
-    def get_last_id(self, table, column='id'):
-        cursor = self.cursor()
+    def get_last_id(self, cursor, table, column='id'):
         cursor.execute("SELECT CURRVAL('%s_%s_seq')" % (table, column))
         return cursor.fetchone()[0]
 
@@ -250,13 +313,13 @@ class PostgreSQLConnection(ConnectionWrapper):
         cursor = self.cursor()
         from trac.db_default import schema
         for table in schema:
-            cursor.execute(cls.to_sql(table))
+            for stmt in cls.to_sql(table):
+                cursor.execute(stmt)
         self.commit()
     init_db = classmethod(init_db)
 
     def to_sql(cls, table):
-        sql = []
-        sql.append("CREATE TABLE %s (" % table.name)
+        sql = ["CREATE TABLE %s (" % table.name]
         coldefs = []
         for column in table.columns:
             ctype = column.type
@@ -267,12 +330,10 @@ class PostgreSQLConnection(ConnectionWrapper):
             coldefs.append("    CONSTRAINT %s_pk PRIMARY KEY (%s)"
                            % (table.name, ','.join(table.key)))
         sql.append(',\n'.join(coldefs) + '\n);')
-        i = 0
-        for index in table.indexes:
-            i += 1
-            sql.append("CREATE INDEX %s_idx%d ON %s (%s);"
-                       % (table.name, i, table.name, ','.join(index.columns)))
-        return '\n'.join(sql)
+        yield '\n'.join(sql)
+        for i, index in enum(table.indexes):
+            yield ("CREATE INDEX %s_idx%d ON %s (%s);"
+                   % (table.name, i, table.name, ','.join(index.columns)))
     to_sql = classmethod(to_sql)
 
 
@@ -358,4 +419,4 @@ def _parse_db_str(db_str):
 
     args = zip(('user', 'password', 'host', 'port', 'path', 'params'),
                (user, password, host, port, path, params))
-    return scheme, dict(filter(lambda x: x[1], args))
+    return scheme, dict([(key, value) for key, value in args if value])

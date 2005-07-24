@@ -12,6 +12,7 @@ initenv <projectname> <db> <repospath> <templatepath>  -- Create and initialize 
 hotcopy <backupdir>                                    -- Make a hot backup copy of an environment
 resync                                                 -- Re-synchronize trac with the repository
 upgrade                                                -- Upgrade database to current version
+xref                                                   -- Rebuild the cross-reference information between Trac objects
 wiki list                                              -- List wiki pages
 wiki remove <name>                                     -- Remove wiki page
 wiki export <page> [file]                              -- Export wiki page to file or stdout

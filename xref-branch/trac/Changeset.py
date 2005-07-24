@@ -30,6 +30,7 @@ from trac.core import *
 from trac.Timeline import ITimelineEventProvider
 from trac.versioncontrol import Changeset, Node
 from trac.web.chrome import INavigationContributor
+from trac.Search import ISearchSource, query_to_sql, shorten_result
 from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.Diff import DiffMixin
@@ -37,7 +38,7 @@ from trac.Diff import DiffMixin
 class ChangesetModule(Component,DiffMixin):
 
     implements(INavigationContributor, IRequestHandler,
-               ITimelineEventProvider, IWikiSyntaxProvider)
+               ITimelineEventProvider, IWikiSyntaxProvider, ISearchSource)
 
     # INavigationContributor methods
 
@@ -105,12 +106,12 @@ class ChangesetModule(Component,DiffMixin):
                 rev = repos.previous_rev(rev)
 
     # IWikiSyntaxProvider methods
-    
+
     def get_wiki_syntax(self):
-        yield (r"!?\[(?P<it_changeset>[a-zA-Z_-]{0,3})\d+\]|\br\d+\b",
-               (lambda x, y, z: self._format_link(x, 'changeset',
-                                                  y[0] == 'r' and y[1:] or y[1:-1],
-                                                  y, z)))
+        yield (r"!?\[(?P<it_changeset>[a-zA-Z_-]{0,3})\d+\]|(?:\b|!)r\d+\b",
+               (lambda x, y, z:
+                self._format_link(x, 'changeset',
+                                  y[0] == 'r' and y[1:] or y[1:-1], y, z)))
 
     def get_link_resolvers(self):
         yield ('changeset', self._format_link)
@@ -130,3 +131,25 @@ class ChangesetModule(Component,DiffMixin):
         else:
             return '<a class="missing changeset" href="%s" rel="nofollow">%s</a>' \
                    % (formatter.href.changeset(rev), label)
+
+    # ISearchProvider methods
+
+    def get_search_filters(self, req):
+        if req.perm.has_permission('CHANGESET_VIEW'):
+            yield ('changeset', 'Changesets')
+
+    def get_search_results(self, req, query, filters):
+        if not 'changeset' in filters:
+            return
+        db = self.env.get_db_cnx()
+        sql = "SELECT rev,time,author,message " \
+              "FROM revision WHERE %s OR %s" % \
+              (query_to_sql(db, query, 'message'),
+               query_to_sql(db, query, 'author'))
+        cursor = db.cursor()
+        cursor.execute(sql)
+        for rev, date, author, log in cursor:
+            yield (self.env.href.changeset(rev),
+                   '[%s]: %s' % (rev, util.escape(util.shorten_line(log))),
+                   date, author,
+                   util.escape(shorten_result(log, query.split())))

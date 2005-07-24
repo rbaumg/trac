@@ -36,6 +36,7 @@ from trac.core import *
 from trac.util import escape
 from trac.env import IEnvironmentSetupParticipant
 from trac.wiki.api import IWikiMacroProvider, WikiSystem
+from trac.wiki.model import WikiPage
 
 
 class TitleIndexMacro(Component):
@@ -171,17 +172,16 @@ class PageOutlineMacro(Component):
 
         db = self.env.get_db_cnx()
         cursor = db.cursor()
-        page = req.args.get('page') or 'WikiStart'
-        cursor.execute("SELECT text FROM wiki WHERE name=%s "
-                       "ORDER BY version DESC LIMIT 1", (page,))
-        (text,) = cursor.fetchone()
+        pagename = req.args.get('page') or 'WikiStart'
+        page = WikiPage(self.env, pagename)
 
         buf = StringIO()
         if not inline:
             buf.write('<div class="wiki-toc">')
         if title:
             buf.write('<h4>%s</h4>' % escape(title))
-        buf.write(wiki_to_outline(text, self.env, db=db, max_depth=max_depth))
+        buf.write(wiki_to_outline(page.text, self.env, db=db,
+                                  max_depth=max_depth))
         if not inline:
             buf.write('</div>')
         return buf.getvalue()
@@ -314,7 +314,12 @@ class ImageMacro(Component):
             # FIXME: should be retrieved from the formatter...
             # ...and the formatter should be provided to the macro
             file = filespec
-            module, id = req.hdf['HTTP.PathInfo'].split('/', 3)[1:]
+            module, id = 'wiki', 'WikiStart'
+            path_info = req.path_info.split('/',2)
+            if len(path_info) > 1:
+                module = path_info[1]
+            if len(path_info) > 2:
+                id = path_info[2]
             if module not in ['wiki', 'ticket']:
                 raise Exception('Cannot reference local attachment from here')
         else:

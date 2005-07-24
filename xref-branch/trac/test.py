@@ -115,7 +115,8 @@ class InMemoryDatabase(SQLiteConnection):
 
         from trac.db_default import schema
         for table in schema:
-            cursor.execute(SQLiteConnection.to_sql(table))
+            for stmt in SQLiteConnection.to_sql(table):
+                cursor.execute(stmt)
 
         self.cnx.commit()
 
@@ -136,6 +137,7 @@ class EnvironmentStub(ComponentManager):
 
         from trac.web.href import Href
         self.href = Href('/trac.cgi')
+        self.abs_href = Href('http://example.com/trac.cgi')
 
         if default_data:
             from trac import db_default

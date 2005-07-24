@@ -159,19 +159,21 @@ class Ticket(TracObject):
                           ','.join(['%s'] * (len(std_fields) + 2))),
                        [self[name] for name in std_fields] +
                        [self.time_created, self.time_changed])
-        tkt_id = db.get_last_id('ticket')
+        tkt_id = db.get_last_id(cursor, 'ticket')
 
         # Insert custom fields
         custom_fields = [f['name'] for f in self.fields if f.get('custom')
                          and f['name'] in self.values.keys()]
-        cursor.executemany("INSERT INTO ticket_custom (ticket,name,value) "
-                           "VALUES (%s,%s,%s)", [(tkt_id, name, self[name])
-                                                 for name in custom_fields])
+        if custom_fields:
+            cursor.executemany("INSERT INTO ticket_custom (ticket,name,value) "
+                               "VALUES (%s,%s,%s)", [(tkt_id, name, self[name])
+                                                     for name in custom_fields])
 
         # Handle initial xrefs
         self.id = tkt_id
-        self.update_links(db, 'description', now, self['reporter'],
-                          self['description'])
+        self.update_links(db, 'description', now,
+                          self.values.get('reporter',''),
+                          self.values.get('description',''))
 
         if handle_ta:
             db.commit()
@@ -341,11 +343,11 @@ class AbstractEnum(object):
         self.env.log.debug("Creating new %s '%s'" % (self.type, self.name))
         value = self.value
         if not value:
-            cursor.execute("SELECT COALESCE(MAX(value)) FROM enum "
+            cursor.execute("SELECT COALESCE(MAX(value),0) FROM enum "
                            "WHERE type=%s", (self.type,))
-            value = int(cursor.fetchone()[0])
-        cursor.execute("INSERT INTO enum (name,value) VALUES (%s,%s)",
-                       (self.name, self.value))
+            value = int(cursor.fetchone()[0]) + 1
+        cursor.execute("INSERT INTO enum (type,name,value) VALUES (%s,%s,%s)",
+                       (self.type, self.name, value))
 
         if handle_ta:
             db.commit()
