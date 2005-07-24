@@ -130,10 +130,10 @@ class Formatter(object):
     _pre_rules = [r"(?P<bolditalic>''''')",
                   r"(?P<bold>''')",
                   r"(?P<italic>'')",
-                  r"(?P<underline>__)",
-                  r"(?P<strike>~~)",
-                  r"(?P<subscript>,,)",
-                  r"(?P<superscript>\^)",
+                  r"(?P<underline>!?__)",
+                  r"(?P<strike>!?~~)",
+                  r"(?P<subscript>!?,,)",
+                  r"(?P<superscript>!?\^)",
                   r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
                   r"(?P<inlinecode2>!?`(?P<inline2>.*?)`)",
                   r"(?P<htmlescapeentity>!?&#\d+;)"]
@@ -158,7 +158,6 @@ class Formatter(object):
                                          'iframe|frame|frameset|link|style|'
                                          'meta|param|doctype)')
     _htmlproc_disallow_attribute = re.compile('(?i)<[^>]*\s+(on\w+)=')
-
 
     def __init__(self, env, req=None, absurls=0, db=None):
         self.env = env
@@ -200,14 +199,14 @@ class Formatter(object):
     rules = property(_get_rules)
 
     def _get_link_resolvers(self):
-        if not Formatter._link_resolvers:
+        if not self._link_resolvers:
             resolvers = {}
             wiki = WikiSystem(self.env)
             for resolver in wiki.syntax_providers:
                 for namespace, handler in resolver.get_link_resolvers():
                     resolvers[namespace] = handler
-            Formatter._link_resolvers = resolvers
-        return Formatter._link_resolvers
+            self._link_resolvers = resolvers
+        return self._link_resolvers
     link_resolvers = property(_get_link_resolvers)
 
     def replace(self, fullmatch):
@@ -296,16 +295,28 @@ class Formatter(object):
         return self.simple_tag_handler('<i>', '</i>')
 
     def _underline_formatter(self, match, fullmatch):
-        return self.simple_tag_handler('<span class="underline">', '</span>')
+        if match[0] == '!':
+            return match[1:]
+        else:
+            return self.simple_tag_handler('<span class="underline">', '</span>')
 
     def _strike_formatter(self, match, fullmatch):
-        return self.simple_tag_handler('<del>', '</del>')
+        if match[0] == '!':
+            return match[1:]
+        else:
+            return self.simple_tag_handler('<del>', '</del>')
 
     def _subscript_formatter(self, match, fullmatch):
-        return self.simple_tag_handler('<sub>', '</sub>')
+        if match[0] == '!':
+            return match[1:]
+        else:
+            return self.simple_tag_handler('<sub>', '</sub>')
 
     def _superscript_formatter(self, match, fullmatch):
-        return self.simple_tag_handler('<sup>', '</sup>')
+        if match[0] == '!':
+            return match[1:]
+        else:
+            return self.simple_tag_handler('<sup>', '</sup>')
 
     def _inlinecode_formatter(self, match, fullmatch):
         return '<tt>%s</tt>' % fullmatch.group('inline')
@@ -330,6 +341,8 @@ class Formatter(object):
             macro = WikiProcessor(self.env, name)
             return macro.process(self.req, args, 1)
         except Exception, e:
+            self.env.log.error('Macro %s(%s) failed' % (name, args),
+                               exc_info=True)
             return system_message('Error: Macro %s(%s) failed' % (name, args), e)
 
     def _heading_formatter(self, match, fullmatch):
@@ -342,7 +355,12 @@ class Formatter(object):
 
         depth = min(len(fullmatch.group('hdepth')), 5)
         heading = match[depth + 1:len(match) - depth - 1]
-        anchor = self._anchor_re.sub('', heading.decode('utf-8'))
+
+        text = wiki_to_oneliner(util.unescape(heading), self.env, self.db,
+                                self._absurls)
+        sans_markup = re.sub(r'</?\w+(?: .*?)?>', '', text)
+
+        anchor = self._anchor_re.sub('', sans_markup.decode('utf-8'))
         if not anchor or not anchor[0].isalpha():
             # an ID must start with a letter in HTML
             anchor = 'a' + anchor
@@ -352,11 +370,7 @@ class Formatter(object):
             anchor = anchor_base + str(i)
             i += 1
         self._anchors.append(anchor)
-        self.out.write('<h%d id="%s">%s</h%d>' % (depth, anchor,
-                                                  wiki_to_oneliner(util.unescape(heading),
-                                                  self.env, self._db,
-                                                  self._absurls),
-                                                  depth))
+        self.out.write('<h%d id="%s">%s</h%d>' % (depth, anchor, text, depth))
 
     def _indent_formatter(self, match, fullmatch):
         depth = int((len(fullmatch.group('idepth')) + 1) / 2)
@@ -589,6 +603,9 @@ class OneLinerFormatter(Formatter):
     """
     flavor = 'oneliner'
 
+    def __init__(self, env, absurls=0, db=None):
+        Formatter.__init__(self, env, None, absurls, db)
+
     # Override a few formatters to disable some wiki syntax in "oneliner"-mode
     def _list_formatter(self, match, fullmatch): return match
     def _macro_formatter(self, match, fullmatch): return match
@@ -611,13 +628,15 @@ class OneLinerFormatter(Formatter):
 
 
 class OutlineFormatter(Formatter):
-    """
-    A simple Wiki formatter
-    """
+    """Special formatter that generates an outline of all the headings in wiki
+    text."""
     flavor = 'outline'
     
     def __init__(self, env, absurls=0, db=None):
         Formatter.__init__(self, env, None, absurls, db)
+
+    # Override a few formatters to disable some wiki syntax in "outline"-mode
+    def _macro_formatter(self, match, fullmatch): return match
 
     def format(self, text, out, max_depth=None):
         self.outline = []
@@ -644,7 +663,10 @@ class OutlineFormatter(Formatter):
         depth = min(len(fullmatch.group('hdepth')), 5)
         heading = match[depth + 1:len(match) - depth - 1]
         anchor = self._anchors[-1]
-        self.outline.append((depth, '<a href="#%s">%s</a>' % (anchor, heading)))
+        text = wiki_to_oneliner(util.unescape(heading), self.env, self.db,
+                                self._absurls)
+        text = re.sub(r'</?a(?: .*?)?>', '', text) # Strip out link tags
+        self.outline.append((depth, '<a href="#%s">%s</a>' % (anchor, text)))
 
     def handle_code_block(self, line):
         if line.strip() == '{{{':
@@ -665,5 +687,5 @@ def wiki_to_oneliner(wikitext, env, db=None, absurls=0):
 
 def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
     out = StringIO.StringIO()
-    OutlineFormatter(env, absurls ,db).format(wikitext, out, max_depth)
+    OutlineFormatter(env, absurls, db).format(wikitext, out, max_depth)
     return out.getvalue()
