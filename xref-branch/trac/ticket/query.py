@@ -630,7 +630,7 @@ class QueryWikiMacro(Component):
         import inspect
         return inspect.getdoc(QueryWikiMacro)
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         query_string = ''
         compact = 0
         argv = content.split(',')

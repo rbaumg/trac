@@ -20,6 +20,12 @@
 # Author: Christian Boos <cboos@wanadoo.fr>
 
 
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+
+
 from trac.core import *
 from trac.util import escape
 
@@ -58,6 +64,8 @@ class TracObject:
         self.env = env
         self.id = id
 
+    # -- Generic methods
+
     def fqname(self):
         """Return the fully qualified Trac Wiki Link for that object"""
         return '%s:%s' % (self.type, escape(self.id))
@@ -74,7 +82,37 @@ class TracObject:
         """Return the href for that object"""
         return self.env.href(self.type, self.id, *args, **kw)
 
-    # Counting cross-references
+    def get_facet(self, facet, db=None):
+        """Return the Wiki content of the given `facet`"""
+        return ''
+
+    # -- -- Wiki formatting methods
+
+    def wiki_to_html(self, facet, wikitext, req,
+                     db=None, absurls=0, escape_newlines=False):
+        from trac.wiki.formatter import Formatter
+        out = StringIO()
+        Formatter(self.env, req, absurls, db).format(self, facet, wikitext,
+                                                     out, escape_newlines)
+        return out.getvalue()
+                  
+    def wiki_to_oneliner(self, facet, wikitext,
+                         db=None, absurls=0):
+        from trac.wiki.formatter import OneLinerFormatter
+        out = StringIO()
+        OneLinerFormatter(self.env, absurls, db).format(self, facet, wikitext,
+                                                        out)
+        return out.getvalue()
+
+    def wiki_to_outline(self, facet, wikitext,
+                        db=None, absurls=0, max_depth=None):
+        from trac.wiki.formatter import OutlineFormatter
+        out = StringIO()
+        OutlineFormatter(self.env, absurls, db).format(self, facet, wikitext,
+                                                       out, max_depth)
+        return out.getvalue()
+
+    # -- -- Cross-references related methods
     
     def xref_count_to_hdf(self, req, db):
         """Setup the HDF with the count of backlinks and relations"""
@@ -153,14 +191,13 @@ class TracObject:
         tuple = (self.type, self.id)
         tuple, relation_clause = self._relation_clause(tuple, relation)
         tuple, facet_clause = self._facet_clause(tuple, facet)
-        print tuple
         cursor.execute("DELETE FROM xref"
                        " WHERE src_type=%s AND src_id=%s"
                        + relation_clause + facet_clause,
                        tuple)
         print "(-) -- %s:%s --[%s]--> *:*" % (self.type, self.id, relation)
     
-    ## XRef helper methods
+    ## -- Helper methods
 
     def _relation_clause(self, tuple, relation):
         """

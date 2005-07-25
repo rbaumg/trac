@@ -68,7 +68,8 @@ class NewticketModule(Component):
         ticket.values.setdefault('reporter', util.get_reporter_id(req))
 
         if 'description' in ticket.values.keys():
-            description = wiki_to_html(ticket['description'], self.env, req, db)
+            description = ticket.wiki_to_html('description',
+                                              ticket['description'], req, db)
             req.hdf['newticket.description_preview'] = description
 
         req.hdf['title'] = 'New Ticket'
@@ -185,9 +186,9 @@ class TicketModule(Component):
                 if comment:
                     req.hdf['ticket.comment'] = util.escape(comment)
                     # Wiki format a preview of comment
-                    req.hdf['ticket.comment_preview'] = wiki_to_html(comment,
-                                                                     self.env,
-                                                                     req, db)
+                    preview = ticket.wiki_to_html('comment:preview',
+                                                  comment, req, db)
+                    req.hdf['ticket.comment_preview'] = preview
         else:
             req.hdf['ticket.reassign_owner'] = req.authname
             # Store a timestamp in order to detect "mid air collisions"
@@ -268,7 +269,8 @@ class TicketModule(Component):
                         util.escape(author))
                 if format == 'rss':
                     href = self.env.abs_href.ticket(id)
-                    message = wiki_to_html(message or '--', self.env, db)
+                    message = message and wiki_to_html(message, self.env, db) \
+                              or '--'
                 else:
                     href = self.env.href.ticket(id)
                     message = wiki_to_oneliner(util.shorten_line(message),
@@ -355,8 +357,9 @@ class TicketModule(Component):
         req.hdf['ticket.reporter_id'] = util.escape(reporter_id)
         req.hdf['title'] = '#%d (%s)' % (ticket.id,
                                          util.escape(ticket['summary']))
-        req.hdf['ticket.description.formatted'] = wiki_to_html(ticket['description'],
-                                                               self.env, req, db)
+        descr = ticket.wiki_to_html('description', ticket['description'],
+                                    req, db)
+        req.hdf['ticket.description.formatted'] = descr
 
         req.hdf['ticket.opened'] = time.strftime('%c', time.localtime(ticket.time_created))
         req.hdf['ticket.opened_delta'] = util.pretty_timedelta(ticket.time_created)
@@ -378,7 +381,8 @@ class TicketModule(Component):
                 curr_date = date
                 curr_author = author
             if field == 'comment':
-                changes[-1]['comment'] = wiki_to_html(new, self.env, req, db)
+                changes[-1]['comment'] = ticket.wiki_to_html('comment:%s' % old,
+                                                             new, req, db)
             elif field == 'description':
                 changes[-1]['fields'][field] = ''
             else:

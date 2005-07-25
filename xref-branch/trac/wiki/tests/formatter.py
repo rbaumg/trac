@@ -23,7 +23,7 @@ class DummyHelloWorldMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(MacroListMacro)
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         return 'Hello World, args = ' + content
 
 
@@ -74,7 +74,7 @@ class WikiTestCase(unittest.TestCase):
 
         env = DummyEnvironment()
         out = StringIO.StringIO()
-        Formatter(env).format(self.input, out)
+        Formatter(env).format(None, '', self.input, out)
         v = out.getvalue().replace('\r','')
         self.assertEquals(self.correct, v)
 

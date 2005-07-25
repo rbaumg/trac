@@ -61,8 +61,14 @@ class IWikiMacroProvider(Interface):
         """Return a plain text description of the macro with the specified name.
         """
 
-    def render_macro(req, name, content):
-        """Return the HTML output of the macro."""
+    def render_macro(req, source, facet, name, content):
+        """Return the HTML output of the macro.
+
+         * `req` is the current request if there's one
+         * `source` is the Trac object owning the wiki text containing the macro
+         * `name` is the name of the macro
+         * `content` contains the arguments for the macro
+        """
 
 
 class IWikiSyntaxProvider(Interface):

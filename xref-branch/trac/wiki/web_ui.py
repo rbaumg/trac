@@ -140,8 +140,8 @@ class WikiModule(Component):
                         escape(name), escape(author))
                 if format == 'rss':
                     href = self.env.abs_href.wiki(name)
-                    comment = wiki_to_html(comment or '--', self.env, db,
-                                           absurls=True)
+                    comment = comment and wiki_to_html(comment, self.env, db,
+                                                       absurls=True) or '--'
                 else:
                     href = self.env.href.wiki(name)
                     comment = wiki_to_oneliner(shorten_line(comment), self.env,
@@ -317,7 +317,7 @@ class WikiModule(Component):
             info['history_href'] = escape(self.env.href.wiki(page.name,
                                                              action='history'))
         if preview:
-            info['page_html'] = wiki_to_html(page.text, self.env, req, db)
+            info['page_html'] = page.wiki_to_html('content', page.text, req, db)
             info['readonly'] = int(req.args.has_key('readonly'))
         req.hdf['wiki'] = info
 
@@ -346,7 +346,9 @@ class WikiModule(Component):
                 'time': time.strftime('%x %X', time.localtime(int(t))),
                 'time_delta': pretty_timedelta(t),
                 'author': escape(author),
-                'comment': wiki_to_oneliner(comment or '', self.env, db),
+                'comment': comment and page.wiki_to_oneliner('comment:%d' \
+                                                             % version,
+                                                             comment, db) or '',
                 'ipaddr': ipnr
             })
         req.hdf['wiki.history'] = history
@@ -372,7 +374,8 @@ class WikiModule(Component):
         req.hdf['wiki'] = {'page_name': page.name, 'exists': page.exists,
                            'version': page.version, 'readonly': page.readonly}
         if page.exists:
-            req.hdf['wiki.page_html'] = wiki_to_html(page.text, self.env, req)
+            req.hdf['wiki.page_html'] = page.wiki_to_html('content',
+                                                          page.text, req, db)
             history_href = self.env.href.wiki(page.name, action='history')
             req.hdf['wiki.history_href'] = escape(history_href)
         else:

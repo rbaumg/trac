@@ -105,14 +105,12 @@ class XRefParser(Formatter):
         Formatter.__init__(self, env, db=db)
         self.relation = relation
 
-    def parse(self, src, facet, time, author, wikitext):
-        self.src = src
-        self.facet = facet
+    def parse(self, source, facet, time, author, wikitext):
         self.time = time
         self.author = author
         class NullOut:
             def write(self,*args): pass
-        self.format(wikitext, NullOut())
+        self.format(source, facet, wikitext, NullOut())
 
     # Reimplemented methods
     
@@ -134,10 +132,10 @@ class XRefParser(Formatter):
                         target = self._lhref_formatter(match, fullmatch)
                     # ignore the rest...
                 if target and issubclass(target.__class__, TracObject):
-                    self.src.create_xref(self.db, self.facet,
-                                         self.time, self.author, target,
-                                         self._extract_context(fullmatch),
-                                         self.relation)
+                    self.source.create_xref(self.db, self.facet,
+                                            self.time, self.author, target,
+                                            self._extract_context(fullmatch),
+                                            self.relation)
 
     def _macro_formatter(self, match, fullmatch):
         pass
@@ -243,9 +241,8 @@ class XRefModule(Component):
 # -- Macros (focus on WikiPage objects)
 
 class BacklinksMacro(Component):
-    """
-    Inline a list of backlinks to the current object
-    """
+    """Inline a list of backlinks to the current object."""
+    
     implements(IWikiMacroProvider)
 
     def get_macros(self):
@@ -254,21 +251,11 @@ class BacklinksMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(BacklinksMacro)
 
-    def render_macro(self, req, name, content):
-        # Kludge: `src` should be known by the formatter and forwarded
-        #         to the macro
-        type, id = 'wiki', 'WikiStart'
-        if req:
-            path_info = req.path_info.split('/', 2)
-            if len(path_info) > 1:
-                type = path_info[1]
-            if len(path_info) > 2:
-                id = path_info[2]
-        src = TracObject.factory(self.env, type, id)
+    def render_macro(self, req, source, facet, name, content):
         db = self.env.get_db_cnx()
         buf = StringIO()
         first = True
-        for backlink in src.find_backlinks(db):
+        for backlink in source.find_backlinks(db):
             dst_type,dst_id,facet,context,time,author,relation = backlink
             if not first:
                 buf.write(', ')
@@ -281,9 +268,8 @@ class BacklinksMacro(Component):
 
 
 class OrphanedPagesMacro(Component):
-    """
-    Lists Wiki pages that are not referenced by another Trac object.
-    """
+    """List Wiki pages that are not referenced by any another Trac object."""
+    
     implements(IWikiMacroProvider)
 
     def get_macros(self):
@@ -292,7 +278,7 @@ class OrphanedPagesMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(OrphanedPagesMacro)
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         from trac.wiki.model import WikiPage
 
         db = self.env.get_db_cnx()
@@ -317,14 +303,8 @@ class OrphanedPagesMacro(Component):
 
 
 class MissingLinksMacro(Component):
-    """
-    Lists Wiki pages that are referenced but don't exist.
-
-    FIXME: That macro has an additional ''feature'': it shows
-    all the ''false positive'' Wiki page names that are identified
-    by the XRefFormatter(CommonFormatter) but shouldn't...
-    (macros names, wiki page names in URLs, etc.)
-    """
+    """List Wiki pages that are referenced but don't exist."""
+    
     implements(IWikiMacroProvider)
 
     def get_macros(self):
@@ -333,7 +313,7 @@ class MissingLinksMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(MissingLinksMacro)
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         from trac.wiki.model import WikiPage
 
         db = self.env.get_db_cnx()

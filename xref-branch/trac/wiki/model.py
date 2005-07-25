@@ -51,6 +51,12 @@ class WikiPage(TracObject):
     def shortname(self):
         return self.name # FIXME: only if name matches pagename rules...
 
+    def get_facet(self, facet, db=None):
+        if facet == 'content':
+            return self.text
+        # TODO: Comment facets
+        return ''
+
     # Own methods
 
     def _fetch(self, name, version=None, db=None):

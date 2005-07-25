@@ -46,9 +46,28 @@ class Ticket(TracObject):
             self.id = self.time_created = self.time_changed = None
         self._old = {}
 
+    # TracObject methods
+
     def shortname(self): return '#%s' % self.id
     def htmlclass(self): return 'newticket'
     # FIXME (should depend on the status, but this would imply a fetch)
+
+    def get_facet(self, facet, db=None):
+        if facet == 'description':
+            return self['description']
+        if facet.startswith('comment:'):
+            num = facet[8:]
+            if not db:
+                db = self.env.get_db_cnx()
+            cursor = db.cursor()
+            cursor.execute("SELECT newvalue "
+                           "  FROM ticket_change WHERE ticket=%s "
+                           "   AND field='comment' AND oldvalue=%s ",
+                           (self.id, num))
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+        return ''
 
     exists = property(fget=lambda self: self.id is not None)
 

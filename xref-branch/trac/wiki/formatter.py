@@ -61,7 +61,7 @@ class WikiProcessor(object):
         if not self.processor:
             # Find a matching wiki macro
             from trac.wiki import WikiSystem
-            wiki = WikiSystem(env)
+            wiki = WikiSystem(self.env)
             for macro_provider in wiki.macro_providers:
                 if self.name in list(macro_provider.get_macros()):
                     self.processor = self._macro_processor
@@ -78,46 +78,48 @@ class WikiProcessor(object):
                 self.processor = self._default_processor
                 self.error = 'No macro named [[%s]] found' % name
 
-    def _comment_processor(self, req, text, env):
+    def _comment_processor(self, req, source, facet, text):
         return ''
 
-    def _default_processor(self, req, text, env):
+    def _default_processor(self, req, source, facet, text):
         return '<pre class="wiki">' + util.escape(text) + '</pre>\n'
 
-    def _html_processor(self, req, text, env):
+    def _html_processor(self, req, source, facet, text):
         if Formatter._htmlproc_disallow_rule.search(text):
             err = system_message('Error: HTML block contains disallowed tags.',
                                  text)
-            env.log.error(err)
+            self.env.log.error(err)
             return err
         if Formatter._htmlproc_disallow_attribute.search(text):
             err = system_message('Error: HTML block contains disallowed attributes.',
                                  text)
-            env.log.error(err)
+            self.env.log.error(err)
             return err
         return text
 
-    def _macro_processor(self, req, text, env):
+    def _macro_processor(self, req, source, facet, text):
         from trac.wiki import WikiSystem
-        wiki = WikiSystem(env)
+        wiki = WikiSystem(self.env)
         for macro_provider in wiki.macro_providers:
             if self.name in list(macro_provider.get_macros()):
-                env.log.debug('Executing Wiki macro %s by provider %s'
-                              % (self.name, macro_provider))
-                return macro_provider.render_macro(req, self.name, text)
+                self.env.log.debug('Executing Wiki macro %s by provider %s'
+                                   % (self.name, macro_provider))
+                return macro_provider.render_macro(req, source, facet,
+                                                   self.name, text)
 
-    def _mimeview_processor(self, req, text, env):
-        return Mimeview(env).render(req, self.name, text)
+    def _mimeview_processor(self, req, source, text):
+        return Mimeview(self.env).render(req, self.name, text)
 
-    def process(self, req, text, inline=False):
+    def process(self, req, source, facet, text, inline=False):
         if self.error:
             return system_message('Error: Failed to load processor <code>%s</code>'
                                   % self.name, self.error)
-        text = self.processor(req, text, self.env)
+        text = self.processor(req, source, facet, text)
         if inline:
             code_block_start = re.compile('^<div class="code-block">')
             code_block_end = re.compile('</div>$')
-            text, nr = code_block_start.subn('<span class="code-block">', text, 1 )
+            text, nr = code_block_start.subn('<span class="code-block">', text,
+                                             1 )
             if nr:
                 text, nr = code_block_end.subn('</span>', text, 1 )
             return text
@@ -365,11 +367,12 @@ class Formatter(object):
         args = util.unescape(args)
         try:
             macro = WikiProcessor(self.env, name)
-            return macro.process(self.req, args, 1)
+            return macro.process(self.req, self.source, self.facet, args, True)
         except Exception, e:
             self.env.log.error('Macro %s(%s) failed' % (name, args),
                                exc_info=True)
-            return system_message('Error: Macro %s(%s) failed' % (name, args), e)
+            return system_message('Error: Macro %s(%s) failed' % (name, args),
+                                  e)
 
     def _heading_formatter(self, match, fullmatch):
         match = match.strip()
@@ -543,7 +546,10 @@ class Formatter(object):
             if self.in_code_block == 0 and self.code_processor:
                 self.close_paragraph()
                 self.close_table()
-                self.out.write(self.code_processor.process(self.req, self.code_text))
+                self.out.write(self.code_processor.process(self.req,
+                                                           self.source,
+                                                           self.facet,
+                                                           self.code_text))
             else:
                 self.code_text += line + os.linesep
         elif not self.code_processor:
@@ -557,7 +563,9 @@ class Formatter(object):
         else:
             self.code_text += line + os.linesep
 
-    def format(self, text, out, escape_newlines=False):
+    def format(self, source, facet, text, out, escape_newlines=False):
+        self.source = source
+        self.facet = facet
         self.out = out
         self._open_tags = []
         self._list_stack = []
@@ -643,9 +651,11 @@ class OneLinerFormatter(Formatter):
     def _table_cell_formatter(self, match, fullmatch): return match
     def _last_table_cell_formatter(self, match, fullmatch): return match
 
-    def format(self, text, out):
+    def format(self, source, facet, text, out):
         if not text:
             return
+        self.source = source
+        self.facet = facet
         self.out = out
         self._open_tags = []
 
@@ -667,11 +677,11 @@ class OutlineFormatter(Formatter):
     # Override a few formatters to disable some wiki syntax in "outline"-mode
     def _macro_formatter(self, match, fullmatch): return match
 
-    def format(self, text, out, max_depth=None):
+    def format(self, source, facet, text, out, max_depth=None):
         self.outline = []
         class NullOut(object):
             def write(self, data): pass
-        Formatter.format(self, text, NullOut())
+        Formatter.format(self, source, facet, text, NullOut())
 
         curr_depth = 0
         for depth,link in self.outline:
@@ -706,17 +716,19 @@ class OutlineFormatter(Formatter):
 
 def wiki_to_html(wikitext, env, req, db=None, absurls=0, escape_newlines=False):
     out = StringIO()
-    Formatter(env, req, absurls, db).format(wikitext, out, escape_newlines)
+    Formatter(env, req, absurls, db).format(None, '', wikitext,
+                                            out, escape_newlines)
     return out.getvalue()
 
 def wiki_to_oneliner(wikitext, env, db=None, absurls=0):
     out = StringIO()
-    OneLinerFormatter(env, absurls, db).format(wikitext, out)
+    OneLinerFormatter(env, absurls, db).format(None, '', wikitext, out)
     return out.getvalue()
 
 def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
     out = StringIO()
-    OutlineFormatter(env, absurls, db).format(wikitext, out, max_depth)
+    OutlineFormatter(env, absurls, db).format(None, ''. wikitext,
+                                              out, max_depth)
     return out.getvalue()
 
 
@@ -789,7 +801,7 @@ class InterWikiMap(Component):
     def get_macro_description(self, name): 
         yield 'Provide a description list for the known InterWiki prefixes.'
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         if not self._interwiki_map:
             self._update()
         keys = self._interwiki_map.keys()

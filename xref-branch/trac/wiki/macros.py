@@ -56,7 +56,7 @@ class TitleIndexMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(TitleIndexMacro)
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         prefix = None
         if content:
             prefix = content.replace('\'', '\'\'')
@@ -97,7 +97,7 @@ class RecentChangesMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(RecentChangesMacro)
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         prefix = limit = None
         if content:
             argv = [arg.strip() for arg in content.split(',')]
@@ -157,8 +157,7 @@ class PageOutlineMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(PageOutlineMacro)
 
-    def render_macro(self, req, name, content):
-        from trac.wiki.formatter import wiki_to_outline
+    def render_macro(self, req, source, facet, name, content):
         max_depth = 6
         title = None
         inline = 0
@@ -172,17 +171,14 @@ class PageOutlineMacro(Component):
                         inline = argv[2].strip().lower() == 'inline'
 
         db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        pagename = req.args.get('page') or 'WikiStart'
-        page = WikiPage(self.env, pagename)
 
         buf = StringIO()
         if not inline:
             buf.write('<div class="wiki-toc">')
         if title:
             buf.write('<h4>%s</h4>' % escape(title))
-        buf.write(wiki_to_outline(page.text, self.env, db=db,
-                                  max_depth=max_depth))
+        buf.write(source.wiki_to_outline(facet, source.get_facet(facet),
+                                         db=db, max_depth=max_depth))
         if not inline:
             buf.write('</div>')
         return buf.getvalue()
@@ -243,7 +239,7 @@ class ImageMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(ImageMacro)
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         # args will be null if the macro is called without parenthesis.
         if not content:
             return ''
@@ -290,6 +286,7 @@ class ImageMacro(Component):
                 module, id, file = parts
             else:
                 raise Exception("%s module can't have attachments" % parts[0])
+            source = TracObject.factory(self.env, module, id)
         elif len(parts) == 2:
             from trac.Browser import BrowserModule
             try:
@@ -310,21 +307,13 @@ class ImageMacro(Component):
                     id = id[1:]
                 else:
                     module = 'wiki'
+            source = TracObject.factory(self.env, module, id)
         elif len(parts) == 1:               # attachment
-            # determine current object
-            # FIXME: source = formatter.source
-            file = filespec
-            module, id = 'wiki', 'WikiStart'
-            path_info = req.path_info.split('/',2)
-            if len(path_info) > 1:
-                module = path_info[1]
-            if len(path_info) > 2:
-                id = path_info[2]
-            if module not in ['wiki', 'ticket']:
-                raise Exception('Cannot reference local attachment from here')
+            file = filespec           
+            if not source:
+                raise Exception('No source object, relative ref not supported')
         else:
             raise Exception('No filespec given')
-        source = TracObject.factory(self.env, module, id)
         if not url: # this is an attachment
             from trac.attachment import Attachment
             attachment = Attachment(source, file)
@@ -354,7 +343,7 @@ class MacroListMacro(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(MacroListMacro)
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         from trac.wiki.formatter import wiki_to_html
         from trac.wiki import WikiSystem
         buf = StringIO()
@@ -422,7 +411,7 @@ class UserMacroProvider(Component):
     def get_macro_description(self, name):
         return inspect.getdoc(self._load_macro(name))
 
-    def render_macro(self, req, name, content):
+    def render_macro(self, req, source, facet, name, content):
         module = self._load_macro(name)
         try:
             return module.execute(req and req.hdf, content, self.env)
