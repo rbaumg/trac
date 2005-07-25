@@ -181,24 +181,19 @@ class TicketSystem(Component):
         intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
                                                          fullmatch)
         if not intertrac:
-            from trac.ticket import Ticket
-            ticket = Ticket(self.env)
-            ticket.id = target
-            return ticket
+            return self._ticket_factory(target)
     
     # ITracObjectManager methods
 
     def get_object_types(self):
-        from trac.ticket.model import Ticket
-        yield ('ticket', lambda id: Ticket(self.env, id))
+        yield ('ticket', self._ticket_factory)
 
     def rebuild_xrefs(self, db):
         from trac.ticket.model import Ticket
         cursor = db.cursor()
         cursor.execute("SELECT id,description,time,reporter FROM ticket")
         for id,description,time,reporter in cursor:
-            src = Ticket(self.env, None)
-            src.id = id
+            src = self._ticket_factory(id)
             descr_time = time
             descr_author = reporter
             chg_cursor = db.cursor()
@@ -216,6 +211,12 @@ class TicketSystem(Component):
                     yield (src, 'comment:%s' % n, time, author, value)
                 # TODO: custom fields?
             yield (src, 'description', descr_time, descr_author, description)
+
+    def _ticket_factory(self, id):
+        from trac.ticket.model import Ticket
+        src = Ticket(self.env, None)
+        src.id = id
+        return src
 
     # ISearchProvider methods
 

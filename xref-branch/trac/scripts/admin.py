@@ -657,11 +657,12 @@ class TracAdmin(cmd.Cmd):
     
     ## XRef
     def do_xref(self, line):
-        from trac.xref import XRefSystem
+        from trac.object import TracObjectSystem
         env = self.env_open()
         env.href = env.abs_href = None
         print 'cross-referencing... (for changesets, use \'resync\')'
-        XRefSystem(env).rebuild_xrefs(env.get_db_cnx(), do_changesets=False)
+        TracObjectSystem(env).rebuild_xrefs(env.get_db_cnx(),
+                                            do_changesets=False)
         print 'done.'
         
     ## Wiki

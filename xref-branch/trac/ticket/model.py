@@ -47,7 +47,8 @@ class Ticket(TracObject):
         self._old = {}
 
     def shortname(self): return '#%s' % self.id
-    def htmlclass(self): return 'newticket' # FIXME (should depend on the status)
+    def htmlclass(self): return 'newticket'
+    # FIXME (should depend on the status, but this would imply a fetch)
 
     exists = property(fget=lambda self: self.id is not None)
 

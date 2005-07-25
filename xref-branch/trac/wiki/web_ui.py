@@ -27,7 +27,7 @@ import re
 import time
 import StringIO
 
-from trac.attachment import attachment_to_hdf, Attachment
+from trac.attachment import Attachment
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.Timeline import ITimelineEventProvider
@@ -382,8 +382,8 @@ class WikiModule(Component):
 
         # Show attachments
         attachments = []
-        for attachment in Attachment.select(self.env, 'wiki', page.name, db):
-            attachments.append(attachment_to_hdf(self.env, db, req, attachment))
+        for attachment in Attachment.select(page, db):
+            attachments.append(attachment.to_hdf(req, db))
         req.hdf['wiki.attachments'] = attachments
         if req.perm.has_permission('WIKI_MODIFY'):
             attach_href = self.env.href.attachment('wiki', page.name)

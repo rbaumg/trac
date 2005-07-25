@@ -24,7 +24,7 @@ import re
 import time
 
 from trac import util
-from trac.attachment import attachment_to_hdf, Attachment
+from trac.attachment import Attachment
 from trac.core import *
 from trac.Milestone import Milestone
 from trac.Notify import TicketNotifyEmail
@@ -386,9 +386,8 @@ class TicketModule(Component):
         req.hdf['ticket.changes'] = changes
 
         # List attached files
-        for idx, attachment in util.enum(Attachment.select(self.env, 'ticket',
-                                                           ticket.id)):
-            hdf = attachment_to_hdf(self.env, db, req, attachment)
+        for idx, attachment in util.enum(Attachment.select(ticket)):
+            hdf = attachment.to_hdf(req, db)
             req.hdf['ticket.attachments.%s' % idx] = hdf
         if req.perm.has_permission('TICKET_APPEND'):
             req.hdf['ticket.attach_href'] = self.env.href.attachment('ticket',

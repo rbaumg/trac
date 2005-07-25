@@ -239,11 +239,12 @@ class WikiSystem(Component):
                                  wikipagenames.__class__.__name__)
             else:
                 yield (wikipagenames.get_wiki_page_names_syntax(),
-                       lambda x, y, z: self._format_link(x, 'wiki', y, y))
+                       lambda x, y, z: self._format_link(x, 'wiki', y, y),
+                       lambda x, y, z: self._parse_link(x, 'wiki', y, y))
                 only_one = False
 
     def get_link_resolvers(self):
-        yield ('wiki', self._format_link)
+        yield ('wiki', self._format_link, self._parse_link)
 
     def _format_link(self, formatter, ns, page, label):
         anchor = ''
@@ -261,19 +262,14 @@ class WikiSystem(Component):
                    % (formatter.href.wiki(page) + anchor, label)
 
     def _parse_link(self, formatter, ns, target, label):
-        from trac.wiki import WikiPage
-        wiki = WikiPage(self.env)
-        wiki.id = wiki.name = target
-        return wiki
+        return self._wiki_factory(target)
 
     # ITracObjectManager methods
 
     def get_object_types(self):
-        from trac.wiki.model import WikiPage
-        yield ('wiki', lambda id: WikiPage(self.env, id))
+        yield ('wiki', self._wiki_factory)
 
     def rebuild_xrefs(self, db):
-        from trac.wiki.model import WikiPage
         cursor = db.cursor()
         cursor.execute("SELECT name,time,author,text"
                        "  FROM wiki ORDER BY name,version DESC")
@@ -281,12 +277,16 @@ class WikiSystem(Component):
         for name,time,author,text in cursor:
             if name != previous:
                 previous = name
-                src = WikiPage(self.env, None) # no _fetch
-                src.id = name
-                src.name = name
-                yield (src, 'content', time, author, text)
-            # Note: wiki edit comments are not yet modifiable
-            #       therefore it's not condidered to be a facet.
+                yield (self._wiki_factory(name), 'content', time, author, text)
+            # Note: wiki edit comments are not yet editable,
+            #       therefore they are not yet considered to be facets.
+
+    def _wiki_factory(self, id):
+        from trac.wiki.model import WikiPage
+        src = WikiPage(self.env, None) # no _fetch
+        src.id = id
+        src.name = id
+        return src
 
 
 class StandardWikiPageNames(Component):

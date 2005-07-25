@@ -86,7 +86,7 @@ from trac.web.main import IRequestHandler
 from trac.web.chrome import add_stylesheet
 from trac.util import escape, TracError, pretty_timedelta
 
-__all__ = ['XRefSystem', 'XRefParser']
+__all__ = ['XRefParser']
 
 
 class XRefParser(Formatter):
@@ -114,7 +114,7 @@ class XRefParser(Formatter):
             def write(self,*args): pass
         self.format(wikitext, NullOut())
 
-    # Reimplemented methods and helpers
+    # Reimplemented methods
     
     def replace(self, fullmatch):
         wiki = WikiSystem(self.env)
@@ -149,6 +149,8 @@ class XRefParser(Formatter):
         if ns in wiki.xref_link_resolvers:
             return wiki.xref_link_resolvers[ns](self, ns, target, label)
 
+    # Helper method
+    
     def _extract_context(self, fullmatch):
         start, end, text = fullmatch.start(), fullmatch.end(), fullmatch.string
         start_ellipsis = end_ellipsis = '...'
@@ -161,41 +163,6 @@ class XRefParser(Formatter):
             end = len(text)
             end_ellipsis = ''
         return start_ellipsis + text[start:end] + end_ellipsis
-
-
-
-class XRefSystem(Component):
-
-    object_managers = ExtensionPoint(ITracObjectManager)
-
-    def __init__(self):
-        self._object_factories = None
-
-    def rebuild_xrefs(self, db, do_changesets=True):
-        """
-        Rebuild all cross-references in the given environment.
-
-        As an option, the rebuilding of the references found in
-        changesets can be skipped, as this is done by a 'resync'
-        operation, which is what is advised to do in trac-admin.
-        """
-        xf = XRefParser(self.env, db)
-        for mgr in self.object_managers:
-            for src, facet, time, author, wikitext in mgr.rebuild_xrefs(db):
-                src.delete_links(db, facet=facet)
-                xf.parse(src, facet, time, author, wikitext)
-        db.commit()
-
-    def _get_object_factories(self):
-        if not self._object_factories:
-            self._object_factories = {}
-            for mgr in self.object_managers:
-                for type, fn in mgr.get_object_types():
-                    self._object_factories[type] = fn
-        return self._object_factories
-
-    def object_factory(self, type, id):
-        return self._get_object_factories()[type](id)
 
 
 
@@ -219,11 +186,10 @@ class XRefModule(Component):
         type = req.args.get('type', 'wiki')
         id = req.args.get('id', 'WikiStart')
 
-        xref = XRefSystem(self.env)
-        me = xref.object_factory(type, id)
+        me = TracObject.factory(self.env, type, id)
 
         def link_to_dict(type, id, facet, context, time, author, relation):
-            obj = xref.object_factory(type, id)
+            obj = TracObject.factory(self.env, type, id)
             return {'type': type,
                     'id': escape(id), 
                     'fqname': obj.fqname(),
@@ -298,19 +264,17 @@ class BacklinksMacro(Component):
                 type = path_info[1]
             if len(path_info) > 2:
                 id = path_info[2]
-        xref = XRefSystem(self.env)
-        src = xref.object_factory(type, id)
+        src = TracObject.factory(self.env, type, id)
         db = self.env.get_db_cnx()
         buf = StringIO()
         first = True
         for backlink in src.find_backlinks(db):
-            print backlink
             dst_type,dst_id,facet,context,time,author,relation = backlink
             if not first:
                 buf.write(', ')
             else:
                 first = False
-            dst = xref.object_factory(dst_type, dst_id)
+            dst = TracObject.factory(self.env, dst_type, dst_id)
             buf.write('<a class="%s" href="%s">%s</a>' \
                           % (dst.htmlclass(), dst.href(), dst.shortname()))
         return buf.getvalue()
@@ -391,8 +355,6 @@ class MissingLinksMacro(Component):
                     missing[-1][1].append(src)
             previous_src = src
 
-        xref = XRefSystem(self.env)
-
         buf = StringIO()
         buf.write('<dl>')
         def format_link(obj, missing=None): # FIXME: method of TracObject?
@@ -409,7 +371,7 @@ class MissingLinksMacro(Component):
                     buf.write(', ')
                 else:
                     first = False
-                buf.write(format_link(xref.object_factory(type, id)))
+                buf.write(format_link(TracObject.factory(self.env, type, id)))
             buf.write('</dd>')
         buf.write('</dl>')
         return buf.getvalue()

@@ -23,36 +23,36 @@
 from trac.core import *
 from trac.util import escape
 
-__all__ = ['TracObject']
+__all__ = ['TracObject', 'TracObjectSystem']
 
-
-class ITracObjectManager(Interface):
-
-    def get_object_types():
-        """
-        Return a pair consisting of the name of the managed object type
-        and its corresponding factory method: a method which takes an `id`
-        argument and returns an instance of the appropriate subclass of
-        TracObject which has the given `id`.
-        """
-
-    def rebuild_xrefs():
-        """
-        Generator that yields (src, facet, time, author, wikitext) tuples,
-        one for each facet of each object controlled by this Object Manager.
-        """
 
 
 class TracObject:
-    """
-    A TracObject encapsulate the identity of a Trac Object
-    (changeset, wiki page, ticket, ...) and can be used to perform
-    generic tasks on those objects:
+    """A TracObject encapsulate the identity of a Trac Object.
+    
+    It can be a changeset, a wiki page, a ticket, etc.
+
+    The methods at the TracObject level can be used to perform
+    generic tasks on the object, which usually won't depend
+    on the actual content of the object, but rather on its
+    `type` and `id`-entity:
      * manage the relationships to other Trac Objects
      * handle custom fields (future)
 
     Note: `type` __must__ be a static class member.
+
+    The methods at the sub-class level usually require that the
+    Trac Object has been fully loaded.
+
+    Lastly, when a Trac Object is directly created using the sub-class
+    constructor, the `id` ''might'' not be set (e.g. while creating a new
+    object). In that case, most of the TracObject methods won't produce a
+    meaningful result.
     """
+
+    def _factory(cls, env, type, id):
+        return TracObjectSystem(env).object_factory(type, id)
+    factory = classmethod(_factory)
 
     def __init__(self, env, id):
         self.env = env
@@ -153,6 +153,7 @@ class TracObject:
         tuple = (self.type, self.id)
         tuple, relation_clause = self._relation_clause(tuple, relation)
         tuple, facet_clause = self._facet_clause(tuple, facet)
+        print tuple
         cursor.execute("DELETE FROM xref"
                        " WHERE src_type=%s AND src_id=%s"
                        + relation_clause + facet_clause,
@@ -214,3 +215,61 @@ class TracObject:
                        + relation_clause + facet_clause, tuple)
         return cursor
 
+
+
+class ITracObjectManager(Interface):
+
+    def get_object_types():
+        """Generator that yield a type and the corresponding factory method
+
+        A factory method is a method which takes an `id` argument
+        and returns an (unloaded) instance of the appropriate
+        subclass of TracObject which has this `id`.
+        """
+
+    def rebuild_xrefs():
+        """
+        Generator that yields (src, facet, time, author, wikitext) tuples,
+        one for each facet of each object controlled by this Object Manager.
+        """
+
+
+
+class TracObjectSystem(Component):
+
+    object_managers = ExtensionPoint(ITracObjectManager)
+
+    def __init__(self):
+        self._object_factories = None
+
+    def rebuild_xrefs(self, db, do_changesets=True):
+        """Rebuild all cross-references in the given environment.
+
+        As an option, the rebuilding of the references found in
+        changesets can be skipped, as this is done by a `resync`
+        operation, which is what is advised to do in `trac-admin`.
+        """
+        from trac.xref import XRefParser
+        xf = XRefParser(self.env, db)
+        for mgr in self.object_managers:
+            for src, facet, time, author, wikitext in mgr.rebuild_xrefs(db):
+                src.delete_links(db, facet=facet)
+                xf.parse(src, facet, time, author, wikitext)
+        db.commit()
+
+    def _get_object_factories(self):
+        if not self._object_factories:
+            self._object_factories = {}
+            for mgr in self.object_managers:
+                for type, fn in mgr.get_object_types():
+                    self._object_factories[type] = fn
+        return self._object_factories
+
+    def object_factory(self, type, id):
+        """Create a Trac Object of the given `type`, with the given `id`.
+
+        The Trac Object will __not__ be preloaded.
+        For the custom methods to work, an explicit call to `load()`
+        is still necessary.
+        """
+        return self._get_object_factories()[type](id)

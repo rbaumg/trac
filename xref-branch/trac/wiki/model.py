@@ -46,8 +46,12 @@ class WikiPage(TracObject):
         self.old_text = self.text
         self.old_readonly = self.readonly
 
+    # TracObject methods
+
     def shortname(self):
         return self.name # FIXME: only if name matches pagename rules...
+
+    # Own methods
 
     def _fetch(self, name, version=None, db=None):
         if not db:
@@ -104,7 +108,7 @@ class WikiPage(TracObject):
             self.delete_links(db)
             from trac.attachment import Attachment
             # Delete orphaned attachments
-            for attachment in Attachment.select(self.env, 'wiki', self.name, db):
+            for attachment in Attachment.select(self, db):
                 attachment.delete(db)
 
             # Let change listeners know about the deletion

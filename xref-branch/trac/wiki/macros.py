@@ -35,6 +35,7 @@ except ImportError:
 from trac.core import *
 from trac.util import escape
 from trac.env import IEnvironmentSetupParticipant
+from trac.object import TracObject
 from trac.wiki.api import IWikiMacroProvider, WikiSystem
 from trac.wiki.model import WikiPage
 
@@ -311,8 +312,7 @@ class ImageMacro(Component):
                     module = 'wiki'
         elif len(parts) == 1:               # attachment
             # determine current object
-            # FIXME: should be retrieved from the formatter...
-            # ...and the formatter should be provided to the macro
+            # FIXME: source = formatter.source
             file = filespec
             module, id = 'wiki', 'WikiStart'
             path_info = req.path_info.split('/',2)
@@ -324,9 +324,10 @@ class ImageMacro(Component):
                 raise Exception('Cannot reference local attachment from here')
         else:
             raise Exception('No filespec given')
+        source = TracObject.factory(self.env, module, id)
         if not url: # this is an attachment
             from trac.attachment import Attachment
-            attachment = Attachment(self.env, module, id, file)
+            attachment = Attachment(source, file)
             url = attachment.href()
             raw_url = attachment.href(format='raw')
             desc = attachment.description
