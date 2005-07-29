@@ -145,7 +145,7 @@ class Ticket(TracObj, UserDict):
 
         for name in Ticket.field_xrefs.keys():
             if self.has_key(name): # hrm, unit test support...
-                self.xref_field(self.env, db, name, self[name],
+                self.xref_field(db, name, self[name],
                                 time.strftime('%c', time.localtime(now)))
         
         custom_fields = filter(lambda n: n[:7] == 'custom_', self.keys())
@@ -202,7 +202,7 @@ class Ticket(TracObj, UserDict):
                 if name in Ticket.std_fields:
                     cursor.execute("UPDATE ticket SET %s=%s WHERE id=%s",
                                    (fname, self[name], id))
-            self.xref_field(self.env, db, fname, self[name],
+            self.xref_field(db, fname, self[name],
                             time.strftime('%c', time.localtime(when)))
             cursor.execute("INSERT INTO ticket_change "
                            "(ticket,time,author,field,oldvalue,newvalue) "
@@ -221,7 +221,7 @@ class Ticket(TracObj, UserDict):
                            "(ticket,time,author,field,oldvalue,newvalue) "
                            "VALUES (%s,%s,%s,'comment',%s,%s)",
                            (id, when, author, n, comment))
-            self.replace_xrefs_from_wiki(self.env, db, 'comment:%d' % n, comment)
+            self.replace_xrefs_from_wiki(db, 'comment:%d' % n, comment)
 
         cursor.execute("UPDATE ticket SET changetime=%s WHERE id=%s",
                        (when, id))
@@ -267,7 +267,7 @@ class Ticket(TracObj, UserDict):
         if Ticket.field_xrefs.has_key(name):
             xref_kind = Ticket.field_xrefs[name]
             if xref_kind[0] == 'implicit':
-                self.replace_xrefs_from_wiki(self.env, db, 'field:'+name, self[name])
+                self.replace_xrefs_from_wiki(db, 'field:'+name, self[name])
             elif xref_kind[0] == '1 to 1':
                 if name in Ticket.std_fields:
                     relation = 'has-'+name
@@ -276,7 +276,7 @@ class Ticket(TracObj, UserDict):
                 self.replace_relation(db, relation, object_factory(self.env, xref_kind[1], value), 
                                       'field:'+name, context)
             elif xref_kind[0] == '1 to n':
-                self.replace_xrefs_from_list(self.env, db, 'field:'+name,
+                self.replace_xrefs_from_list(db, 'field:'+name,
                                              name.replace('_','-'), self[name])
 
     def can_be_closed(self, db):
