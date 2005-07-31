@@ -29,8 +29,9 @@ from trac import mimeview, util
 from trac.core import *
 from trac.Timeline import ITimelineEventProvider
 from trac.versioncontrol import Changeset, Node
-from trac.web.chrome import INavigationContributor
+from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.Search import ISearchSource, query_to_sql, shorten_result
+from trac.web.chrome import INavigationContributor
 from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.Diff import DiffMixin
@@ -136,6 +137,7 @@ class ChangesetModule(Component,DiffMixin):
     def get_search_results(self, req, query, filters):
         if not 'changeset' in filters:
             return
+        authzperm = SubversionAuthorizer(self.env, req.authname)
         db = self.env.get_db_cnx()
         sql = "SELECT rev,time,author,message " \
               "FROM revision WHERE %s OR %s" % \
@@ -144,6 +146,8 @@ class ChangesetModule(Component,DiffMixin):
         cursor = db.cursor()
         cursor.execute(sql)
         for rev, date, author, log in cursor:
+            if not authzperm.has_permission_for_changeset(rev):
+                continue
             yield (self.env.href.changeset(rev),
                    '[%s]: %s' % (rev, util.escape(util.shorten_line(log))),
                    date, author,

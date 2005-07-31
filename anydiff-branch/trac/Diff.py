@@ -334,7 +334,7 @@ class DiffMixin(object):
             if old_content != new_content:
                 context = 3
                 for option in diff_options[1]:
-                    if option[:2] == '-U':
+                    if option.startswith('-U'):
                         context = int(option[2:])
                         break
                 tabwidth = int(self.config.get('diff', 'tab_width',
@@ -418,7 +418,7 @@ class DiffMixin(object):
             if old_content != new_content:
                 context = 3
                 for option in diff_options[1]:
-                    if option[:2] == '-U':
+                    if option.startswith('-U'):
                         context = int(option[2:])
                         break
                 req.write('Index: ' + new_path + util.CRLF)

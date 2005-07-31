@@ -170,7 +170,7 @@ class ConnectionPool(object):
 
 try:
     import pysqlite2.dbapi2 as sqlite
-    using_pysqlite2 = True
+    have_pysqlite = 2
 
     class PyFormatCursor(sqlite.Cursor):
         def execute(self, sql, args=None):
@@ -181,9 +181,27 @@ try:
             if args:
                 sql = sql % tuple(['?'] * len(args[0]))
             sqlite.Cursor.executemany(self, sql, args or [])
-
+        def _convert_row(self, row):
+            return tuple([(isinstance(v, unicode) and [v.encode('utf-8')] or [v])[0]
+                          for v in row])
+        def fetchone(self):
+            row = sqlite.Cursor.fetchone(self)
+            return row and self._convert_row(row) or None
+        def fetchmany(self, num):
+            rows = sqlite.Cursor.fetchmany(self, num)
+            return rows != None and [self._convert_row(row)
+                                     for row in rows] or None
+        def fetchall(self):
+            rows = sqlite.Cursor.fetchall(self)
+            return rows != None and [self._convert_row(row)
+                                     for row in rows] or None
+                
 except ImportError:
-    using_pysqlite2 = False
+    try:
+        import sqlite
+        have_pysqlite = 1
+    except ImportError:
+        have_pysqlite = 0
 
 
 class SQLiteConnection(ConnectionWrapper):
@@ -192,7 +210,7 @@ class SQLiteConnection(ConnectionWrapper):
     __slots__ = ['cnx']
 
     def __init__(self, path, params={}):
-        global using_pysqlite2
+        assert have_pysqlite > 0
         self.cnx = None
         if path != ':memory:':
             if not os.access(path, os.F_OK):
@@ -207,9 +225,7 @@ class SQLiteConnection(ConnectionWrapper):
                                  % path
 
         timeout = int(params.get('timeout', 10000))
-        if using_pysqlite2:
-            global sqlite
-
+        if have_pysqlite == 2:
             # Convert unicode to UTF-8 bytestrings. This is case-sensitive, so
             # we need two converters
             sqlite.register_converter('text', str)
@@ -218,11 +234,10 @@ class SQLiteConnection(ConnectionWrapper):
             cnx = sqlite.connect(path, detect_types=sqlite.PARSE_DECLTYPES,
                                  check_same_thread=False, timeout=timeout)
         else:
-            import sqlite
             cnx = sqlite.connect(path, timeout=timeout)
         ConnectionWrapper.__init__(self, cnx)
 
-    if using_pysqlite2:
+    if have_pysqlite == 2:
         def cursor(self):
             return self.cnx.cursor(PyFormatCursor)
     else:
@@ -235,7 +250,7 @@ class SQLiteConnection(ConnectionWrapper):
     def like(self):
         return 'LIKE'
 
-    if using_pysqlite2:
+    if have_pysqlite == 2:
         def get_last_id(self, cursor, table, column='id'):
             return cursor.lastrowid
     else:
@@ -248,7 +263,6 @@ class SQLiteConnection(ConnectionWrapper):
             if os.path.exists(path):
                 raise TracError, 'Database already exists at %s' % path
             os.makedirs(os.path.split(path)[0])
-        import sqlite
         cnx = sqlite.connect(path, timeout=int(params.get('timeout', 10000)))
         cursor = cnx.cursor()
         from trac.db_default import schema
@@ -280,6 +294,9 @@ class SQLiteConnection(ConnectionWrapper):
     to_sql = classmethod(to_sql)
 
 
+psycopg = None
+PgSQL = None
+
 class PostgreSQLConnection(ConnectionWrapper):
     """Connection wrapper for PostgreSQL."""
 
@@ -287,10 +304,29 @@ class PostgreSQLConnection(ConnectionWrapper):
 
     def __init__(self, path, user=None, password=None, host=None, port=None,
                  params={}):
-        from pyPgSQL import libpq, PgSQL
         if path.startswith('/'):
             path = path[1:]
-        cnx = PgSQL.connect('', user, password, host, path, port)
+        # We support both psycopg and PgSQL but prefer psycopg
+        global psycopg
+        global PgSQL
+        if not psycopg and not PgSQL:
+            try:
+                import psycopg
+            except ImportError:
+                from pyPgSQL import PgSQL
+        if psycopg:
+            dsn = []
+            if path:
+                dsn.append('dbname=' + path)
+            if user:
+                dsn.append('user=' + user)
+            if password:
+                dsn.append('password=' + password)
+            if host:
+                dsn.append('host=' + host)
+            cnx = psycopg.connect(' '.join(dsn))
+        else:
+            cnx = PgSQL.connect('', user, password, host, path, port)
         ConnectionWrapper.__init__(self, cnx)
 
     def cast(self, column, type):
@@ -307,7 +343,6 @@ class PostgreSQLConnection(ConnectionWrapper):
         return cursor.fetchone()[0]
 
     def init_db(cls, **args):
-        from pyPgSQL import libpq, PgSQL
         self = cls(**args)
         cursor = self.cursor()
         from trac.db_default import schema
