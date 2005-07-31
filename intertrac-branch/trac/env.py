@@ -256,7 +256,7 @@ class Environment(Component, ComponentManager):
         import shutil
 
         db_str = self.config.get('trac', 'database')
-        if db_str[:7] != 'sqlite:':
+        if not db_str.startswith('sqlite:'):
             raise EnvironmentError, 'Can only backup sqlite databases'
         db_name = os.path.join(self.path, db_str[7:])
         if not dest:
@@ -340,7 +340,7 @@ class EnvironmentSetup(Component):
                 raise TracError, err
             script.do_upgrade(self.env, i, cursor)
         cursor.execute("UPDATE system SET value=%s WHERE "
-                       "name='database_version'", (db_default.db_version))
+                       "name='database_version'", (db_default.db_version,))
         self.log.info('Upgraded database version from %d to %d',
                       dbver, db_default.db_version)
 

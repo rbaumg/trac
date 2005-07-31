@@ -61,7 +61,7 @@ class WikiProcessor(object):
         if not self.processor:
             # Find a matching wiki macro
             from trac.wiki import WikiSystem
-            wiki = WikiSystem(env)
+            wiki = WikiSystem(self.env)
             for macro_provider in wiki.macro_providers:
                 if self.name in list(macro_provider.get_macros()):
                     self.processor = self._macro_processor
@@ -78,42 +78,42 @@ class WikiProcessor(object):
                 self.processor = self._default_processor
                 self.error = 'No macro named [[%s]] found' % name
 
-    def _comment_processor(self, req, text, env):
+    def _comment_processor(self, req, text):
         return ''
 
-    def _default_processor(self, req, text, env):
+    def _default_processor(self, req, text):
         return '<pre class="wiki">' + util.escape(text) + '</pre>\n'
 
-    def _html_processor(self, req, text, env):
+    def _html_processor(self, req, text):
         if Formatter._htmlproc_disallow_rule.search(text):
             err = system_message('Error: HTML block contains disallowed tags.',
                                  text)
-            env.log.error(err)
+            self.env.log.error(err)
             return err
         if Formatter._htmlproc_disallow_attribute.search(text):
             err = system_message('Error: HTML block contains disallowed attributes.',
                                  text)
-            env.log.error(err)
+            self.env.log.error(err)
             return err
         return text
 
-    def _macro_processor(self, req, text, env):
+    def _macro_processor(self, req, text):
         from trac.wiki import WikiSystem
-        wiki = WikiSystem(env)
+        wiki = WikiSystem(self.env)
         for macro_provider in wiki.macro_providers:
             if self.name in list(macro_provider.get_macros()):
-                env.log.debug('Executing Wiki macro %s by provider %s'
-                              % (self.name, macro_provider))
+                self.env.log.debug('Executing Wiki macro %s by provider %s'
+                                   % (self.name, macro_provider))
                 return macro_provider.render_macro(req, self.name, text)
 
-    def _mimeview_processor(self, req, text, env):
-        return Mimeview(env).render(req, self.name, text)
+    def _mimeview_processor(self, req, text):
+        return Mimeview(self.env).render(req, self.name, text)
 
     def process(self, req, text, inline=False):
         if self.error:
             return system_message('Error: Failed to load processor <code>%s</code>'
                                   % self.name, self.error)
-        text = self.processor(req, text, self.env)
+        text = self.processor(req, text)
         if inline:
             code_block_start = re.compile('^<div class="code-block">')
             code_block_end = re.compile('</div>$')
@@ -255,7 +255,7 @@ class Formatter(object):
         ns = self.env.config.get('intertrac', ns.upper(), ns)
         if ns in self.link_resolvers:
             return self.link_resolvers[ns](self, ns, target, label)
-        elif target[:2] == '//' or ns == "mailto":
+        elif target.startswith('//') or ns == "mailto":
             return self._make_ext_link(ns+':'+target, label)
         else:
             intertrac = self._make_intertrac_link(ns, target, label)
@@ -270,7 +270,14 @@ class Formatter(object):
 
     def _make_intertrac_link(self, ns, target, label):
         if self.env.siblings.has_key(ns):
-            ref = wiki_to_oneliner(target, self.env.siblings[ns])
+            sibling = self.env.siblings[ns]
+            if not hasattr(sibling, 'href'):
+                from trac.web.href import Href
+                def xchg_base(base):
+                    return '/'.join(base.split('/')[:-1] + [ns])
+                sibling.href = Href(xchg_base(self.env.href.base))
+                sibling.abs_href = Href(xchg_base(self.env.abs_href.base))
+            ref = wiki_to_oneliner(target, sibling)
             return ref.replace('>%s' % target, '>%s' % label)
         url = self.env.config.get('intertrac', ns.upper()+'.url')
         if url:

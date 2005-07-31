@@ -242,7 +242,7 @@ class StandardWikiPageNames(Component):
     implements(IWikiPageNameSyntaxProvider)
 
     def get_wiki_page_names_syntax(self):
-        return (r"!?(^|(?<=[^A-Za-z]))"     # where to start
+        return (r"!?(^|(?<=[^A-Za-z/]))"    # where to start
                 r"[A-Z][a-z]+"              # initial WikiPageNames word
                 r"(?:[A-Z][a-z]*[a-z/])+"   # additional WikiPageNames word
                 r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
@@ -265,7 +265,7 @@ class FlexibleWikiPageNames(Component):
     implements(IWikiPageNameSyntaxProvider)
 
     def get_wiki_page_names_syntax(self):
-        return (r"!?(^|(?<=[^A-Za-z\d]))"   # where to start
+        return (r"!?(^|(?<=[^A-Za-z\d/]))"  # where to start
                 r"(?:[A-Z\d]{2,}[a-z]+"                  # 1st way
                 r"|[A-Z\d]+[a-z]+(?:/?[A-Z\d]+[a-z]*)+)" # 2nd way
                 r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
@@ -284,7 +284,7 @@ class SubWikiPageNames(Component):
     implements(IWikiPageNameSyntaxProvider)
 
     def get_wiki_page_names_syntax(self):
-        return (r"!?(^|(?<=[^A-Za-z]))"     # where to start
+        return (r"!?(^|(?<=[^A-Za-z/]))"    # where to start
                 r"(?:[A-Z][A-Z]+[a-z\d]+[A-Z]*"  # 1st and 3rd way
                 r"|[A-Z][a-z]+(?:[A-Z][a-z]+)+)" # 2nd way
                 r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
