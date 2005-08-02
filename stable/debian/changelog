@@ -1,3 +1,9 @@
+trac (0.8.4-2) UNRELEASED; urgency=low
+
+  * Add 10_stolen_from_0.8-branch.patch sync with r2041.
+  
+ -- Otavio Salvador <otavio@debian.org>  Tue,  2 Aug 2005 07:05:28 -0300
+
 trac (0.8.4-1) unstable; urgency=critical
 
   * New upstream release.
