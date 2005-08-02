@@ -4,7 +4,7 @@ Priority: optional
 Build-Depends-Indep: debhelper (>= 4.0.0), python2.3-dev, cdbs, python
 Maintainer: Jesus Climent <jesus.climent@hispalinux.es>
 Uploaders: Otavio Salvador <otavio@debian.org>
-Standards-Version: 3.6.1.1
+Standards-Version: 3.6.2
 
 Package: trac
 Architecture: all
