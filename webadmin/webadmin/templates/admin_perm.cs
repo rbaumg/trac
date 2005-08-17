@@ -47,6 +47,6 @@
   /each ?></tbody>
  </table>
  <div class="buttons">
-  <input type="submit" name="remove" value="Revoke selected permissions" />
+  <input type="submit" name="remove" value="Remove selected items" />
  </div>
 </form>

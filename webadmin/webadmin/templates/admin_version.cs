@@ -39,9 +39,9 @@ else ?>
     <input type="submit" name="add" value="Add">
    </div>
   </fieldset>
- </form>
+ </form><?cs
 
- <form method="POST">
+ if:len(admin.versions) ?><form method="POST">
   <table class="listing" id="verlist">
    <thead>
     <tr><th class="sel">&nbsp;</th><th>Name</th>
@@ -59,9 +59,15 @@ else ?>
    /each ?></tbody>
   </table>
   <div class="buttons">
-   <input type="submit" name="remove" value="Remove selected" />
-   <input type="submit" name="setdefault" value="Set default version" />
+   <input type="submit" name="remove" value="Remove selected items" />
+   <input type="submit" name="apply" value="Apply changes" />
   </div>
+  <p class="help">You can remove all items from this list to completely hide
+  this field from the user interface.</p>
  </form><?cs
+ else ?>
+  <p class="help">As long as you don't add any items to the list, this field
+  will remain completely hidden from the user interface.</p><?cs
+ /if ?><?cs
 
 /if ?>

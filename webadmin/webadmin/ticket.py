@@ -81,12 +81,13 @@ class ComponentAdminPage(Component):
                     req.redirect(self.env.href.admin(cat, page))
 
                 # Set default component
-                elif req.args.get('setdefault') and req.args.get('default'):
-                    name = req.args.get('default')
-                    self.log.info('Setting default component to %s', name)
-                    self.config.set('ticket', 'default_component', name)
-                    self.config.save()
-                    req.redirect(self.env.href.admin(cat, page))
+                elif req.args.get('apply'):
+                    if req.args.get('default'):
+                        name = req.args.get('default')
+                        self.log.info('Setting default component to %s', name)
+                        self.config.set('ticket', 'default_component', name)
+                        self.config.save()
+                        req.redirect(self.env.href.admin(cat, page))
 
             default = self.config.get('ticket', 'default_component')
             req.hdf['admin.components'] = \
@@ -157,12 +158,13 @@ class VersionsAdminPage(Component):
                     req.redirect(self.env.href.admin(cat, page))
 
                 # Set default version
-                elif req.args.get('setdefault') and req.args.get('default'):
-                    name = req.args.get('default')
-                    self.log.info('Setting default version to %s', name)
-                    self.config.set('ticket', 'default_version', name)
-                    self.config.save()
-                    req.redirect(self.env.href.admin(cat, page))
+                elif req.args.get('apply'):
+                    if req.args.get('default'):
+                        name = req.args.get('default')
+                        self.log.info('Setting default version to %s', name)
+                        self.config.set('ticket', 'default_version', name)
+                        self.config.save()
+                        req.redirect(self.env.href.admin(cat, page))
 
             default = self.config.get('ticket', 'default_version')
             req.hdf['admin.versions'] = \
@@ -173,28 +175,23 @@ class VersionsAdminPage(Component):
             
         return 'admin_version.cs', None
 
+
 class EnumAdminPageBase(Component):
 
-    _page_id = 'unknown'
-    _page_label = 'Unknown'
+    _type = 'unknown'
     _enum_cls = None
-    _heading = 'Default Heading'
-    _add_label = 'Add Undefined'
-    _remove_label = 'Remove selected Undefined'
-    _modify_label = 'Modify Undefined'
+    _label = ('(Undefined)', '(Undefined)')
 
     # IAdminPageProvider
     def get_admin_pages(self, req):
         if req.perm.has_permission('TICKET_ADMIN'):
-            yield ('ticket', 'Ticket System', self._page_id, self._page_label)
+            yield ('ticket', 'Ticket System', self._type, self._label[1])
 
     def process_admin_request(self, req, cat, page, path_info):
         req.perm.assert_permission('TICKET_ADMIN')
         req.hdf['admin.enum'] = {
-            'heading': self._heading,
-            'add_label': self._add_label,
-            'remove_label': self._remove_label,
-            'modify_label': self._modify_label
+            'label_singular': self._label[0],
+            'label_plural': self._label[1]
         }
         # Detail view?
         if path_info:
@@ -212,15 +209,17 @@ class EnumAdminPageBase(Component):
                 'value': enum.value
             }
         else:
+            default = self.config.get('ticket', 'default_%s' % self._type)
+
             if req.method == 'POST':
-                # Add Enum
+                # Add enum
                 if req.args.get('add') and req.args.get('name'):
                     enum = self._enum_cls(self.env)
                     enum.name = req.args.get('name')
                     enum.insert()
                     req.redirect(self.env.href.admin(cat, page))
                          
-                # Remove Enums
+                # Remove enums
                 elif req.args.get('remove') and req.args.get('sel'):
                     sel = req.args.get('sel')
                     sel = isinstance(sel, list) and sel or [sel]
@@ -233,33 +232,63 @@ class EnumAdminPageBase(Component):
                     db.commit()
                     req.redirect(self.env.href.admin(cat, page))
 
-            req.hdf['admin.enums'] = \
-                [{'name': e.name,
-                  'value': e.value,
-                  'href': self.env.href.admin(cat, page, e.name)
-                 } for e in self._enum_cls.select(self.env)]
-            
+                # Appy changes
+                elif req.args.get('apply'):
+                    # Set default value
+                    if req.args.get('default'):
+                        name = req.args.get('default')
+                        if name != default:
+                            self.log.info('Setting default %s to %s',
+                                          self._type, name)
+                            self.config.set('ticket', 'default_%s' % self._type,
+                                            name)
+                            self.config.save()
+
+                    # Change enum values
+                    order = dict([(key[6:], req.args.get(key)) for key
+                                  in req.args.keys()
+                                  if key.startswith('value_')])
+                    values = dict([(val, True) for val in order.values()])
+                    if len(order) != len(values):
+                        raise TracError, 'Order numbers must be unique'
+                    db = self.env.get_db_cnx()
+                    for enum in self._enum_cls.select(self.env, db=db):
+                        new_value = order[enum.value]
+                        if new_value != enum.value:
+                            enum.value = new_value
+                            enum.update(db=db)
+                    db.commit()
+
+                    req.redirect(self.env.href.admin(cat, page))
+
+            req.hdf['admin.enums'] = [
+                {'name': e.name, 'value': e.value,
+                 'is_default': e.name == default,
+                 'href': self.env.href.admin(cat, page, e.name)
+                } for e in self._enum_cls.select(self.env)]
+
         return 'admin_enum.cs', None
+
 
 class PriorityAdminPage(EnumAdminPageBase):
     implements(IAdminPageProvider)
 
-    _page_id = 'priority'
-    _page_label = 'Priorities'
+    _type = 'priority'
     _enum_cls = ticket.Priority
-    _heading = 'Manage Priorities'
-    _add_label = 'Add Priority'
-    _remove_label = 'Remove selected priorities'
-    _modify_label = 'Modify Priority'
+    _label = ('Priority', 'Priorities')
+
+
+class SeverityAdminPage(EnumAdminPageBase):
+    implements(IAdminPageProvider)
+
+    _type = 'severity'
+    _enum_cls = ticket.Severity
+    _label = ('Severity', 'Severities')
+
 
 class TicketTypeAdminPage(EnumAdminPageBase):
     implements(IAdminPageProvider)
 
-    _page_id = 'type'
-    _page_label = 'Ticket Types'
+    _type = 'type'
     _enum_cls = ticket.Type
-    _heading = 'Manage Ticket Types'
-    _add_label = 'Add Ticket Type'
-    _remove_label = 'Remove selected ticket types'
-    _modify_label = 'Modify Ticket Type'
-
+    _label = ('Ticket Type', 'Ticket Types')

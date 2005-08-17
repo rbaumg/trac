@@ -18,13 +18,14 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
+
 import re
 
 from trac.core import *
 from trac.util import TracError
 from trac.perm import IPermissionRequestor
+from trac.web import IRequestHandler
 from trac.web.chrome import add_stylesheet, INavigationContributor, ITemplateProvider
-from trac.web.main import IRequestHandler
 
 __all__ = ['IAdminPageProvider']
 
