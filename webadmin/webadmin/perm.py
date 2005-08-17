@@ -28,7 +28,7 @@ from webadmin.web_ui import IAdminPageProvider
 __all__ = []
 
 
-class PermAdminPage(Component):
+class PermissionAdminPage(Component):
 
     implements(IAdminPageProvider)
 

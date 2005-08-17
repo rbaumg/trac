@@ -105,7 +105,7 @@ class ComponentAdminPage(Component):
         return 'admin_component.cs', None
 
 
-class VersionsAdminPage(Component):
+class VersionAdminPage(Component):
 
     implements(IAdminPageProvider)
 
@@ -176,7 +176,9 @@ class VersionsAdminPage(Component):
         return 'admin_version.cs', None
 
 
-class EnumAdminPageBase(Component):
+class AbstractEnumAdminPage(Component):
+    implements(IAdminPageProvider)
+    abstract = True
 
     _type = 'unknown'
     _enum_cls = None
@@ -270,25 +272,19 @@ class EnumAdminPageBase(Component):
         return 'admin_enum.cs', None
 
 
-class PriorityAdminPage(EnumAdminPageBase):
-    implements(IAdminPageProvider)
-
+class PriorityAdminPage(AbstractEnumAdminPage):
     _type = 'priority'
     _enum_cls = ticket.Priority
     _label = ('Priority', 'Priorities')
 
 
-class SeverityAdminPage(EnumAdminPageBase):
-    implements(IAdminPageProvider)
-
+class SeverityAdminPage(AbstractEnumAdminPage):
     _type = 'severity'
     _enum_cls = ticket.Severity
     _label = ('Severity', 'Severities')
 
 
-class TicketTypeAdminPage(EnumAdminPageBase):
-    implements(IAdminPageProvider)
-
+class TicketTypeAdminPage(AbstractEnumAdminPage):
     _type = 'type'
     _enum_cls = ticket.Type
     _label = ('Ticket Type', 'Ticket Types')
