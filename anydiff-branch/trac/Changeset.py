@@ -34,11 +34,11 @@ from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web import IRequestHandler
 from trac.web.chrome import INavigationContributor
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
-from trac.Diff import DiffMixin
+from trac.Diff import AbstractDiffModule
 
-class ChangesetModule(Component,DiffMixin):
+class ChangesetModule(AbstractDiffModule):
 
-    implements(INavigationContributor, IRequestHandler,
+    implements(INavigationContributor, 
                ITimelineEventProvider, IWikiSyntaxProvider, ISearchSource)
 
     # INavigationContributor methods
@@ -49,17 +49,13 @@ class ChangesetModule(Component,DiffMixin):
     def get_navigation_items(self, req):
         return []
 
-    # IRequestHandler methods
+    # (reimplemented) IRequestHandler methods
 
     def match_request(self, req):
         match = re.match(r'/changeset/([0-9]+)$', req.path_info)
         if match:
             req.args['rev'] = match.group(1)
             return 1
-
-    def process_request(self, req):
-        req.perm.assert_permission('CHANGESET_VIEW')
-        return DiffMixin.process_request(self, req)
 
     # ITimelineEventProvider methods
 

@@ -50,7 +50,17 @@ class ChangesPermission(Component):
         return ['CHANGESET_VIEW']
     
 
-class DiffMixin(object):
+class AbstractDiffModule(Component):
+
+    abstract = True
+
+    implements(IRequestHandler)
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        raise NotImplementedError
+
     def process_request(self, req):
         """
         There are different request parameters combinations,
@@ -66,6 +76,8 @@ class DiffMixin(object):
            
         In any case, the given path@rev pair must exist.
         """
+        req.perm.assert_permission('CHANGESET_VIEW')
+        
         # -- retrieve arguments
         path = req.args.get('path')
         rev = req.args.get('rev')       # ''Last changes'' mode
@@ -470,21 +482,17 @@ class DiffMixin(object):
         req.write(buf.getvalue())
 
 
-class DiffModule(Component,DiffMixin):
+class DiffModule(AbstractDiffModule):
 
-    implements(IRequestHandler, IWikiSyntaxProvider)
+    implements(IWikiSyntaxProvider)
 
-    # IRequestHandler methods
+    # (reimplemented) IRequestHandler methods
 
     def match_request(self, req):
         match = re.match(r'/diff(?:(/.*)|$)', req.path_info)
         if match:
             req.args['path'] = match.group(1)
             return 1
-
-    def process_request(self, req):
-        req.perm.assert_permission('CHANGESET_VIEW')
-        return DiffMixin.process_request(self, req)
 
     # IWikiSyntaxProvider methods
     
