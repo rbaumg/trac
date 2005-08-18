@@ -28,8 +28,8 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.util import enum, escape, pretty_timedelta, CRLF
 from trac.ticket import Ticket
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 
 
 class RoadmapModule(Component):
@@ -55,7 +55,7 @@ class RoadmapModule(Component):
     # IRequestHandler methods
 
     def match_request(self, req):
-        return req.path_info == '/roadmap'
+        return re.match(r'/roadmap/?', req.path_info) is not None
 
     def process_request(self, req):
         req.perm.assert_permission('ROADMAP_VIEW')

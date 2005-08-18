@@ -27,12 +27,12 @@ import re
 
 from trac import mimeview, util
 from trac.core import *
+from trac.Search import ISearchSource, query_to_sql, shorten_result
 from trac.Timeline import ITimelineEventProvider
 from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
-from trac.Search import ISearchSource, query_to_sql, shorten_result
+from trac.web import IRequestHandler
 from trac.web.chrome import INavigationContributor
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.Diff import DiffMixin
 

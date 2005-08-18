@@ -30,8 +30,8 @@ from trac.Milestone import Milestone
 from trac.Notify import TicketNotifyEmail
 from trac.ticket import Ticket, TicketSystem
 from trac.Timeline import ITimelineEventProvider
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner
 
 
@@ -53,7 +53,7 @@ class NewticketModule(Component):
     # IRequestHandler methods
 
     def match_request(self, req):
-        return req.path_info == '/newticket'
+        return re.match(r'/newticket/?', req.path_info) is not None
 
     def process_request(self, req):
         req.perm.assert_permission('TICKET_CREATE')
@@ -118,7 +118,7 @@ class NewticketModule(Component):
         ticket = Ticket(self.env, db=db)
         ticket.values.setdefault('reporter', util.get_reporter_id(req))
         ticket.populate(req.args)
-        ticket.insert(db)
+        ticket.insert(db=db)
         db.commit()
 
         # Notify
@@ -148,10 +148,10 @@ class TicketModule(Component):
     # IRequestHandler methods
 
     def match_request(self, req):
-        match = re.match(r'/ticket/([0-9]+)?', req.path_info)
+        match = re.match(r'/ticket/([0-9]+)', req.path_info)
         if match:
             req.args['id'] = match.group(1)
-            return 1
+            return True
 
     def process_request(self, req):
         req.perm.assert_permission('TICKET_VIEW')

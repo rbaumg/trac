@@ -219,10 +219,11 @@ class SQLiteConnection(ConnectionWrapper):
             dbdir = os.path.dirname(path)
             if not os.access(path, os.R_OK + os.W_OK) or \
                    not os.access(dbdir, os.R_OK + os.W_OK):
-                raise TracError, 'The web server user requires read _and_ ' \
-                                 'write permission to the database %s and ' \
-                                 'the directory this file is located in.' \
-                                 % path
+                from getpass import getuser
+                raise TracError, 'The user %s requires read _and_ write ' \
+                                 'permission to the database file %s and the ' \
+                                 'directory it is located in.' \
+                                 % (getuser(), path)
 
         timeout = int(params.get('timeout', 10000))
         if have_pysqlite == 2:
@@ -311,7 +312,10 @@ class PostgreSQLConnection(ConnectionWrapper):
         global PgSQL
         if not psycopg and not PgSQL:
             try:
-                import psycopg
+                try:
+                    import psycopg2 as psycopg
+                except ImportError:
+                    import psycopg
             except ImportError:
                 from pyPgSQL import PgSQL
         if psycopg:

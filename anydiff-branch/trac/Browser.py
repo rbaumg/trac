@@ -29,8 +29,8 @@ from trac import util
 from trac.core import *
 from trac.mimeview import get_mimetype, is_binary, detect_unicode, Mimeview
 from trac.perm import IPermissionRequestor
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.versioncontrol import Changeset
 
@@ -153,12 +153,16 @@ class BrowserModule(Component):
         node = repos.get_node(path, rev)
         rev = repos.normalize_rev(rev)
 
+        hidden_properties = [p.strip() for p
+                             in self.config.get('browser', 'hide_properties',
+                                                'svk:merge').split(',')]
         req.hdf['title'] = path
         req.hdf['browser'] = {
             'path': path,
             'revision': rev,
             'props': dict([(util.escape(name), util.escape(value))
-                           for name, value in node.get_properties().items()]),
+                           for name, value in node.get_properties().items()
+                           if not name in hidden_properties]),
             'href': self.env.href.browser(path,rev=rev),
             'diff_href': self.env.href.diff(path,rev=rev),
             'log_href': self.env.href.log(path)

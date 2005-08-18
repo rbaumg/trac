@@ -30,6 +30,7 @@ import cmd
 import shlex
 import shutil
 import StringIO
+import traceback
 import urllib
 
 import trac
@@ -109,7 +110,6 @@ class TracAdmin(cmd.Cmd):
             return self.__env
         except Exception, e:
             print 'Failed to create environment.', e
-            import traceback
             traceback.print_exc()
             sys.exit(1)
 
@@ -120,14 +120,11 @@ class TracAdmin(cmd.Cmd):
             return self.__env
         except Exception, e:
             print 'Failed to open environment.', e
+            traceback.print_exc()
             sys.exit(1)
 
     def db_open(self):
-        try:
-            return self.env_open().get_db_cnx()
-        except Exception, e:
-            print 'Failed to open environment.', e
-            sys.exit(1)
+        return self.env_open().get_db_cnx()
 
     def db_query(self, sql, cursor=None):
         if not cursor:
@@ -598,7 +595,6 @@ class TracAdmin(cmd.Cmd):
 
         except Exception, e:
             print 'Failed to initialize environment.', e
-            import traceback
             traceback.print_exc()
             sys.exit(2)
 
@@ -726,6 +722,7 @@ class TracAdmin(cmd.Cmd):
         if not cursor.fetchone():
             raise Exception("No such wiki page '%s'" % name)
         cursor.execute("DELETE FROM wiki WHERE name=%s", (name,))
+        cnx.commit()
 
     def _do_wiki_import(self, filename, title, cursor=None):
         if not os.path.isfile(filename):
@@ -1039,6 +1036,7 @@ class TracAdmin(cmd.Cmd):
             print 'Upgrade done.'
         except Exception, e:
             print "Upgrade failed:", e
+            traceback.print_exc()
 
     _help_hotcopy = [('hotcopy <backupdir>',
                       'Make a hot backup copy of an environment')]

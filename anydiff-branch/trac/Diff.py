@@ -31,8 +31,8 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 
 
@@ -295,6 +295,10 @@ class DiffMixin(object):
                 info['browser_href.new'] = new_href
             return info
 
+        hidden_properties = [p.strip() for p
+                             in self.config.get('browser', 'hide_properties',
+                                                'svk:merge').split(',')]
+
         def _prop_changes(old_node, new_node):
             old_props = old_node.get_properties()
             new_props = new_node.get_properties()
@@ -308,6 +312,9 @@ class DiffMixin(object):
                 for k,v in new_props.items():
                     if not k in old_props:
                         changed_props[k] = {'new': v}
+                for k in hidden_properties:
+                    if k in changed_props:
+                        del changed_props[k]
             return changed_props
 
         def _content_changes(old_node, new_node):

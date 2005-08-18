@@ -90,8 +90,9 @@ class NotifyEmail(Notify):
 
         # Get the email addresses of all known users
         self.email_map = {}
-        for username,name,email in self.env.get_known_users(self.db):
-            self.email_map[username] = email
+        for username, name, email in self.env.get_known_users(self.db):
+            if email:
+                self.email_map[username] = email
 
     def notify(self, resid, subject):
         self.subject = subject
@@ -148,7 +149,7 @@ class NotifyEmail(Notify):
             msg[hdr] = mime_headers[hdr]
         self.env.log.debug("Sending SMTP notification to %s on port %d"
                            % (self.smtp_server, self.smtp_port))
-        self.server.sendmail(self.from_email, rcpt, msg.as_string())
+        self.server.sendmail(self.from_email, [rcpt], msg.as_string())
 
     def finish_send(self):
         self.server.quit()
@@ -168,7 +169,7 @@ class TicketNotifyEmail(NotifyEmail):
         NotifyEmail.__init__(self, env)
         self.prev_cc = []
 
-    def notify(self, ticket, newticket=1, modtime=0):
+    def notify(self, ticket, newticket=True, modtime=0):
         self.ticket = ticket
         self.modtime = modtime
         self.newticket = newticket
@@ -178,8 +179,8 @@ class TicketNotifyEmail(NotifyEmail):
         self.ticket['link'] = self.env.abs_href.ticket(ticket.id)
         self.hdf['email.ticket_props'] = self.format_props()
         self.hdf['email.ticket_body_hdr'] = self.format_hdr()
-        self.hdf['ticket'] = self.ticket
-        self.hdf['ticket.new'] = self.newticket and '1' or '0'
+        self.hdf['ticket'] = self.ticket.values
+        self.hdf['ticket.new'] = self.newticket
         subject = self.format_subj()
         if not self.newticket:
             subject = 'Re: ' + subject
@@ -219,9 +220,10 @@ class TicketNotifyEmail(NotifyEmail):
 
     def format_props(self):
         tkt = self.ticket
-        fields = [f for f in tkt.fields if f['type'] != 'textarea']
+        fields = [f for f in tkt.fields if f['type'] != 'textarea'
+                                       and f['name'] != 'summary']
         t = self.modtime or tkt.time_changed
-        width = [0,0,0,0]
+        width = [0, 0, 0, 0]
         for i, f in enum([f['name'] for f in fields]):
             if not f in tkt.values.keys():
                 continue
@@ -233,10 +235,10 @@ class TicketNotifyEmail(NotifyEmail):
                 width[idx] = len(f)
             if len(fval) > width[idx + 1]:
                 width[idx + 1] = len(fval)
-        format = ('%%%is:  %%-%is  |  ' % (width[2], width[3]),
-                  ' %%%is:  %%-%is%s' % (width[0], width[1], CRLF))
+        format = ('%%%is:  %%-%is  |  ' % (width[0], width[1]),
+                  ' %%%is:  %%-%is%s' % (width[2], width[3], CRLF))
         i = 1
-        l = (width[2] + width[3] + 5)
+        l = (width[0] + width[1] + 5)
         sep = l*'-' + '+' + (self.COLS-l)*'-'
         txt = sep + CRLF
         big = []
@@ -247,7 +249,7 @@ class TicketNotifyEmail(NotifyEmail):
                 big.append((f.capitalize(), fval))
             else:
                 txt += format[i % 2] % (f.capitalize(), fval)
-        if i % 2:
+        if not i % 2:
             txt += '\n'
         if big:
             txt += sep
@@ -305,9 +307,8 @@ class TicketNotifyEmail(NotifyEmail):
         for recipient in recipients:
             if recipient.find('@') >= 0:
                 emails.append(recipient)
-            else:
-                if self.email_map.has_key(recipient):
-                    emails.append(self.email_map[recipient])
+            elif self.email_map.has_key(recipient):
+                emails.append(self.email_map[recipient])
 
         # Remove duplicates
         result = []

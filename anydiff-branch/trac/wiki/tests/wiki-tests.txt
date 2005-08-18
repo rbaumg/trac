@@ -233,10 +233,10 @@ query:milestone!=
 <a class="query" href="/query?order=priority">query:?order=priority</a>
 </p>
 <p>
-<a class="query" href="/query?status=new&status=reopened&order=priority">query:status=new|reopened</a>
+<a class="query" href="/query?status=new&amp;status=reopened&amp;order=priority">query:status=new|reopened</a>
 </p>
 <p>
-<a class="query" href="/query?milestone=%21&order=priority">query:milestone!=</a>
+<a class="query" href="/query?milestone=%21&amp;order=priority">query:milestone!=</a>
 </p>
 ==============================
 {{{
@@ -503,3 +503,11 @@ __foo__
 /absolute/path/is/NotWiki and relative/path/is/NotWiki
 /ThisIsNotWikiEither and /ThisIs/NotWikiEither but <a class="missing wiki" href="/wiki/ThisIs/SubWiki" rel="nofollow">ThisIs/SubWiki?</a>
 </p>
+==============================
+|| a || 
+|| b ||
+------------------------------
+<table class="wiki">
+<tr><td> a 
+</td></tr><tr><td> b 
+</td></tr></table>
