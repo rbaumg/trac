@@ -51,6 +51,19 @@ class ChangesPermission(Component):
     
 
 class AbstractDiffModule(Component):
+    """Provide flexible functionality for showing sets of differences.
+
+    If the differences shown are coming from a specific changeset,
+    then that changeset informations can be shown too.
+
+    In addition, it is possible to show only a subset of the changeset:
+    Only the changes affecting a given path will be shown.
+    This is called the ''restricted'' changeset.
+
+    But the differences can also be computed in a more general way,
+    between two arbitrary paths and/or between two arbitrary revisions.
+    In that case, there's no changeset information displayed.
+    """
 
     abstract = True
 
@@ -62,26 +75,29 @@ class AbstractDiffModule(Component):
         raise NotImplementedError
 
     def process_request(self, req):
-        """
-        There are different request parameters combinations,
-        which corresponds to different (chgset,restricted) pairs:
-         * only the path: latest changeset for that path
-           (chgset=True,restricted=False)
-         * the path and the rev: changeset for that path in that revision
-           (chgset=True,restricted=True)
-         * the path, old and new: diffs from path@old to path@new
-           (chgset=False,restricted=True)
-         * the old_path, old, path and new: diffs from old_path@old to path@new
-           (chgset=False,restricted=False)
-           
+        """The appropriate mode of operation is inferred from
+        the request parameters:
+         * If `old` and `new` parameters are given, it will be an
+           arbitrary set of differences: `chgset` is False.
+           * If `old_path` is given and is different from `path`,
+             it's a generalized diff, from `old_path@old`
+             to `path@new`: `restricted` is False.
+           * Otherwise those are differences between two arbitrary revisions
+             of a given path: `restricted` is True.
+         * Otherwise, we are dealing with a changeset only: `chgset` is True.
+           * If the `path` is not empty or not the root, then only
+             the changes affecting that path (i.e. itself, children or
+             ancestors) will be considered: `restricted` is True.
+           * Otherwise, it's the full changeset: `restricted` is False.
+         
         In any case, the given path@rev pair must exist.
         """
         req.perm.assert_permission('CHANGESET_VIEW')
         
         # -- retrieve arguments
         path = req.args.get('path')
-        rev = req.args.get('rev')       # ''Last changes'' mode
-        old = req.args.get('old')       # ''Arbitrary Diff'' mode
+        rev = req.args.get('rev')
+        old = req.args.get('old')
         new = req.args.get('new')
         old_path = req.args.get('old_path', path)
 
@@ -91,30 +107,27 @@ class AbstractDiffModule(Component):
         rev = repos.normalize_rev(rev)
         old_path = repos.normalize_path(old_path)
         
-        if old_path == path and old and old == new: # ''Last Changes'' mode
+        if old_path == path and old and old == new: # revert to Changeset
             rev = old
             old_path = old = new = None
 
         diff_options = get_diff_options(req)
 
-        # -- setup the view mode (chgset,restricted)
+        # -- setup the `chgset` and `restricted` flags, see docstring above.
         chgset = not old and not new and not old_path
-        if chgset:                      # -- ''Arbitrary Diff'' mode
+        if chgset:
             restricted = path != '' and path != '/' # (subset or not)
-        else:                           # -- ''Last Changes'' mode
+        else:
             restricted = old_path == path # (same path or not)
 
         # -- redirect if changing the diff options
         if req.args.has_key('update'):
             if chgset:
                 if restricted:
-                    print 'redirect restricted'
                     req.redirect(self.env.href.diff(path, rev=rev))
                 else:
-                    print 'redirect chgset'
                     req.redirect(self.env.href.changeset(rev))
             else:
-                print 'redirect diff'
                 req.redirect(self.env.href.diff(path, new=new,
                                                 old_path=old_path, old=old))
 
@@ -263,7 +276,8 @@ class AbstractDiffModule(Component):
                 else:
                     next_rev = repos.next_rev(chgset.rev)
                     next_href = self.env.href.changeset(next_rev)
-                    add_link(req, 'last', self.env.href.diff(path, rev=youngest_rev),
+                    add_link(req, 'last',
+                             self.env.href.diff(path, rev=youngest_rev),
                              'Changeset %s' % youngest_rev)
                 if next_rev:
                     add_link(req, 'next', next_href, _changeset_title(next_rev))
