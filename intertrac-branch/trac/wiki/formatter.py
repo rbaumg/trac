@@ -305,8 +305,8 @@ class Formatter(object):
     def _make_interwiki_link(self, ns, target, label):
         interwiki = InterWikiMap(self.env)
         if interwiki.has_key(ns):
-            return self._make_ext_link(interwiki.url(ns, target), label,
-                                       '%s in %s' % (target, ns))
+            url, title = interwiki.url(ns, target)
+            return self._make_ext_link(url, label, '%s in %s' % (target, title))
         else:
             return None
 
@@ -738,11 +738,14 @@ class InterWikiMap(Component):
     implements(IWikiChangeListener, IWikiMacroProvider)
 
     _page_name = 'InterMapTxt'
-    _interwiki_re = re.compile(r"(\w+)[ \t]+(.*)[ \t]*$",re.UNICODE)
+    _interwiki_re = re.compile(r"(\w+)[ \t]+([^ \t]+)(?:[ \t]+#(.*))?",
+                               re.UNICODE)
     _argspec_re = re.compile(r"\$\d")
 
     def __init__(self):
         self._interwiki_map = None
+        # This dictionary maps upper-cased namespaces
+        # to (namespace, prefix, title) values
 
     def has_key(self, ns):
         if not self._interwiki_map:
@@ -750,16 +753,16 @@ class InterWikiMap(Component):
         return self._interwiki_map.has_key(ns.upper())
 
     def url(self, ns, target):
-        url = self._interwiki_map[ns.upper()][1]
+        ns, url, title = self._interwiki_map[ns.upper()]
         args = target.split(':')
         def setarg(match):
             num = int(match.group()[1:])
             return 0 < num <= len(args) and args[num-1] or ''
         url2 = re.sub(InterWikiMap._argspec_re, setarg, url)
         if url2 == url: 
-            return url + target
+            return url + target, title
         else:
-            return url2
+            return url2, title
 
     # IWikiChangeListener methods
 
@@ -787,8 +790,11 @@ class InterWikiMap(Component):
                 else:
                     m = re.match(InterWikiMap._interwiki_re, line)
                     if m:
-                        prefix, url = m.groups()
-                        self._interwiki_map[prefix.upper()] = (prefix, url.strip())
+                        prefix, url, title = m.groups()
+                        url = url.strip()
+                        title = title and title.strip() or prefix
+                        self._interwiki_map[prefix.upper()] = (prefix, url,
+                                                               title)
             elif line.startswith('----'):
                 in_map = True
 

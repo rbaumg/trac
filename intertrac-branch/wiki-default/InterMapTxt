@@ -1,7 +1,6 @@
-= InterWikiTxt =
+= InterMapTxt =
 
-This is the InterMapTxt wiki page, modelled after the MeatBall:InterMapTxt page
-(the intial content of this page also comes from that page, as of the 5th of July 2005).
+This is the InterMapTxt wiki page, modelled after the MeatBall:InterMapTxt page.
 
 This page is interpreted in a special way by Trac, in order to support
 !InterWiki links in a flexible and dynamic way.
@@ -16,8 +15,16 @@ so handle with care!
 
 Also note that !InterWiki prefixes are case insensitive.
 
+Finally, note that it is possible to create InterWiki links which support
+multiple arguments, e.g. Trac:ticket:40.
+
 ----
 {{{
+Trac http://projects.edgewall.com/trac/$1/$2   # The Official Trac for Trac
+
+#
+# From MeatBall:InterMapTxt, rev 276 (19th of August 2005):
+#
 AbbeNormal http://ourpla.net/cgi/pikie?
 AcadWiki http://xarch.tu-graz.ac.at/autocad/wiki/
 Acronym http://www.acronymfinder.com/af-query.asp?String=exact&Acronym=
@@ -32,8 +39,11 @@ C2find http://c2.com/cgi/wiki?FindPage&value=
 Cache http://www.google.com/search?q=cache:
 CarpeWiki http://carpe.com/wiki/wiki.pl?
 CommunityWiki http://www.emacswiki.org/cgi-bin/community?
+CPAN http://search.cpan.org/perldoc?
 CraoWiki http://wiki.crao.net/index.php/
 CreationMatters http://www.ourpla.net/cgi-bin/wiki.pl?
+DebianBug http://bugs.debian.org/
+DebianPackage http://packages.debian.org/
 Dictionary http://www.dict.org/bin/Dict?Database=*&Form=Dict1&Strategy=*&Query=
 DseWiki http://www.wikiservice.at/dse/wiki.cgi?
 EmacsWiki http://www.emacswiki.org/cgi-bin/wiki.pl?
