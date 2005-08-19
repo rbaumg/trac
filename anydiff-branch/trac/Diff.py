@@ -456,6 +456,8 @@ class AbstractDiffModule(Component):
                     if option.startswith('-U'):
                         context = int(option[2:])
                         break
+                if not old_node_info[0]:
+                    old_node_info = new_node_info # support for 'A'dd changes
                 req.write('Index: ' + new_path + util.CRLF)
                 req.write('=' * 67 + util.CRLF)
                 req.write('--- %s (revision %s)' % old_node_info +
