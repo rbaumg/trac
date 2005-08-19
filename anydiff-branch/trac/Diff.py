@@ -99,7 +99,7 @@ class AbstractDiffModule(Component):
         rev = req.args.get('rev')
         old = req.args.get('old')
         new = req.args.get('new')
-        old_path = req.args.get('old_path', path)
+        old_path = req.args.get('old_path')
 
         # -- normalize and check for special case
         repos = self.env.get_repository(req.authname)
