@@ -164,7 +164,7 @@ class BrowserModule(Component):
                            for name, value in node.get_properties().items()
                            if not name in hidden_properties]),
             'href': self.env.href.browser(path,rev=rev),
-            'diff_href': self.env.href.diff(path,rev=rev),
+            'restricted_changeset_href': self.env.href.changeset(rev,path=path),
             'anydiff_href': self.env.href.anydiff(),
             'log_href': self.env.href.log(path)
         }

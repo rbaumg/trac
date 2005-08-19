@@ -3,8 +3,10 @@
 
 <div id="ctxtnav" class="nav">
  <ul>
-  <li class="first"><a href="<?cs var:browser.diff_href ?>">Last Changes</a></li>
-  <li class="last"><a href="<?cs var:browser.log_href ?>">Revision Log</a></li>
+  <li class="first"><a href="<?cs var:browser.restricted_changeset_href ?>">
+   Last Changes</a></li>
+  <li class="last"><a href="<?cs var:browser.log_href ?>">
+   Revision Log</a></li>
  </ul>
 </div>
 
@@ -122,8 +124,8 @@
    if len(browser.path) > #1 ?>
     <form action="<?cs var:browser.anydiff_href ?>" method="get">
      <input type="hidden" name="new_path" value="<?cs var:browser.path ?>" />
-     <input type="hidden" name="new_rev" value="<?cs var:browser.revision ?>" />
      <input type="hidden" name="old_path" value="<?cs var:browser.path ?>" />
+     <input type="hidden" name="new_rev" value="<?cs var:browser.revision ?>" />
      <input type="hidden" name="old_rev" value="<?cs var:browser.revision ?>" />
      <div class="buttons">
       <input type="submit" value="Diff ..." title="Prepare an Arbitrary Diff" />

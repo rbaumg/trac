@@ -366,7 +366,8 @@ class AbstractDiffModule(Component):
 
             if old_content != new_content:
                 context = 3
-                for option in diff_options[1]:
+                options = diff_options[1]
+                for option in options:
                     if option.startswith('-U'):
                         context = int(option[2:])
                         break
@@ -376,9 +377,9 @@ class AbstractDiffModule(Component):
                 return hdf_diff(old_content.splitlines(),
                                 new_content.splitlines(),
                                 context, tabwidth,
-                                ignore_blank_lines='-B' in diff_options[1],
-                                ignore_case='-i' in diff_options[1],
-                                ignore_space_changes='-b' in diff_options[1])
+                                ignore_blank_lines='-B' in options,
+                                ignore_case='-i' in options,
+                                ignore_space_changes='-b' in options)
             else:
                 return []
 
@@ -450,7 +451,8 @@ class AbstractDiffModule(Component):
 
             if old_content != new_content:
                 context = 3
-                for option in diff_options[1]:
+                options = diff_options[1]
+                for option in options:
                     if option.startswith('-U'):
                         context = int(option[2:])
                         break
@@ -462,9 +464,9 @@ class AbstractDiffModule(Component):
                           util.CRLF)
                 for line in unified_diff(old_content.splitlines(),
                                          new_content.splitlines(), context,
-                                         ignore_blank_lines='-B' in diff_options[1],
-                                         ignore_case='-i' in diff_options[1],
-                                         ignore_space_changes='-b' in diff_options[1]):
+                                         ignore_blank_lines='-B' in options,
+                                         ignore_case='-i' in options,
+                                         ignore_space_changes='-b' in options):
                     req.write(line + util.CRLF)
 
     def _render_zip(self, req, filename, repos, diff):
@@ -575,6 +577,4 @@ class AnyDiffModule(Component):
             'diff_href': self.env.href.diff(),
             }
 
-        add_stylesheet(req, 'css/changeset.css') # FIXME
-        add_stylesheet(req, 'css/diff.css') # FIXME
         return 'anydiff.cs', None
