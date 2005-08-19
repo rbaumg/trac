@@ -29,8 +29,8 @@ from trac import util
 from trac.core import *
 from trac.mimeview import get_mimetype, is_binary, detect_unicode, Mimeview
 from trac.perm import IPermissionRequestor
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.versioncontrol import Changeset
 
@@ -71,7 +71,7 @@ def _get_changes(env, repos, revs, full=None, req=None, format=None):
         }
     return changes
 
-def _get_path_links(href, path, rev, old_path=None, old_rev=None):
+def _get_path_links(href, path, rev):
     links = []
     parts = path.split('/')
     if not parts[-1]:
@@ -81,7 +81,7 @@ def _get_path_links(href, path, rev, old_path=None, old_rev=None):
         path = path + part + '/'
         links.append({
             'name': part or 'root',
-            'href': href.browser(path, rev=rev, old_path=old_path, old_rev=old_rev)
+            'href': href.browser(path, rev=rev)
         })
     return links
 
@@ -153,39 +153,30 @@ class BrowserModule(Component):
         node = repos.get_node(path, rev)
         rev = repos.normalize_rev(rev)
 
+        hidden_properties = [p.strip() for p
+                             in self.config.get('browser', 'hide_properties',
+                                                'svk:merge').split(',')]
         req.hdf['title'] = path
         req.hdf['browser'] = {
             'path': path,
             'revision': rev,
             'props': dict([(util.escape(name), util.escape(value))
-                           for name, value in node.get_properties().items()]),
+                           for name, value in node.get_properties().items()
+                           if not name in hidden_properties]),
             'href': self.env.href.browser(path,rev=rev),
-            'diff_href': self.env.href.diff(path,rev=rev),
+            'restricted_changeset_href': self.env.href.changeset(rev,path=path),
+            'anydiff_href': self.env.href.anydiff(),
             'log_href': self.env.href.log(path)
         }
 
-        # Diff support:
-        action = req.args.get('diff')
-        old_path = req.args.get('old_path')
-        old_rev = req.args.get('old_rev', rev or repos.youngest_rev)
-        req.hdf['diff.href'] = self.env.href.diff(path)
-        if action == 'replace':
-            old_path = path
-        elif action == 'cancel':
-            old_path = None
-        if old_path:
-            req.hdf['browser'] = { 'old_path': old_path, 'old_rev': old_rev }
-        else:
-            old_rev = None
-
-        path_links = _get_path_links(self.env.href, path, rev, old_path, old_rev)
+        path_links = _get_path_links(self.env.href, path, rev)
         if len(path_links) > 1:
             add_link(req, 'up', path_links[-2]['href'], 'Parent directory')
         req.hdf['browser.path'] = path_links
 
         if node.isdir:
             req.hdf['browser.is_dir'] = True
-            self._render_directory(req, repos, node, rev, old_path, old_rev)
+            self._render_directory(req, repos, node, rev)
         else:
             self._render_file(req, repos, node, rev)
 
@@ -194,7 +185,7 @@ class BrowserModule(Component):
 
     # Internal methods
 
-    def _render_directory(self, req, repos, node, rev=None, old_path=None, old_rev=None):
+    def _render_directory(self, req, repos, node, rev=None):
         req.perm.assert_permission('BROWSER_VIEW')
 
         order = req.args.get('order', 'name').lower()
@@ -214,8 +205,7 @@ class BrowserModule(Component):
                 'rev': entry.rev,
                 'permission': 1, # FIXME
                 'log_href': self.env.href.log(entry.path, rev=rev),
-                'browser_href': self.env.href.browser(entry.path, rev=rev,
-                                                      old_path=old_path, old_rev=old_rev)
+                'browser_href': self.env.href.browser(entry.path, rev=rev)
             })
         changes = _get_changes(self.env, repos, [i['rev'] for i in info])
 

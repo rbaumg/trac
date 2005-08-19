@@ -459,6 +459,7 @@ default_config = \
   ('notification', 'smtp_replyto', 'trac@localhost'),
   ('timeline', 'changeset_show_files', '0'),
   ('timeline', 'default_daysback', '30'),
+  ('browser', 'hide_properties', 'svk:merge'),
   ('disabled_components', 'trac.wiki.api.StandardWikiPageNames', 'no'),
   ('disabled_components', 'trac.wiki.api.FlexibleWikiPageNames', 'yes'),
   ('disabled_components', 'trac.wiki.api.SubWikiPageNames', 'yes'),
@@ -473,4 +474,4 @@ default_components = ('trac.About', 'trac.attachment', 'trac.Browser',
                       'trac.wiki.macros', 'trac.mimeview.enscript',
                       'trac.mimeview.patch', 'trac.mimeview.php',
                       'trac.mimeview.rst', 'trac.mimeview.silvercity',
-                      'trac.mimeview.txtl')
+                      'trac.mimeview.txtl', 'trac.web.auth')

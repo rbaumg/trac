@@ -3,25 +3,19 @@
 
 <div id="ctxtnav" class="nav">
  <ul>
-  <li class="first"><a href="<?cs var:browser.diff_href ?>">Last Changes</a></li>
-  <li class="last"><a href="<?cs var:browser.log_href ?>">Revision Log</a></li>
+  <li class="first"><a href="<?cs var:browser.restricted_changeset_href ?>">
+   Last Changes</a></li>
+  <li class="last"><a href="<?cs var:browser.log_href ?>">
+   Revision Log</a></li>
  </ul>
 </div>
 
 
 <div id="content" class="browser">
- <h1><?cs 
-  if:browser.old_path ?>Current Target for Diff: <?cs
-  /if ?><?cs call:browser_path_links(browser.path, browser) ?>
- </h1><?cs
-  if:browser.old_path ?><h2>Browse to select a different target</h2><?cs
-  /if ?>
+ <h1><?cs call:browser_path_links(browser.path, browser) ?></h1>
+
  <div id="jumprev">
-  <form action="" method="get"><?cs
-   if:browser.old_path ?>
-    <input type="hidden" name="old_path" value="<?cs var:browser.old_path ?>" />
-    <input type="hidden" name="old_rev" value="<?cs var:browser.old_rev ?>" /><?cs
-   /if ?>
+  <form action="" method="get">
    <div>
     <label for="rev">View revision:</label>
     <input type="text" id="rev" name="rev" value="<?cs
@@ -127,40 +121,14 @@
  </div>
 
   <div id="anydiff"><?cs
-   if:browser.old_path ?><?cs
-    if:browser.old_path == browser.path && browser.old_rev == browser.revision ?>
-     <h2>This Path/Revision is the Base for the current Diff operation.</h2><?cs
-    else ?>
-     <form action="<?cs var:diff.href ?>" method="get">
-      <label for="diff">
-       <h2>Current Base for Diff: <?cs var:browser.old_path ?> in Revision <?cs var:browser.old_rev ?></h2>
-      </label>
-      <input type="hidden" name="old_path" value="<?cs var:browser.old_path ?>" />
-      <input type="hidden" name="old" value="<?cs var:browser.old_rev ?>" />
-      <input type="hidden" name="new" value="<?cs var:browser.revision ?>" />
-      <div class="buttons">
-        <input type="<?cs if:len(browser.path) > #1 ?>submit<?cs else ?>hidden<?cs /if ?>"
-               name="diff" value="Diff" 
-               title="Diff the current Path/Revision against the selected Base" />
-      </div>
-     </form><?cs
-    /if ?>
-    <form action="<?cs var:browser.href ?>" method="get">
-     <input type="hidden" name="diff" value="cancel" />
+   if len(browser.path) > #1 ?>
+    <form action="<?cs var:browser.anydiff_href ?>" method="get">
+     <input type="hidden" name="new_path" value="<?cs var:browser.path ?>" />
+     <input type="hidden" name="old_path" value="<?cs var:browser.path ?>" />
+     <input type="hidden" name="new_rev" value="<?cs var:browser.revision ?>" />
+     <input type="hidden" name="old_rev" value="<?cs var:browser.revision ?>" />
      <div class="buttons">
-      <input type="submit" value="Cancel" 
-       title="Cancel the current Diff operation" />
-     </div>
-    </form><?cs
-   elif len(browser.path) > #1 ?>
-    <form action="<?cs var:browser.href ?>" method="get">
-     <input type="hidden" name="rev" value="<?cs var:browser.revision ?>" />
-     <input type="hidden" name="diff" value="replace" />
-     <div class="buttons">
-      <input type="submit" 
-             value="<?cs if:browser.old_path ?>Replace Base for Diff <?cs
-                    else ?>Set Base for Diff<?cs /if ?>"
-             title="Select the current Path/Revision to be the Base for a Diff operation" />
+      <input type="submit" value="Diff ..." title="Prepare an Arbitrary Diff" />
      </div>
     </form><?cs
    /if ?>

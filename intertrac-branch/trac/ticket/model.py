@@ -121,7 +121,7 @@ class Ticket(object):
             if name[9:] not in values.keys():
                 self[name[9:]] = '0'
 
-    def insert(self, db=None):
+    def insert(self, when=0, db=None):
         """Add ticket to database"""
         assert not self.exists, 'Cannot insert an existing ticket'
         if not db:
@@ -131,8 +131,9 @@ class Ticket(object):
             handle_ta = False
 
         # Add a timestamp
-        now = int(time.time())
-        self.time_created = self.time_changed = now
+        if not when:
+            when = int(time.time())
+        self.time_created = self.time_changed = when
 
         cursor = db.cursor()
 
@@ -176,6 +177,10 @@ class Ticket(object):
         the database.
         """
         assert self.exists, 'Cannot update a new ticket'
+
+        if not self._old and not comment:
+            return # Not modified
+
         if not db:
             db = self.env.get_db_cnx()
             handle_ta = True
@@ -184,9 +189,6 @@ class Ticket(object):
         cursor = db.cursor()
         if not when:
             when = int(time.time())
-
-        if not self._old and not comment:
-            return # Not modified
 
         if 'component' in self.values.keys():
             # If the component is changed on a 'new' ticket then owner field
@@ -346,8 +348,8 @@ class AbstractEnum(object):
         cursor = db.cursor()
         self.env.log.info('Updating %s "%s"' % (self.type, self.name))
         cursor.execute("UPDATE enum SET name=%s,value=%s "
-                       "WHERE type=%s AND value=%s",
-                       (self.name, self.value, self.type, self._old_value))
+                       "WHERE type=%s AND name=%s",
+                       (self.name, self.value, self.type, self._old_name))
         if self.name != self._old_name:
             # Update tickets
             cursor.execute("UPDATE ticket SET %s=%%s WHERE %s=%%s" %
@@ -366,8 +368,8 @@ class AbstractEnum(object):
                        "ORDER BY value", (cls.type,))
         for name, value in cursor:
             obj = cls(env)
-            obj.name = name
-            obj.value = value
+            obj.name = obj._old_name = name
+            obj.value = obj._old_value = value
             yield obj
     select = classmethod(select)
 

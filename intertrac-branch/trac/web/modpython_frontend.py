@@ -34,9 +34,9 @@ except ImportError:
 from mod_python import apache, util
 
 from trac.util import http_date, rstrip
-from trac.web.main import Request, RequestDone, dispatch_request, \
-                          send_pretty_error, get_environment, \
-                          send_project_index
+from trac.web.api import Request, RequestDone
+from trac.web.main import dispatch_request, get_environment, \
+                          send_pretty_error, send_project_index
 
 
 class ModPythonRequest(Request):
@@ -162,7 +162,14 @@ class FieldStorageWrapper(util.FieldStorage):
             self.list += qsargs
 
     def get(self, key, default=None):
-        return util.FieldStorage.get(self, key, default)
+        # Work around a quirk with the ModPython FieldStorage class.
+        # Instances of a string subclass are returned instead of real
+        # strings, this confuses psycopg2 among others.
+        v = util.FieldStorage.get(self, key, default)
+        if isinstance(v, util.StringField):
+            return v.value
+        else:
+            return v
 
     def __setitem__(self, key, value):
         if value is not None and key not in self:

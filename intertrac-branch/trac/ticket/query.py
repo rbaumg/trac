@@ -26,11 +26,11 @@ import re
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.ticket import Ticket, TicketSystem
+from trac.util import escape, shorten_line, sql_escape, CRLF, TRUE
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiMacroProvider, \
                       IWikiSyntaxProvider
-from trac.util import escape, shorten_line, sql_escape, CRLF, TRUE
 
 
 class QuerySyntaxError(Exception):
@@ -598,13 +598,13 @@ class QueryModule(Component):
     def _format_link(self, formatter, ns, query, label):
         if query[0] == '?':
             return '<a class="query" href="%s">%s</a>' \
-                   % (formatter.href.query() + query, label)
+                   % (formatter.href.query() + escape(query), escape(label))
         else:
             from trac.ticket.query import Query, QuerySyntaxError
             try:
                 query = Query.from_string(formatter.env, query)
                 return '<a class="query" href="%s">%s</a>' \
-                       % (query.get_href(), label)
+                       % (escape(query.get_href()), escape(label))
             except QuerySyntaxError, e:
                 return '<em class="error">[Error: %s]</em>' % escape(e)
 

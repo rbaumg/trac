@@ -28,8 +28,8 @@ import urllib
 from trac import util
 from trac.core import *
 from trac.perm import IPermissionRequestor
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, IWikiSyntaxProvider
 
 
@@ -196,11 +196,11 @@ class ReportModule(Component):
         if not row:
             raise util.TracError('Report %s does not exist.' % id,
                                  'Invalid Report Number')
-        req.hdf['title'] = 'Delete Report {%s} %s' % (id, row['title'])
+        req.hdf['title'] = 'Delete Report {%s} %s' % (id, row[0])
         req.hdf['report'] = {
             'id': id,
             'mode': 'delete',
-            'title': util.escape(row['title']),
+            'title': util.escape(row[0]),
             'href': self.env.href.report(id)
         }
 
@@ -413,12 +413,12 @@ class ReportModule(Component):
         cursor.execute(sql)
 
         # FIXME: fetchall should probably not be used.
-        info = cursor.fetchall()
-        cols = cursor.description
+        info = cursor.fetchall() or []
+        cols = cursor.description or []
 
         db.rollback()
 
-        return [cols, info]
+        return cols, info
 
     def get_info(self, db, id, args):
         if id == -1:

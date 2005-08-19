@@ -29,8 +29,8 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.util import enum, escape, http_date, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 
 
 class ITimelineEventProvider(Interface):
@@ -83,7 +83,7 @@ class TimelineModule(Component):
     # IRequestHandler methods
 
     def match_request(self, req):
-        return req.path_info == '/timeline'
+        return re.match(r'/timeline/?', req.path_info) is not None
 
     def process_request(self, req):
         req.perm.assert_permission('TIMELINE_VIEW')
@@ -148,15 +148,15 @@ class TimelineModule(Component):
 
         # Get the email addresses of all known users
         email_map = {}
-        for username,name,email in self.env.get_known_users():
+        for username, name, email in self.env.get_known_users():
             if email:
                 email_map[username] = email
 
         idx = 0
-        for kind,href,title,date,author,message in events:
+        for kind, href, title, date, author, message in events:
             t = time.localtime(date)
-            event = {'kind': kind, 'title': title,
-                     'author': author or 'anonymous', 'href': href,
+            event = {'kind': kind, 'title': title, 'href': escape(href),
+                     'author': escape(author or 'anonymous'),
                      'date': time.strftime('%x', t),
                      'time': time.strftime('%H:%M', t), 'message': message}
 
@@ -168,9 +168,9 @@ class TimelineModule(Component):
                 if author:
                     # For RSS, author must be an email address
                     if author.find('@') != -1:
-                        event['author.email'] = author
-                    elif author in email_map.keys():
-                        event['author.email'] = email_map[author]
+                        event['author.email'] = escape(author)
+                    elif email_map.has_key(author):
+                        event['author.email'] = escape(email_map[author])
                 event['date'] = http_date(time.mktime(t))
 
             req.hdf['timeline.events.%s' % idx] = event
