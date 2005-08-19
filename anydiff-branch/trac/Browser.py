@@ -71,7 +71,7 @@ def _get_changes(env, repos, revs, full=None, req=None, format=None):
         }
     return changes
 
-def _get_path_links(href, path, rev, old_path=None, old_rev=None):
+def _get_path_links(href, path, rev):
     links = []
     parts = path.split('/')
     if not parts[-1]:
@@ -81,7 +81,7 @@ def _get_path_links(href, path, rev, old_path=None, old_rev=None):
         path = path + part + '/'
         links.append({
             'name': part or 'root',
-            'href': href.browser(path, rev=rev, old_path=old_path, old_rev=old_rev)
+            'href': href.browser(path, rev=rev)
         })
     return links
 
@@ -165,31 +165,18 @@ class BrowserModule(Component):
                            if not name in hidden_properties]),
             'href': self.env.href.browser(path,rev=rev),
             'diff_href': self.env.href.diff(path,rev=rev),
+            'anydiff_href': self.env.href.anydiff(),
             'log_href': self.env.href.log(path)
         }
 
-        # Diff support:
-        action = req.args.get('diff')
-        old_path = req.args.get('old_path')
-        old_rev = req.args.get('old_rev', rev or repos.youngest_rev)
-        req.hdf['diff.href'] = self.env.href.diff(path)
-        if action == 'replace':
-            old_path = path
-        elif action == 'cancel':
-            old_path = None
-        if old_path:
-            req.hdf['browser'] = { 'old_path': old_path, 'old_rev': old_rev }
-        else:
-            old_rev = None
-
-        path_links = _get_path_links(self.env.href, path, rev, old_path, old_rev)
+        path_links = _get_path_links(self.env.href, path, rev)
         if len(path_links) > 1:
             add_link(req, 'up', path_links[-2]['href'], 'Parent directory')
         req.hdf['browser.path'] = path_links
 
         if node.isdir:
             req.hdf['browser.is_dir'] = True
-            self._render_directory(req, repos, node, rev, old_path, old_rev)
+            self._render_directory(req, repos, node, rev)
         else:
             self._render_file(req, repos, node, rev)
 
@@ -198,7 +185,7 @@ class BrowserModule(Component):
 
     # Internal methods
 
-    def _render_directory(self, req, repos, node, rev=None, old_path=None, old_rev=None):
+    def _render_directory(self, req, repos, node, rev=None):
         req.perm.assert_permission('BROWSER_VIEW')
 
         order = req.args.get('order', 'name').lower()
@@ -218,8 +205,7 @@ class BrowserModule(Component):
                 'rev': entry.rev,
                 'permission': 1, # FIXME
                 'log_href': self.env.href.log(entry.path, rev=rev),
-                'browser_href': self.env.href.browser(entry.path, rev=rev,
-                                                      old_path=old_path, old_rev=old_rev)
+                'browser_href': self.env.href.browser(entry.path, rev=rev)
             })
         changes = _get_changes(self.env, repos, [i['rev'] for i in info])
 

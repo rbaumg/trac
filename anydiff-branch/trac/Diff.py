@@ -505,7 +505,8 @@ class DiffModule(AbstractDiffModule):
     def match_request(self, req):
         match = re.match(r'/diff(?:(/.*)|$)', req.path_info)
         if match:
-            req.args['path'] = match.group(1)
+            if match.group(1):
+                req.args['path'] = match.group(1)
             return 1
 
     # IWikiSyntaxProvider methods
@@ -540,3 +541,40 @@ class DiffModule(AbstractDiffModule):
                                    old_path=old_path, old=old_rev)
         return '<a class="changeset" title="%s" href="%s">%s</a>' \
                    % ('Diff', href, label)
+
+
+class AnyDiffModule(Component):
+
+    implements(IRequestHandler)
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        return re.match(r'/anydiff$', req.path_info)
+
+    def process_request(self, req):
+        # -- retrieve arguments
+        new_path = req.args.get('new_path')
+        new_rev = req.args.get('new_rev')
+        old_path = req.args.get('old_path')
+        old_rev = req.args.get('old_rev')
+
+        # -- normalize 
+        repos = self.env.get_repository(req.authname)
+        new_path = repos.normalize_path(new_path)
+        new_rev = repos.normalize_rev(new_rev)
+        old_path = repos.normalize_path(old_path)
+        old_rev = repos.normalize_rev(old_rev)
+
+        # -- prepare rendering
+        req.hdf['anydiff'] = {
+            'new_path': new_path,
+            'new_rev': new_rev,
+            'old_path': old_path,
+            'old_rev': old_rev,
+            'diff_href': self.env.href.diff(),
+            }
+
+        add_stylesheet(req, 'css/changeset.css') # FIXME
+        add_stylesheet(req, 'css/diff.css') # FIXME
+        return 'anydiff.cs', None
