@@ -25,6 +25,7 @@ from __future__ import generators
 import time
 import re
 import posixpath
+from urllib import urlencode
 
 from trac import mimeview, util
 from trac.core import *
@@ -191,7 +192,10 @@ class AbstractDiffModule(Component):
         if chgset:
             diff_params = 'rev=%s' % rev
         else:
-            diff_params = 'new=%s&old_path=%s&old=%s' % (new, old_path, old)
+            diff_params = urlencode({'path': path,
+                                     'new': new,
+                                     'old_path': old_path,
+                                     'old': old})
         add_link(req, 'alternate', '?format=diff&'+diff_params, 'Unified Diff',
                  'text/plain', 'diff')
         add_link(req, 'alternate', '?format=zip&'+diff_params, 'Zip Archive',
