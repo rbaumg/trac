@@ -804,7 +804,7 @@ class InterWikiMap(Component):
         yield 'InterWiki'
 
     def get_macro_description(self, name): 
-        yield 'Provide a description list for the known InterWiki prefixes.'
+        return "Provide a description list for the known InterWiki prefixes."
 
     def render_macro(self, req, name, content):
         if not self._interwiki_map:
@@ -814,9 +814,8 @@ class InterWikiMap(Component):
         buf = StringIO()
         buf.write('<dl>')
         for k in keys:
-            prefix, url = self._interwiki_map[k]
-            buf.write('<dt><a href="%(url)sRecentChanges">%(prefix)s</a></dt>'
-                      '<dd><a href="%(url)s">%(url)s</a></dd>' \
-                      % {'url':url, 'prefix':prefix})
+            prefix, url, title = self._interwiki_map[k]
+            buf.write('<dt><a href="%s">%s</a></dt>'
+                      '<dd>%s</dd>' % (url, prefix, title))
         buf.write('</dl>')
         return buf.getvalue()
