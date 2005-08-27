@@ -21,6 +21,7 @@ from trac.util import TracError
 from trac.perm import IPermissionRequestor
 from trac.web import IRequestHandler
 from trac.web.chrome import add_stylesheet, INavigationContributor, ITemplateProvider
+from trac.web.href import Href
 
 __all__ = ['IAdminPageProvider']
 
@@ -106,27 +107,26 @@ class AdminModule(Component):
                                    'cat_label': page[1],
                                    'page_id': page[2],
                                    'page_label': page[3],
-                                   'href': self.env.href.admin(page[0],
-                                                               page[2])
+                                   'href': self.env.href.admin(page[0], page[2])
                                    } for page in pages]
         req.hdf['admin.active_cat'] = cat_id
         req.hdf['admin.active_page'] = page_id
         req.hdf['admin.page_template'] = template
-        add_stylesheet(req, 'css/admin.css')
+        add_stylesheet(req, 'admin/css/admin.css')
         return 'admin.cs', content_type
 
     # ITemplateProvider
     
-    def get_htdocs_dir(self):
+    def get_htdocs_dirs(self):
         """Return the absolute path of a directory containing additional
         static resources (such as images, style sheets, etc).
         """
         from pkg_resources import resource_filename
-        return resource_filename(__name__, 'htdocs')
+        return [('admin', resource_filename(__name__, 'htdocs'))]
 
-    def get_templates_dir(self):
+    def get_templates_dirs(self):
         """Return the absolute path of the directory containing the provided
         ClearSilver templates.
         """
         from pkg_resources import resource_filename
-        return resource_filename(__name__, 'templates')
+        return [resource_filename(__name__, 'templates')]

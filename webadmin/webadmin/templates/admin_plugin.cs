@@ -14,7 +14,7 @@
 </form>
 
 <script type="text/javascript" src="<?cs
-  var:htdocs_location ?>js/admin.js"></script><?cs
+  var:chrome.href ?>/admin/js/admin.js"></script><?cs
  each:plugin = admin.plugins ?><form method="post"><div class="plugin">
  <h3 id="no<?cs var:name(plugin) ?>"><?cs
    var:plugin.name ?> <?cs var:plugin.version ?></h3>
