@@ -1,21 +1,16 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004 Edgewall Software
-# Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2004 Edgewall Software
+# Copyright (C) 2003-2004 Jonas Borgström <jonas@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
@@ -144,8 +139,8 @@ class SearchModule(Component):
                 
         req.hdf['title'] = 'Search'
 
-        if 'q' in req.args:
-            query = orig_query = req.args.get('q')
+        query = req.args.get('q')
+        if query:
             page = int(req.args.get('page', '1'))
             redir = self.quickjump(query)
             if redir:
@@ -167,7 +162,7 @@ class SearchModule(Component):
             results = results[(page-1) * page_size: page * page_size]
 
             req.hdf['title'] = 'Search Results'
-            req.hdf['search.q'] = orig_query.replace('"', "&#34;")
+            req.hdf['search.q'] = req.args.get('q').replace('"', "&#34;")
             req.hdf['search.page'] = page
             req.hdf['search.n_hits'] = n
             req.hdf['search.n_pages'] = n_pages
@@ -197,7 +192,7 @@ class SearchModule(Component):
                   'excerpt': result[4]
                 } for result in results]
 
-        add_stylesheet(req, 'css/search.css')
+        add_stylesheet(req, 'common/css/search.css')
         return 'search.cs', None
 
     def quickjump(self, kwd):
@@ -245,6 +240,10 @@ class SearchModule(Component):
         yield ('search', self._format_link)
 
     def _format_link(self, formatter, ns, query, label):
-        return '<a class="search" href="%s">%s</a>' \
-               % (formatter.href.search(query), label)
+        if query and query[0] == '?':
+            href = formatter.href.search() + \
+                   query.replace('&amp;', '&').replace(' ', '+')
+        else:
+            href = formatter.href.search(q=query)
+        return '<a class="search" href="%s">%s</a>' % (href, label)
 

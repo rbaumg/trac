@@ -1,26 +1,20 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
-#
 
 from __future__ import generators
 try:
@@ -31,7 +25,7 @@ import time
 import urllib
 
 from trac.core import *
-from trac.util import to_utf8
+from trac.util import to_utf8, TRUE
 
 
 class IWikiChangeListener(Interface):
@@ -140,14 +134,20 @@ class WikiSystem(Component):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        yield (r"!?(^|(?<=[^A-Za-z/]))[A-Z][a-z]+(?:[A-Z][a-z]*[a-z/])+"
+        ignore_missing = self.config.get('wiki', 'ignore_missing_pages')
+        ignore_missing = ignore_missing in TRUE
+        yield (r"!?(?<!/)\b[A-Z][a-z]+(?:[A-Z][a-z]*[a-z/])+"
                 "(?:#[A-Za-z0-9]+)?(?=\Z|\s|[.,;:!?\)}\]])",
-               lambda x, y, z: self._format_link(x, 'wiki', y, y))
+               lambda x, y, z: self._format_link(x, 'wiki', y, y,
+                                                 ignore_missing))
 
     def get_link_resolvers(self):
-        yield ('wiki', self._format_link)
+        yield ('wiki', self._format_fancy_link)
 
-    def _format_link(self, formatter, ns, page, label):
+    def _format_fancy_link(self, f, n, p, l):
+        return self._format_link(f, n, p, l, False)
+
+    def _format_link(self, formatter, ns, page, label, ignore_missing):
         anchor = ''
         if page.find('#') != -1:
             anchor = page[page.find('#'):]
@@ -156,6 +156,8 @@ class WikiSystem(Component):
         label = urllib.unquote(label)
 
         if not self.has_page(page):
+            if ignore_missing:
+                return label
             return '<a class="missing wiki" href="%s" rel="nofollow">%s?</a>' \
                    % (formatter.href.wiki(page) + anchor, label)
         else:

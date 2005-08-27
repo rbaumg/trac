@@ -71,7 +71,7 @@ CamelCase AlabamA ABc AlaBamA FooBar
 CamelCase,CamelCase.CamelCase:CamelCase
 ------------------------------
 <p>
-<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>,<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>.<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>:<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>
+<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>,<a class="missing wiki" href="/wiki/CamelCase" rel="nofollow">CamelCase?</a>.CamelCase:CamelCase
 </p>
 ==============================
 !CamelCase
@@ -206,6 +206,8 @@ source:/foo/bar#head
 source:/foo%20bar/baz%2Bquux
 
 source:/foo%2520bar/baz%252Bquux#42
+
+source:#42
 ------------------------------
 <p>
 <a class="source" href="/browser/foo/bar">source:/foo/bar</a>
@@ -221,6 +223,9 @@ source:/foo%2520bar/baz%252Bquux#42
 </p>
 <p>
 <a class="source" href="/browser/foo%2520bar/baz%252Bquux?rev=42">source:/foo%20bar/baz%2Bquux#42</a>
+</p>
+<p>
+<a class="source" href="/browser/?rev=42">source:#42</a>
 </p>
 ==============================
 query:?order=priority
@@ -437,11 +442,23 @@ milestone:foo
 </p>
 ==============================
 search:foo
+search:"foo bar"
 [search:bar Bar]
 ------------------------------
 <p>
-<a class="search" href="/search/foo">search:foo</a>
-<a class="search" href="/search/bar">Bar</a>
+<a class="search" href="/search?q=foo">search:foo</a>
+<a class="search" href="/search?q=foo+bar">search:"foo bar"</a>
+<a class="search" href="/search?q=bar">Bar</a>
+</p>
+==============================
+search:?q=foo&wiki=on
+search:"?q=foo bar&wiki=on"
+[search:?q=bar&ticket=on Bar in Tickets]
+------------------------------
+<p>
+<a class="search" href="/search?q=foo&wiki=on">search:?q=foo&amp;wiki=on</a>
+<a class="search" href="/search?q=foo+bar&wiki=on">search:"?q=foo bar&amp;wiki=on"</a>
+<a class="search" href="/search?q=bar&ticket=on">Bar in Tickets</a>
 </p>
 ==============================
 '''Note:'''
@@ -470,6 +487,30 @@ ticket:"123"
 <a class="missing ticket" href="/ticket/1" rel="nofollow">ticket:"1"</a>
 <a class="missing ticket" href="/ticket/12" rel="nofollow">ticket:"12"</a>
 <a class="missing ticket" href="/ticket/123" rel="nofollow">ticket:"123"</a>
+</p>
+==============================
+source:'even with whitespaces'
+source:"even with whitespaces"
+[source:'even with whitespaces' Path with spaces]
+[source:"even with whitespaces" Path with spaces]
+------------------------------
+<p>
+<a class="source" href="/browser/even%20with%20whitespaces">source:'even with whitespaces'</a>
+<a class="source" href="/browser/even%20with%20whitespaces">source:"even with whitespaces"</a>
+<a class="source" href="/browser/even%20with%20whitespaces">Path with spaces</a>
+<a class="source" href="/browser/even%20with%20whitespaces">Path with spaces</a>
+</p>
+==============================
+svn+ssh://secureserver.org
+[svn+ssh://secureserver.org SVN link]
+rfc-2396.compatible://link
+[rfc-2396.compatible://link RFC 2396]
+------------------------------
+<p>
+<a class="ext-link" href="svn+ssh://secureserver.org">svn+ssh://secureserver.org</a>
+<a class="ext-link" href="svn+ssh://secureserver.org">SVN link</a>
+<a class="ext-link" href="rfc-2396.compatible://link">rfc-2396.compatible://link</a>
+<a class="ext-link" href="rfc-2396.compatible://link">RFC 2396</a>
 </p>
 ==============================
 = ça marche! =
@@ -502,6 +543,14 @@ __foo__
 <p>
 /absolute/path/is/NotWiki and relative/path/is/NotWiki
 /ThisIsNotWikiEither and /ThisIs/NotWikiEither but <a class="missing wiki" href="/wiki/ThisIs/SubWiki" rel="nofollow">ThisIs/SubWiki?</a>
+</p>
+==============================
+8FjBpOmy
+anotherWikiPageName
+------------------------------
+<p>
+8FjBpOmy
+anotherWikiPageName
 </p>
 ==============================
 || a || 

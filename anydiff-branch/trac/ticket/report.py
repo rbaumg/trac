@@ -1,21 +1,16 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004 Edgewall Software
-# Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2004 Jonas Borgström <jonas@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
@@ -139,7 +134,7 @@ class ReportModule(Component):
            self.env.is_component_enabled(QueryModule):
             req.hdf['report.query_href'] = self.env.href.query()
 
-        add_stylesheet(req, 'css/report.css')
+        add_stylesheet(req, 'common/css/report.css')
         return 'report.cs', None
 
     # Internal methods
@@ -359,8 +354,7 @@ class ReportModule(Component):
                     value['date'] = time.strftime('%x', t)
                     value['time'] = time.strftime('%X', t)
                     value['datetime'] = time.strftime('%c', t)
-                    value['gmt'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT',
-                                                 time.gmtime(int(cell)))
+                    value['gmt'] = util.http_date(int(cell))
                 prefix = 'report.items.%d.%s' % (row_idx, str(column))
                 req.hdf[prefix] = util.escape(str(cell))
                 for key in value.keys():

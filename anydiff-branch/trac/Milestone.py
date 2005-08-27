@@ -1,21 +1,16 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004, 2005 Edgewall Software
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2004-2005 Edgewall Software
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
@@ -331,7 +326,7 @@ class MilestoneModule(Component):
         else:
             self._render_view(req, db, milestone)
 
-        add_stylesheet(req, 'css/roadmap.css')
+        add_stylesheet(req, 'common/css/roadmap.css')
         return 'milestone.cs', None
 
     # Internal methods
@@ -417,13 +412,20 @@ class MilestoneModule(Component):
         req.hdf['milestone'] = milestone_to_hdf(self.env, db, req, milestone)
 
         available_groups = []
+        component_group_available = False
         for field in TicketSystem(self.env).get_ticket_fields():
-            if field['type'] == 'select' or field['name'] == 'owner':
+            if field['type'] == 'select' and field['name'] != 'milestone' \
+                    or field['name'] == 'owner':
                 available_groups.append({'name': field['name'],
                                          'label': field['label']})
+                if field['name'] == 'component':
+                    component_group_available = True
         req.hdf['milestone.stats.available_groups'] = available_groups
 
-        by = req.args.get('by', 'component')
+        if component_group_available:
+            by = req.args.get('by', 'component')
+        else:
+            by = req.args.get('by', available_groups[0]['name'])
         req.hdf['milestone.stats.grouped_by'] = by
 
         tickets = get_tickets_for_milestone(self.env, db, milestone.name, by)

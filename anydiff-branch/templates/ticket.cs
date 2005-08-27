@@ -262,7 +262,7 @@
    <label>to:<?cs
    if:len(ticket.fields.owner.options) ?><?cs
     call:hdf_select(ticket.fields.owner.options, "reassign_owner",
-                    ticket.reassign_owner, 0) ?><?cs
+                    ticket.reassign_owner, 1) ?><?cs
    else ?>
     <input type="text" id="reassign_owner" name="reassign_owner" size="40" value="<?cs
       var:ticket.reassign_owner ?>" /><?cs
@@ -289,7 +289,7 @@
  /if ?>
 
  <script type="text/javascript" src="<?cs
-   var:htdocs_location ?>js/wikitoolbar.js"></script>
+   var:chrome.href ?>/common/js/wikitoolbar.js"></script>
 
  <div class="buttons">
   <input type="submit" name="preview" value="Preview" />&nbsp;
