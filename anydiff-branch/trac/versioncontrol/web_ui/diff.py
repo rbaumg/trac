@@ -256,7 +256,8 @@ class AbstractDiffModule(Component):
                     prev = repos.get_node(path, rev).get_previous()
                     if prev:
                         prev_path, prev_rev = prev[:2]
-                        prev_href = self.env.href.diff(prev_path, rev=prev_rev)
+                        prev_href = self.env.href.changeset(prev_rev,
+                                                            path=prev_path)
                     else:
                         prev_path = prev_rev = None
                 else:
