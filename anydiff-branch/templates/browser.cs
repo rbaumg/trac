@@ -128,7 +128,7 @@
      <input type="hidden" name="new_rev" value="<?cs var:browser.revision ?>" />
      <input type="hidden" name="old_rev" value="<?cs var:browser.revision ?>" />
      <div class="buttons">
-      <input type="submit" value="Diff ..." title="Prepare an Arbitrary Diff" />
+      <input type="submit" value="View changes..." title="Prepare an Arbitrary Diff" />
      </div>
     </form><?cs
    /if ?>

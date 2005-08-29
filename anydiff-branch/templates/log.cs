@@ -77,15 +77,12 @@
   </div>
  </div>
 
+ <form action="<?cs var:log.href ?>" method="post">
+  <div class="buttons"><input type="submit" value="View changes" 
+       title="Diff from Old Revision to New Revision (select them below)" />
+ </div>
  <table id="chglist" class="listing">
-  <form action="<?cs var:log.href ?>" method="post">
   <thead>
-   <tr class="diff">
-    <th colspan="2">
-     <div class="buttons"><input type="submit" value="Diff" 
-       title="Diff from Old Revision to New Revision (select them below)" /></div>
-    </th>
-   </tr>
    <tr>
     <th>Old</th>
     <th>New</th>
@@ -137,8 +134,11 @@
     set:idx = idx + 1 ?><?cs
    /each ?>
   </tbody>
-  </form>
- </table><?cs
+ </table>
+ <div class="buttons"><input type="submit" value="View changes" 
+      title="Diff from Old Revision to New Revision (select them below)" />
+ </div>
+ </form><?cs
  if:len(links.prev) || len(links.next) ?><div id="paging" class="nav"><ul><?cs
   if:len(links.prev) ?><li class="first<?cs
    if:!len(links.next) ?> last<?cs /if ?>">&larr; <a href="<?cs
