@@ -10,14 +10,14 @@
      <li class="first<?cs if:!len(links.next) ?> last<?cs /if ?>">
       <a class="prev" href="<?cs var:links.prev.0.href ?>" title="<?cs
         var:links.prev.0.title ?>">Previous <?cs 
-         if:diff.restricted ?>Changes<?cs else ?>Changeset<?cs /if ?></a>
+         if:diff.restricted ?>Change<?cs else ?>Changeset<?cs /if ?></a>
      </li><?cs
     /if ?><?cs
     if:len(links.next) ?>
      <li class="<?cs if:len(links.prev) ?>first <?cs /if ?>last">
       <a class="next" href="<?cs var:links.next.0.href ?>" title="<?cs
         var:links.next.0.title ?>">Next <?cs 
-         if:diff.restricted ?>Changes<?cs else ?>Changeset<?cs /if ?></a>
+         if:diff.restricted ?>Change<?cs else ?>Changeset<?cs /if ?></a>
      </li><?cs
     /if ?><?cs
    else ?>
@@ -43,19 +43,19 @@
     if:diff.restricted ?>
     <h1>Changes in <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
       <?cs var:diff.new_path ?></a>
-     from Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
+     from revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
       <?cs var:diff.old_rev ?></a>
-     to Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
+     to <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
       <?cs var:diff.new_rev ?></a>
     </h1><?cs
    else ?>
     <h1>Changes from <a title="Show entry in browser" href="<?cs var:diff.href.old_path ?>">
       <?cs var:diff.old_path ?></a> 
-     at Revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
+     at revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
       <?cs var:diff.old_rev ?></a>
      to <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
      <?cs var:diff.new_path ?></a> 
-    at Revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
+     at revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
      <?cs var:diff.new_rev ?></a>
     </h1><?cs
    /if ?><?cs
