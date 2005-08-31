@@ -3,20 +3,15 @@
 # Copyright (C) 2003, 2004, 2005 Edgewall Software
 # Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -146,7 +141,7 @@ class Ticket(TracObject):
             if name[9:] not in values.keys():
                 self[name[9:]] = '0'
 
-    def insert(self, db=None):
+    def insert(self, when=0, db=None):
         """Add ticket to database"""
         assert not self.exists, 'Cannot insert an existing ticket'
         if not db:
@@ -156,8 +151,9 @@ class Ticket(TracObject):
             handle_ta = False
 
         # Add a timestamp
-        now = int(time.time())
-        self.time_created = self.time_changed = now
+        if not when:
+            when = int(time.time())
+        self.time_created = self.time_changed = when
 
         cursor = db.cursor()
 
@@ -191,7 +187,7 @@ class Ticket(TracObject):
 
         # Handle initial xrefs
         self.id = tkt_id
-        self.update_links(db, 'description', now,
+        self.update_links(db, 'description', when,
                           self.values.get('reporter',''),
                           self.values.get('description',''))
 
@@ -206,6 +202,10 @@ class Ticket(TracObject):
         the database.
         """
         assert self.exists, 'Cannot update a new ticket'
+
+        if not self._old and not comment:
+            return # Not modified
+
         if not db:
             db = self.env.get_db_cnx()
             handle_ta = True
@@ -214,9 +214,6 @@ class Ticket(TracObject):
         cursor = db.cursor()
         if not when:
             when = int(time.time())
-
-        if not self._old and not comment:
-            return # Not modified
 
         if 'component' in self.values.keys():
             # If the component is changed on a 'new' ticket then owner field
@@ -384,8 +381,8 @@ class AbstractEnum(object):
         cursor = db.cursor()
         self.env.log.info('Updating %s "%s"' % (self.type, self.name))
         cursor.execute("UPDATE enum SET name=%s,value=%s "
-                       "WHERE type=%s AND value=%s",
-                       (self.name, self.value, self.type, self._old_value))
+                       "WHERE type=%s AND name=%s",
+                       (self.name, self.value, self.type, self._old_name))
         if self.name != self._old_name:
             # Update tickets
             cursor.execute("UPDATE ticket SET %s=%%s WHERE %s=%%s" %
@@ -404,8 +401,8 @@ class AbstractEnum(object):
                        "ORDER BY value", (cls.type,))
         for name, value in cursor:
             obj = cls(env)
-            obj.name = name
-            obj.value = value
+            obj.name = obj._old_name = name
+            obj.value = obj._old_value = value
             yield obj
     select = classmethod(select)
 

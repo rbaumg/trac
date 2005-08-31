@@ -192,7 +192,8 @@
       if:field.type == 'text' ?><input type="text" id="<?cs
         var:name(field) ?>" name="<?cs
         var:name(field) ?>" value="<?cs var:ticket[name(field)] ?>" /><?cs
-      elif:field.type == 'select' ?><select name="<?cs
+      elif:field.type == 'select' ?><select id="<?cs
+        var:name(field) ?>" name="<?cs
         var:name(field) ?>"><?cs
         if:field.optional ?><option></option><?cs /if ?><?cs
         each:option = field.options ?><option<?cs
@@ -200,16 +201,19 @@
          var:option ?></option><?cs
         /each ?></select><?cs
       elif:field.type == 'checkbox' ?><input type="hidden" name="checkbox_<?cs
-        var:name(field) ?>" /><input type="checkbox" name="<?cs
+        var:name(field) ?>" /><input type="checkbox" id="<?cs
+        var:name(field) ?>" name="<?cs
         var:name(field) ?>" value="1"<?cs
         if:ticket[name(field)] ?> checked="checked"<?cs /if ?> /><?cs
-      elif:field.type == 'textarea' ?><textarea name="<?cs
+      elif:field.type == 'textarea' ?><textarea id="<?cs
+        var:name(field) ?>" name="<?cs
         var:name(field) ?>"<?cs
         if:field.height ?> rows="<?cs var:field.height ?>"<?cs /if ?><?cs
         if:field.width ?> cols="<?cs var:field.width ?>"<?cs /if ?>><?cs
         var:ticket[name(field)] ?></textarea><?cs
       elif:field.type == 'radio' ?><?cs set:optidx = 0 ?><?cs
-       each:option = field.options ?><label><input type="radio" name="<?cs
+       each:option = field.options ?><label><input type="radio" id="<?cs
+         var:name(field) ?>" name="<?cs
          var:name(field) ?>" value="<?cs var:option ?>"<?cs
          if:ticket[name(field)] == option ?> checked="checked"<?cs /if ?> /> <?cs
          var:option ?></label> <?cs set:optidx = optidx + 1 ?><?cs
@@ -259,7 +263,7 @@
    <label>to:<?cs
    if:len(ticket.fields.owner.options) ?><?cs
     call:hdf_select(ticket.fields.owner.options, "reassign_owner",
-                    ticket.reassign_owner, 0) ?><?cs
+                    ticket.reassign_owner, 1) ?><?cs
    else ?>
     <input type="text" id="reassign_owner" name="reassign_owner" size="40" value="<?cs
       var:ticket.reassign_owner ?>" /><?cs
@@ -286,7 +290,7 @@
  /if ?>
 
  <script type="text/javascript" src="<?cs
-   var:htdocs_location ?>js/wikitoolbar.js"></script>
+   var:chrome.href ?>/common/js/wikitoolbar.js"></script>
 
  <div class="buttons">
   <input type="submit" name="preview" value="Preview" />&nbsp;

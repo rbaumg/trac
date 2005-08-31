@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -27,6 +22,7 @@ import time
 from trac.core import *
 from trac.object import TracObject
 from trac.wiki.api import WikiSystem
+from trac.util import escape
 
 
 class WikiPage(TracObject):
@@ -40,7 +36,7 @@ class WikiPage(TracObject):
         if name:
             self._fetch(name, version, db)
         else:
-            self.version = -1
+            self.version = 0
             self.text = ''
             self.readonly = 0
         self.old_text = self.text
@@ -49,7 +45,7 @@ class WikiPage(TracObject):
     # TracObject methods
 
     def shortname(self):
-        return self.name # FIXME: only if name matches pagename rules...
+        return escape(self.name) # FIXME: only if name matches pagename rules...
 
     def get_facet(self, facet, db=None):
         if facet == 'content':
@@ -78,11 +74,11 @@ class WikiPage(TracObject):
             self.text = text
             self.readonly = readonly and int(readonly) or 0
         else:
-            self.version = -1
+            self.version = 0
             self.text = ''
             self.readonly = 0
 
-    exists = property(fget=lambda self: self.version >= 0)
+    exists = property(fget=lambda self: self.version > 0)
 
     def delete(self, version=None, db=None):
         assert self.exists, 'Cannot delete non-existent page'
@@ -154,7 +150,7 @@ class WikiPage(TracObject):
             db.commit()
 
         for listener in WikiSystem(self.env).change_listeners:
-            if self.version == 0:
+            if self.version == 1:
                 listener.wiki_page_added(self)
             else:
                 listener.wiki_page_changed(self, self.version, t, author,

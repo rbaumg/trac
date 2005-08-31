@@ -1,21 +1,16 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004 Edgewall Software
-# Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2004 Jonas Borgström <jonas@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
@@ -28,8 +23,8 @@ import urllib
 from trac import util
 from trac.core import *
 from trac.perm import IPermissionRequestor
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, IWikiSyntaxProvider
 
 
@@ -139,7 +134,7 @@ class ReportModule(Component):
            self.env.is_component_enabled(QueryModule):
             req.hdf['report.query_href'] = self.env.href.query()
 
-        add_stylesheet(req, 'css/report.css')
+        add_stylesheet(req, 'common/css/report.css')
         return 'report.cs', None
 
     # Internal methods
@@ -196,11 +191,11 @@ class ReportModule(Component):
         if not row:
             raise util.TracError('Report %s does not exist.' % id,
                                  'Invalid Report Number')
-        req.hdf['title'] = 'Delete Report {%s} %s' % (id, row['title'])
+        req.hdf['title'] = 'Delete Report {%s} %s' % (id, row[0])
         req.hdf['report'] = {
             'id': id,
             'mode': 'delete',
-            'title': util.escape(row['title']),
+            'title': util.escape(row[0]),
             'href': self.env.href.report(id)
         }
 
@@ -284,7 +279,7 @@ class ReportModule(Component):
             title=col[0].capitalize()
             prefix = 'report.headers.%d' % idx
             req.hdf['%s.real' % prefix] = col[0]
-            if title[:2] == '__' and title[-2:] == '__':
+            if title.startswith('__') and title.endswith('__'):
                 continue
             elif title[0] == '_' and title[-1] == '_':
                 title = title[1:-1].capitalize()
@@ -305,7 +300,7 @@ class ReportModule(Component):
                 colName = cols[x][0]
                 if colName == sortCol:
                     colIndex = x
-                if colName[:2] == '__' and colName[-2:] == '__':
+                if colName.startswith('__') and colName.endswith('__'):
                     hiddenCols += 1
             if colIndex != None:
                 k = 'report.headers.%d.asc' % (colIndex - hiddenCols)
@@ -328,7 +323,7 @@ class ReportModule(Component):
                 column = cols[col_idx][0]
                 value = {}
                 # Special columns begin and end with '__'
-                if column[:2] == '__' and column[-2:] == '__':
+                if column.startswith('__') and column.endswith('__'):
                     value['hidden'] = 1
                 elif (column[0] == '_' and column[-1] == '_'):
                     value['fullrow'] = 1
@@ -359,8 +354,7 @@ class ReportModule(Component):
                     value['date'] = time.strftime('%x', t)
                     value['time'] = time.strftime('%X', t)
                     value['datetime'] = time.strftime('%c', t)
-                    value['gmt'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT',
-                                                 time.gmtime(int(cell)))
+                    value['gmt'] = util.http_date(int(cell))
                 prefix = 'report.items.%d.%s' % (row_idx, str(column))
                 req.hdf[prefix] = util.escape(str(cell))
                 for key in value.keys():
@@ -413,12 +407,12 @@ class ReportModule(Component):
         cursor.execute(sql)
 
         # FIXME: fetchall should probably not be used.
-        info = cursor.fetchall()
-        cols = cursor.description
+        info = cursor.fetchall() or []
+        cols = cursor.description or []
 
         db.rollback()
 
-        return [cols, info]
+        return cols, info
 
     def get_info(self, db, id, args):
         if id == -1:

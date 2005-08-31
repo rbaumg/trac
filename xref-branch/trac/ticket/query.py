@@ -1,21 +1,16 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2004-2005 Edgewall Software
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
@@ -26,11 +21,11 @@ import re
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.ticket import Ticket, TicketSystem
+from trac.util import escape, shorten_line, sql_escape, CRLF, TRUE
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiMacroProvider, \
                       IWikiSyntaxProvider
-from trac.util import escape, shorten_line, sql_escape, CRLF, TRUE
 
 
 class QuerySyntaxError(Exception):
@@ -370,7 +365,7 @@ class QueryModule(Component):
         for k, v in query.constraints.items():
             constraint = {'values': [], 'mode': ''}
             for val in v:
-                neg = val[:1] == '!'
+                neg = val.startswith('!')
                 if neg:
                     val = val[1:]
                 mode = ''
@@ -461,7 +456,7 @@ class QueryModule(Component):
 
     def display_html(self, req, query):
         req.hdf['title'] = 'Custom Query'
-        add_stylesheet(req, 'css/report.css')
+        add_stylesheet(req, 'common/css/report.css')
 
         db = self.env.get_db_cnx()
 
@@ -598,13 +593,13 @@ class QueryModule(Component):
     def _format_link(self, formatter, ns, query, label):
         if query[0] == '?':
             return '<a class="query" href="%s">%s</a>' \
-                   % (formatter.href.query() + query, label)
+                   % (formatter.href.query() + escape(query), escape(label))
         else:
             from trac.ticket.query import Query, QuerySyntaxError
             try:
                 query = Query.from_string(formatter.env, query)
                 return '<a class="query" href="%s">%s</a>' \
-                       % (query.get_href(), label)
+                       % (escape(query.get_href()), escape(label))
             except QuerySyntaxError, e:
                 return '<em class="error">[Error: %s]</em>' % escape(e)
 

@@ -1,25 +1,21 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Daniel Lundin <daniel@edgewall.com>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Daniel Lundin <daniel@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Daniel Lundin <daniel@edgewall.com>
 
 from trac.config import default_dir
+from trac.db import Table, Column, Index
 
 # Database version identifier. Used for automatic upgrades.
 db_version = 14
@@ -37,31 +33,6 @@ def __mkreports(reports):
 ##
 ## Database schema
 ##
-
-class Table(object):
-    def __init__(self, name, key=[]):
-        self.name = name
-        self.columns = []
-        self.indexes = []
-        self.key = key
-        if isinstance(key, (str, unicode)):
-            self.key = [key]
-    def __getitem__(self, objs):
-        self.columns = [o for o in objs if isinstance(o, Column)]
-        self.indexes = [o for o in objs if isinstance(o, Index)]
-        return self
-
-class Column(object):
-    def __init__(self, name, type='text', size=None, unique=False,
-                 auto_increment=False):
-        self.name = name
-        self.type = type
-        self.size = size
-        self.auto_increment = auto_increment
-
-class Index(object):
-    def __init__(self, columns):
-        self.columns = columns
 
 schema = [
     # Common
@@ -422,8 +393,7 @@ data = (('component',
                __mkreports(reports)))
 
 default_config = \
- (('trac', 'htdocs_location', ''),
-  ('trac', 'repository_dir', ''),
+ (('trac', 'repository_dir', ''),
   ('trac', 'templates_dir', default_dir('templates')),
   ('trac', 'database', 'sqlite:db/trac.db'),
   ('trac', 'default_charset', 'iso-8859-15'),
@@ -459,6 +429,7 @@ default_config = \
   ('mimeviewer', 'enscript_path', 'enscript'),
   ('mimeviewer', 'php_path', 'php'),
   ('mimeviewer', 'tab_width', '8'),
+  ('mimeviewer', 'max_preview_size', '262144'),
   ('notification', 'smtp_enabled', 'false'),
   ('notification', 'smtp_server', 'localhost'),
   ('notification', 'smtp_port', '25'),
@@ -471,19 +442,23 @@ default_config = \
   ('notification', 'smtp_replyto', 'trac@localhost'),
   ('timeline', 'changeset_show_files', '0'),
   ('timeline', 'default_daysback', '30'),
+  ('browser', 'hide_properties', 'svk:merge'),
+  ('wiki', 'ignore_missing_pages', 'false'),
   ('disabled_components', 'trac.wiki.api.StandardWikiPageNames', 'no'),
   ('disabled_components', 'trac.wiki.api.FlexibleWikiPageNames', 'yes'),
   ('disabled_components', 'trac.wiki.api.SubWikiPageNames', 'yes'),
 )
 
-default_components = ('trac.About', 'trac.attachment', 'trac.Browser',
-                      'trac.Changeset', 'trac.Search', 'trac.Settings',
-                      'trac.Diff',
-                      'trac.xref',
-                      'trac.ticket.query', 'trac.ticket.report',
+default_components = ('trac.About', 'trac.attachment', 
+                      'trac.mimeview.enscript', 'trac.mimeview.patch',
+                      'trac.mimeview.php', 'trac.mimeview.rst',
+                      'trac.mimeview.silvercity', 'trac.mimeview.txtl',
                       'trac.Roadmap',
-                      'trac.ticket.web_ui', 'trac.Timeline', 'trac.wiki.web_ui',
-                      'trac.wiki.macros', 'trac.mimeview.enscript',
-                      'trac.mimeview.patch', 'trac.mimeview.php',
-                      'trac.mimeview.rst', 'trac.mimeview.silvercity',
-                      'trac.mimeview.txtl')
+                      'trac.Search', 'trac.Settings',
+                      'trac.ticket.query', 'trac.ticket.report',
+                      'trac.ticket.web_ui',
+                      'trac.Timeline',
+                      'trac.versioncontrol.web_ui',
+                      'trac.wiki.macros', 'trac.wiki.web_ui',
+                      'trac.web.auth',
+                      'trac.xref')

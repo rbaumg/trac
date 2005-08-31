@@ -1,25 +1,20 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004, 2005 Edgewall Software
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2004-2005 Edgewall Software
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
 # Copyright (C) 2005 Matthew Good <trac@matt-good.net>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
-# Author: Matthew Good <trac@matt-good.net>
+#         Matthew Good <trac@matt-good.net>
 
 import locale
 import mimetypes
@@ -34,8 +29,9 @@ except ImportError:
 from mod_python import apache, util
 
 from trac.util import http_date, rstrip
-from trac.web.main import Request, RequestDone, dispatch_request, \
-                          send_pretty_error, get_environment
+from trac.web.api import Request, RequestDone
+from trac.web.main import dispatch_request, get_environment, \
+                          send_pretty_error, send_project_index
 
 
 class ModPythonRequest(Request):
@@ -161,7 +157,14 @@ class FieldStorageWrapper(util.FieldStorage):
             self.list += qsargs
 
     def get(self, key, default=None):
-        return util.FieldStorage.get(self, key, default)
+        # Work around a quirk with the ModPython FieldStorage class.
+        # Instances of a string subclass are returned instead of real
+        # strings, this confuses psycopg2 among others.
+        v = util.FieldStorage.get(self, key, default)
+        if isinstance(v, util.StringField):
+            return v.value
+        else:
+            return v
 
     def __setitem__(self, key, value):
         if value is not None and key not in self:
@@ -187,12 +190,14 @@ def handler(req):
         os.environ['PYTHON_EGG_CACHE'] = req.subprocess_env['PYTHON_EGG_CACHE']
 
     mpr = ModPythonRequest(req, options)
-    env = get_environment(mpr, dict_translate(options,
-                ('TracEnv', 'TRAC_ENV'),
-                ('TracEnvParentDir', 'TRAC_ENV_PARENT_DIR'),
-                ('TracEnvIndexTemplate', 'TRAC_ENV_INDEX_TEMPLATE'),
-                ('TracTemplateVars', 'TRAC_TEMPLATE_VARS')))
+    project_opts = dict_translate(options,
+            ('TracEnv', 'TRAC_ENV'),
+            ('TracEnvParentDir', 'TRAC_ENV_PARENT_DIR'),
+            ('TracEnvIndexTemplate', 'TRAC_ENV_INDEX_TEMPLATE'),
+            ('TracTemplateVars', 'TRAC_TEMPLATE_VARS'))
+    env = get_environment(mpr, project_opts)
     if not env:
+        send_project_index(mpr, project_opts)
         return apache.OK
 
     req.content_type = 'text/html'

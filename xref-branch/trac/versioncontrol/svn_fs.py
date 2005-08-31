@@ -2,20 +2,15 @@
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
@@ -34,6 +29,15 @@ from svn import fs, repos, core, delta
 _kindmap = {core.svn_node_dir: Node.DIRECTORY,
             core.svn_node_file: Node.FILE}
 
+try:
+    import threading
+except ImportError:
+    import dummy_threading as threading
+
+apr_lock = threading.Lock()
+apr_refcount = 0
+
+    
 def _get_history(path, authz, fs_ptr, pool, start, end, limit=None):
     history = []
     if hasattr(repos, 'svn_repos_history2'):
@@ -75,7 +79,17 @@ class Pool(object):
         self._parent_pool = parent_pool
         self._children = []
         self._waiting_to_close = False
-        
+        # Make sure apr_init is called before the first pool is created
+        global apr_refcount
+        apr_lock.acquire()
+        try:
+            assert apr_refcount >= 0
+            apr_refcount += 1
+            if apr_refcount == 1:
+                core.apr_initialize()
+        finally:
+            apr_lock.release()
+            
         if self._parent_pool:
             self._pool = core.svn_pool_create(self._parent_pool())        
             self._parent_pool._children.append(self)
@@ -112,10 +126,19 @@ class Pool(object):
         if self._children:
             self._waiting_to_close = True
             return
-        
         core.svn_pool_destroy(self._pool)
         self._pool = None
-        
+        # Make sure apr_terminate is called after the last pool is destroyed
+        global apr_refcount
+        apr_lock.acquire()
+        try:
+            apr_refcount -= 1
+            assert apr_refcount >= 0
+            if apr_refcount == 0:
+                core.apr_terminate()
+        finally:
+            apr_lock.release()
+            
         if self._parent_pool:
             self._parent_pool._child_closed(self)
             self._parent_pool = None
@@ -137,15 +160,10 @@ class SubversionRepository(Repository):
                   "Subversion >= 1.0 required: Found %d.%d.%d" % \
                   (core.SVN_VER_MAJOR, core.SVN_VER_MINOR, core.SVN_VER_MICRO)
 
-        self.apr_initialized = 0
         self.pool = None
         self.repos = None
         self.fs_ptr = None
         self.path = path
-
-        core.apr_initialize()
-        self.apr_initialized = 1
-
         self.pool = Pool(self)
 
         # Remove any trailing slash or else subversion might abort
@@ -202,9 +220,6 @@ class SubversionRepository(Repository):
             self.repos = None
             self.fs_ptr = None
             self.rev = None
-        if self.apr_initialized:
-            core.apr_terminate()
-            self.apr_initialized = 0
 
     def get_changeset(self, rev):
         return SubversionChangeset(int(rev), self.authz, self.scope,

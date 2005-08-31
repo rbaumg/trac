@@ -51,6 +51,10 @@ tr.diff input {
  margin: 0; 
 }
 
+div.buttons {
+ clear: left;
+}
+
 #anydiff {
  margin: 0 0 1em;
  float: left;

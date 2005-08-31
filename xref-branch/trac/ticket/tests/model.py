@@ -170,7 +170,8 @@ class TicketModelTestCase(unittest.TestCase):
             elif field == 'milestone':
                 self.assertEqual(('bar', 'foo'), (old, new))
             elif field == 'comment':
-                self.assertEqual(('', 'Testing'), (old, new))
+                self.assertEqual(('1', 'Testing'), (old, new))
+                # Note: 'old' used for comment numbering
             else:
                 self.fail('Unexpected change (%s)'
                           % ((t, author, field, old, new),))
@@ -184,7 +185,8 @@ class TicketModelTestCase(unittest.TestCase):
         for t, author, field, old, new in ticket.get_changelog():
             self.assertEqual((42, 'jane'), (t, author))
             if field == 'comment':
-                self.assertEqual(('', 'Testing'), (old, new))
+                self.assertEqual(('1', 'Testing'), (old, new))
+                # Note: 'old' used for comment numbering
             else:
                 self.fail('Unexpected change (%s)'
                           % ((t, author, field, old, new),))

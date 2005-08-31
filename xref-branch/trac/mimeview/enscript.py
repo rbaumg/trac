@@ -1,27 +1,19 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004, 2005 Edgewall Software
+# Copyright (C) 2004-2005 Edgewall Software
 # Copyright (C) 2004 Daniel Lundin <daniel@edgewall.com>
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Daniel Lundin <daniel@edgewall.com>
-#
-# Syntax highlighting module, using GNU enscript.
-#
 
 from __future__ import generators
 
@@ -32,6 +24,7 @@ from trac.util import escape, NaivePopen, Deuglifier
 __all__ = ['EnscriptRenderer']
 
 types = {
+    'application/xhtml+xml':    'html',
     'application/postscript':   'postscript',
     'application/x-csh':        'csh',
     'application/x-troff':      'nroff',
@@ -98,9 +91,7 @@ class EnscriptDeuglifier(Deuglifier):
 
 
 class EnscriptRenderer(Component):
-    """
-    Syntax highlighting using GNU Enscript.
-    """
+    """Syntax highlighting using GNU Enscript."""
 
     implements(IHTMLPreviewRenderer)
 

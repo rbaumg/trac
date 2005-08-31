@@ -1,21 +1,16 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004, 2005 Edgewall Software
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2004-2005 Edgewall Software
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
@@ -28,8 +23,8 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.util import enum, escape, pretty_timedelta, CRLF
 from trac.ticket import Ticket
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 
 
 class RoadmapModule(Component):
@@ -55,7 +50,7 @@ class RoadmapModule(Component):
     # IRequestHandler methods
 
     def match_request(self, req):
-        return req.path_info == '/roadmap'
+        return re.match(r'/roadmap/?', req.path_info) is not None
 
     def process_request(self, req):
         req.perm.assert_permission('ROADMAP_VIEW')
@@ -85,7 +80,7 @@ class RoadmapModule(Component):
             self.render_ics(req, db, milestones)
             return
 
-        add_stylesheet(req, 'css/roadmap.css')
+        add_stylesheet(req, 'common/css/roadmap.css')
 
         # FIXME should use the 'webcal:' scheme, probably
         username = None

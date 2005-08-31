@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -38,6 +33,19 @@ from trac.wiki.api import WikiSystem, IWikiChangeListener, IWikiMacroProvider
 
 __all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline']
 
+#
+# Customization of the Wiki syntax  ***use with care***
+#
+BOLDITALIC_TOKEN = "'''''"
+BOLD_TOKEN = "'''"
+ITALIC_TOKEN = "''"
+UNDERLINE_TOKEN = "__"
+STRIKE_TOKEN = "~~"
+SUBSCRIPT_TOKEN = ",,"
+SUPERSCRIPT_TOKEN = r"\^"
+INLINE_TOKEN = "`"
+
+LINK_SCHEME = r"[\w.+-]+" # as per RFC 2396
 
 def system_message(msg, text):
     return """<div class="system-message">
@@ -107,7 +115,7 @@ class WikiProcessor(object):
                 return macro_provider.render_macro(req, source, facet,
                                                    self.name, text)
 
-    def _mimeview_processor(self, req, source, text):
+    def _mimeview_processor(self, req, source, facet, text):
         return Mimeview(self.env).render(req, self.name, text)
 
     def process(self, req, source, facet, text, inline=False):
@@ -131,24 +139,31 @@ class Formatter(object):
     flavor = 'default'
 
     # Rules provided by IWikiSyntaxProviders are inserted between pre_rules and post_rules
-    _pre_rules = [r"(?P<bolditalic>''''')",
-                  r"(?P<bold>''')",
-                  r"(?P<italic>'')",
-                  r"(?P<underline>!?__)",
-                  r"(?P<strike>!?~~)",
-                  r"(?P<subscript>!?,,)",
-                  r"(?P<superscript>!?\^)",
+    _pre_rules = [r"(?P<bolditalic>%s)" % BOLDITALIC_TOKEN,
+                  r"(?P<bold>%s)" % BOLD_TOKEN,
+                  r"(?P<italic>%s)" % ITALIC_TOKEN,
+                  r"(?P<underline>!?%s)" % UNDERLINE_TOKEN,
+                  r"(?P<strike>!?%s)" % STRIKE_TOKEN,
+                  r"(?P<subscript>!?%s)" % SUBSCRIPT_TOKEN,
+                  r"(?P<superscript>!?%s)" % SUPERSCRIPT_TOKEN,
                   r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
-                  r"(?P<inlinecode2>!?`(?P<inline2>.*?)`)",
+                  r"(?P<inlinecode2>!?%s(?P<inline2>.*?)%s)" % (INLINE_TOKEN,
+                                                                INLINE_TOKEN),
                   r"(?P<htmlescapeentity>!?&#\d+;)"]
-    _post_rules = [r"(?P<shref>!?((?P<sns>\w+):(?P<stgt>'[^']+'|\"[^\"]+\"|((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))",
-                   r"(?P<lhref>(?<![\[!])\[(?:(?P<lns>\w+):(?P<ltgt>[^\] ]+)|(?P<rel>[/.][^ [\]]*))(?: (?P<label>.*?))?\])",
-                   r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)(\]\]|\((?P<macroargs>.*?)\)\]\]))",
+    _post_rules = [(r"(?P<shref>!?((?P<sns>%s):" % LINK_SCHEME +
+                    r"(?P<stgt>'[^']+'|\"[^\"]+\"|"
+                    r"((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))"),
+                   (r"(?P<lhref>!?\[(?:(?P<lns>%s):" % LINK_SCHEME +
+                    r"(?P<ltgt>'[^']+'|\"[^\"]+\"|[^\] ]+)"
+                    r"|(?P<rel>[/.][^ [\]]*))"
+                    r"(?: (?P<label>.*?))?\])"),
+                   (r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)"
+                    r"(\]\]|\((?P<macroargs>.*?)\)\]\]))"),
                    r"(?P<heading>^\s*(?P<hdepth>=+)\s.*\s(?P=hdepth)\s*$)",
                    r"(?P<list>^(?P<ldepth>\s+)(?:\*|\d+\.) )",
                    r"(?P<definition>^\s+(.+)::)\s*",
                    r"(?P<indent>^(?P<idepth>\s+)(?=\S))",
-                   r"(?P<last_table_cell>\|\|$)",
+                   r"(?P<last_table_cell>\|\|\s*$)",
                    r"(?P<table_cell>\|\|)"]
 
     _processor_re = re.compile('#\!([\w+-][\w+-/]*)')
@@ -237,6 +252,8 @@ class Formatter(object):
     def _lhref_formatter(self, match, fullmatch):
         ns = fullmatch.group('lns')
         target = fullmatch.group('ltgt') 
+        if target and target[0] in "'\"":
+            target = target[1:-1]
         label = fullmatch.group('label') or target
         rel = fullmatch.group('rel')
         if rel:
@@ -250,7 +267,7 @@ class Formatter(object):
         ns = self.env.config.get('intertrac', ns.upper(), ns)
         if ns in wiki.link_resolvers:
             return wiki.link_resolvers[ns](self, ns, target, label)
-        elif target[:2] == '//' or ns == "mailto":
+        elif target.startswith('//') or ns == "mailto":
             return self._make_ext_link(ns+':'+target, label)
         else:
             intertrac = self._make_intertrac_link(ns, target, label)
@@ -265,7 +282,14 @@ class Formatter(object):
 
     def _make_intertrac_link(self, ns, target, label):
         if self.env.siblings.has_key(ns):
-            ref = wiki_to_oneliner(target, self.env.siblings[ns])
+            sibling = self.env.siblings[ns]
+            if not hasattr(sibling, 'href'):
+                from trac.web.href import Href
+                def xchg_base(base):
+                    return '/'.join(base.split('/')[:-1] + [ns])
+                sibling.href = Href(xchg_base(self.env.href.base))
+                sibling.abs_href = Href(xchg_base(self.env.abs_href.base))
+            ref = wiki_to_oneliner(target, sibling)
             return ref.replace('>%s' % target, '>%s' % label)
         url = self.env.config.get('intertrac', ns.upper()+'.url')
         if url:
@@ -293,8 +317,8 @@ class Formatter(object):
     def _make_interwiki_link(self, ns, target, label):
         interwiki = InterWikiMap(self.env)
         if interwiki.has_key(ns):
-            return self._make_ext_link(interwiki.url(ns, target), label,
-                                       '%s in %s' % (target, ns))
+            url, title = interwiki.url(ns, target)
+            return self._make_ext_link(url, label, '%s in %s' % (target, title))
         else:
             return None
 
@@ -739,11 +763,14 @@ class InterWikiMap(Component):
     implements(IWikiChangeListener, IWikiMacroProvider)
 
     _page_name = 'InterMapTxt'
-    _interwiki_re = re.compile(r"(\w+)[ \t]+(.*)[ \t]*$",re.UNICODE)
+    _interwiki_re = re.compile(r"(\w+)[ \t]+([^ \t]+)(?:[ \t]+#(.*))?",
+                               re.UNICODE)
     _argspec_re = re.compile(r"\$\d")
 
     def __init__(self):
         self._interwiki_map = None
+        # This dictionary maps upper-cased namespaces
+        # to (namespace, prefix, title) values
 
     def has_key(self, ns):
         if not self._interwiki_map:
@@ -751,16 +778,16 @@ class InterWikiMap(Component):
         return self._interwiki_map.has_key(ns.upper())
 
     def url(self, ns, target):
-        url = self._interwiki_map[ns.upper()][1]
+        ns, url, title = self._interwiki_map[ns.upper()]
         args = target.split(':')
         def setarg(match):
             num = int(match.group()[1:])
             return 0 < num <= len(args) and args[num-1] or ''
         url2 = re.sub(InterWikiMap._argspec_re, setarg, url)
         if url2 == url: 
-            return url + target
+            return url + target, title
         else:
-            return url2
+            return url2, title
 
     # IWikiChangeListener methods
 
@@ -788,8 +815,11 @@ class InterWikiMap(Component):
                 else:
                     m = re.match(InterWikiMap._interwiki_re, line)
                     if m:
-                        prefix, url = m.groups()
-                        self._interwiki_map[prefix.upper()] = (prefix, url.strip())
+                        prefix, url, title = m.groups()
+                        url = url.strip()
+                        title = title and title.strip() or prefix
+                        self._interwiki_map[prefix.upper()] = (prefix, url,
+                                                               title)
             elif line.startswith('----'):
                 in_map = True
 
@@ -799,7 +829,7 @@ class InterWikiMap(Component):
         yield 'InterWiki'
 
     def get_macro_description(self, name): 
-        yield 'Provide a description list for the known InterWiki prefixes.'
+        return "Provide a description list for the known InterWiki prefixes."
 
     def render_macro(self, req, source, facet, name, content):
         if not self._interwiki_map:
@@ -809,9 +839,8 @@ class InterWikiMap(Component):
         buf = StringIO()
         buf.write('<dl>')
         for k in keys:
-            prefix, url = self._interwiki_map[k]
-            buf.write('<dt><a href="%(url)sRecentChanges">%(prefix)s</a></dt>'
-                      '<dd><a href="%(url)s">%(url)s</a></dd>' \
-                      % {'url':url, 'prefix':prefix})
+            prefix, url, title = self._interwiki_map[k]
+            buf.write('<dt><a href="%s">%s</a></dt>'
+                      '<dd>%s</dd>' % (url, prefix, title))
         buf.write('</dl>')
         return buf.getvalue()

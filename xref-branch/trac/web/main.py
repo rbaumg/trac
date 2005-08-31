@@ -3,274 +3,88 @@
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
 # Copyright (C) 2005 Matthew Good <trac@matt-good.net>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
-# Author: Matthew Good <trac@matt-good.net>
+#         Matthew Good <trac@matt-good.net>
 
-import mimetypes
 import os
-import os.path
 
 from trac.core import *
 from trac.env import open_environment
 from trac.perm import PermissionCache, PermissionError
-from trac.util import escape, http_date, TRUE, enum, href_join
+from trac.util import escape, enum
+from trac.web.api import absolute_url, Request, RequestDone, IAuthenticator, \
+                         IRequestHandler
+from trac.web.chrome import Chrome
+from trac.web.clearsilver import HDFWrapper
 from trac.web.href import Href
 from trac.web.session import Session
 
+# Environment cache for multithreaded front-ends:
 try:
     import threading
 except ImportError:
-    import dummy_threading as threading
+    has_threads = False
+else:
+    has_threads = True
+    env_cache = {}
+    env_cache_lock = threading.Lock()
 
+def _open_environment(env_path, threaded=True):
+    if not has_threads or not threaded:
+        return open_environment(env_path)
 
-class RequestDone(Exception):
-    """
-    Marker exception that indicates whether request processing has completed
-    and a response was sent.
-    """
-
-
-class Request(object):
-    """
-    This class is used to abstract the interface between different frontends.
-
-    Trac modules must use this interface. It is not allowed to have
-    frontend (cgi, tracd, mod_python) specific code in the modules.
-    """
-
-    method = None
-    scheme = None
-    server_name = None
-    server_port = None
-    remote_addr = None
-    remote_user = None
-
-    args = None
-    hdf = None
-    authname = None
-    perm = None
-    session = None
-    _headers = None # additional headers to send
-
-    def __init__(self):
-        import Cookie
-        self.incookie = Cookie.SimpleCookie()
-        self.outcookie = Cookie.SimpleCookie()
-        self._headers = []
-
-    def get_header(self, name):
-        """
-        Return the value of the specified HTTP header, or `None` if there's no
-        such header in the request.
-        """
-        raise NotImplementedError
-
-    def send_response(self, code):
-        """
-        Set the status code of the response.
-        """
-        raise NotImplementedError
-
-    def send_header(self, name, value):
-        """
-        Send the response header with the specified name and value.
-        """
-        raise NotImplementedError
-
-    def end_headers(self):
-        """
-        Must be called after all headers have been sent and before the actual
-        content is written.
-        """
-        raise NotImplementedError
-
-    def check_modified(self, timesecs, extra=''):
-        """
-        Check the request "If-None-Match" header against an entity tag generated
-        from the specified last modified time in seconds (`timesecs`),
-        optionally appending an `extra` string to indicate variants of the
-        requested resource.
-
-        If the generated tag matches the "If-None-Match" header of the request,
-        this method sends a "304 Not Modified" response to the client.
-        Otherwise, it adds the entity tag as as "ETag" header to the response so
-        that consequetive requests can be cached.
-        """
-        etag = 'W"%s/%d/%s"' % (self.authname, timesecs, extra)
-        inm = self.get_header('If-None-Match')
-        if (not inm or inm != etag):
-            self._headers.append(('ETag', etag))
-        else:
-            self.send_response(304)
-            self.end_headers()
-            raise RequestDone()
-
-    def redirect(self, url):
-        """
-        Send a redirect to the client, forwarding to the specified URL. The
-        `url` may be relative or absolute, relative URLs will be translated
-        appropriately.
-        """
-        if self.session:
-            self.session.save() # has to be done before the redirect is sent
-        self.send_response(302)
-        if not url.startswith('http://') and not url.startswith('https://'):
-            # Make sure the URL is absolute
-            url = absolute_url(self, url)
-        self.send_header('Location', url)
-        self.send_header('Content-Type', 'text/plain')
-        self.send_header('Pragma', 'no-cache')
-        self.send_header('Cache-control', 'no-cache')
-        self.send_header('Expires', 'Fri, 01 Jan 1999 00:00:00 GMT')
-        cookies = self.outcookie.output(header='')
-        for cookie in cookies.splitlines():
-            self.send_header('Set-Cookie', cookie.strip())
-        self.end_headers()
-        self.write('Redirecting...')
-        raise RequestDone()
-
-    def display(self, template, content_type='text/html', response=200):
-        """
-        Render the response using the ClearSilver template given by the
-        `template` parameter, which can be either the name of the template file,
-        or an already parsed `neo_cs.CS` object.
-        """
-        assert self.hdf, 'HDF dataset not available'
-        if self.args.has_key('hdfdump'):
-            # FIXME: the administrator should probably be able to disable HDF
-            #        dumps
-            content_type = 'text/plain'
-            data = str(self.hdf)
-        else:
-            data = self.hdf.render(template)
-
-        self.send_response(response)
-        self.send_header('Cache-control', 'must-revalidate')
-        self.send_header('Expires', 'Fri, 01 Jan 1999 00:00:00 GMT')
-        self.send_header('Content-Type', content_type + ';charset=utf-8')
-        self.send_header('Content-Length', len(data))
-        for name, value in self._headers:
-            self.send_header(name, value)
-        cookies = self.outcookie.output(header='')
-        for cookie in cookies.splitlines():
-            self.send_header('Set-Cookie', cookie.strip())
-        self.end_headers()
-
-        if self.method != 'HEAD':
-            self.write(data)
-
-        raise RequestDone
-
-    def send_file(self, path, mimetype=None):
-        """
-        Send a local file to the browser. This method includes the
-        "Last-Modified", "Content-Type" and "Content-Length" headers in the
-        response, corresponding to the file attributes. It also checks the last
-        modification time of the local file against the "If-Modified-Since"
-        provided by the user agent, and sends a "304 Not Modified" response if
-        it matches.
-        """
-        if not os.path.isfile(path):
-            raise TracError, "File %s not found" % path
-
-        stat = os.stat(path)
-        last_modified = http_date(stat.st_mtime)
-        if last_modified == self.get_header('If-Modified-Since'):
-            self.send_response(304)
-            self.end_headers()
-            raise RequestDone
-
-        self.send_response(200)
-        if not mimetype:
-            mimetype = mimetypes.guess_type(path)[0]
-        self.send_header('Content-Type', mimetype)
-        self.send_header('Content-Length', stat.st_size)
-        self.send_header('Last-Modified', last_modified)
-        self.end_headers()
-
-        if self.method != 'HEAD':
-            try:
-                fd = open(path, 'rb')
-                while True:
-                    data = fd.read(4096)
-                    if not data:
-                        break
-                    self.write(data)
-            finally:
-                fd.close()
-
-        raise RequestDone
-
-    def read(self, size):
-        """
-        Read the specified number of bytes from the request body.
-        """
-        raise NotImplementedError
-
-    def write(self, data):
-        """
-        Write the given data to the response body.
-        """
-        raise NotImplementedError
-
-
-class IRequestHandler(Interface):
-    """
-    Extension point interface for request handlers.
-    """
-
-    def match_request(req):
-        """
-        Return whether the handler wants to process the given request.
-        """
-
-    def process_request(req):
-        """
-        Process the request. Should return a (template_name, content_type)
-        tuple, where `template` is the ClearSilver template to use (either
-        a `neo_cs.CS` object, or the file name of the template), and
-        `content_type` is the MIME type of the content. If `content_type` is
-        `None`, "text/html" is assumed.
-
-        Note that if template processing should not occur, this method can
-        simply send the response itself and not return anything.
-        """
+    global env_cache, env_cache_lock
+    env = None
+    env_cache_lock.acquire()
+    try:
+        if not env_path in env_cache:
+            env_cache[env_path] = open_environment(env_path)
+        env = env_cache[env_path]
+    finally:
+        env_cache_lock.release()
+    return env
 
 
 class RequestDispatcher(Component):
-    """
-    Component responsible for dispatching requests to registered handlers.
-    """
+    """Component responsible for dispatching requests to registered handlers."""
 
+    authenticators = ExtensionPoint(IAuthenticator)
     handlers = ExtensionPoint(IRequestHandler)
 
+    def authenticate(self, req):
+        for authenticator in self.authenticators:
+            authname = authenticator.authenticate(req)
+            if authname:
+                return authname
+        else:
+            return 'anonymous'
+
     def dispatch(self, req):
+        """Find a registered handler that matches the request and let it process
+        it.
+        
+        In addition, this method initializes the HDF data set and adds the web
+        site chrome.
         """
-        Find a registered handler that matches the request and let it process
-        it. In addition, this method initializes the HDF data set and adds the
-        web site chrome.
-        """
-        from trac.web.chrome import Chrome
-        from trac.web.clearsilver import HDFWrapper
+        req.authname = self.authenticate(req)
+        req.perm = PermissionCache(self.env, req.authname)
 
         chrome = Chrome(self.env)
-        req.hdf = HDFWrapper(loadpaths=chrome.get_templates_dirs())
+        req.hdf = HDFWrapper(loadpaths=chrome.get_all_templates_dirs())
         populate_hdf(req.hdf, self.env, req)
+
+        newsession = req.args.has_key('newsession')
+        req.session = Session(self.env, req, newsession)
 
         # Select the component that should handle the request
         chosen_handler = None
@@ -289,18 +103,47 @@ class RequestDispatcher(Component):
             # FIXME: Should return '404 Not Found' to the client
             raise TracError, 'No handler matched request to %s' % req.path_info
 
-        resp = chosen_handler.process_request(req)
-        if resp:
-            template, content_type = resp
-            if not content_type:
-                content_type = 'text/html'
+        try:
+            resp = chosen_handler.process_request(req)
+            if resp:
+                template, content_type = resp
+                if not content_type:
+                    content_type = 'text/html'
 
-            req.display(template, content_type or 'text/html')
+                req.display(template, content_type or 'text/html')
+        finally:
+            # Give the session a chance to persist changes
+            req.session.save()
 
+
+def dispatch_request(path_info, req, env):
+    """Main entry point for the Trac web interface."""
+
+    # Re-parse the configuration file if it changed since the last the time it
+    # was parsed
+    env.config.parse_if_needed()
+
+    base_url = env.config.get('trac', 'base_url')
+    if not base_url:
+        base_url = absolute_url(req)
+    req.base_url = base_url
+    req.path_info = path_info
+
+    env.href = Href(req.cgi_location)
+    env.abs_href = Href(req.base_url)
+
+    db = env.get_db_cnx()
+    try:
+        try:
+            dispatcher = RequestDispatcher(env)
+            dispatcher.dispatch(req)
+        except RequestDone:
+            pass
+    finally:
+        db.close()
 
 def populate_hdf(hdf, env, req=None):
-    """
-    Populate the HDF data set with various information, such as common URLs,
+    """Populate the HDF data set with various information, such as common URLs,
     project information and request-related information.
     """
     from trac import __version__
@@ -354,92 +197,6 @@ def populate_hdf(hdf, env, req=None):
                 hdf['args.%s' % arg] = [v.value for v in req.args[arg]]
             else:
                 hdf['args.%s' % arg] = req.args[arg].value
-
-def absolute_url(req, path=None):
-    """
-    Reconstruct the absolute URL of the given request. If the `path` parameter
-    is specified, the path is appended to the URL. Otherwise, only a URL with
-    the components scheme, host and port is returned.
-    """
-    host = req.get_header('Host')
-    if req.get_header('X-Forwarded-Host'):
-        host = req.get_header('X-Forwarded-Host')
-    if not host:
-        # Missing host header, so reconstruct the host from the
-        # server name and port
-        default_port = {'http': 80, 'https': 443}
-        if req.server_port and req.server_port != default_port[req.scheme]:
-            host = '%s:%d' % (req.server_name, req.server_port)
-        else:
-            host = req.server_name
-    if not path:
-        path = req.cgi_location
-    from urlparse import urlunparse
-    return urlunparse((req.scheme, host, path, None, None, None))
-
-def dispatch_request(path_info, req, env):
-    """
-    Main entry point for the Trac web interface.
-    """
-
-    # Re-parse the configuration file if it changed since the last the time it
-    # was parsed
-    env.config.parse_if_needed()
-
-    base_url = env.config.get('trac', 'base_url')
-    if not base_url:
-        base_url = absolute_url(req)
-    req.base_url = base_url
-    req.path_info = path_info
-
-    env.href = Href(req.cgi_location)
-    env.abs_href = Href(req.base_url)
-
-    db = env.get_db_cnx()
-
-    try:
-        try:
-            from trac.web.auth import Authenticator
-            check_ip = env.config.get('trac', 'check_auth_ip')
-            check_ip = check_ip.strip().lower() in TRUE
-            ignore_case = env.config.get('trac', 'ignore_auth_case')
-            ignore_case = ignore_case.strip().lower() in TRUE
-            authenticator = Authenticator(db, req, check_ip, ignore_case)
-            if path_info == '/logout':
-                authenticator.logout(req)
-                referer = req.get_header('Referer')
-                if referer and not referer.startswith(req.base_url):
-                    # only redirect to referer if the latter is from the same
-                    # instance
-                    referer = None
-                req.redirect(referer or env.href.wiki())
-            elif req.remote_user:
-                authenticator.login(req)
-                if path_info == '/login':
-                    referer = req.get_header('Referer')
-                    if referer and not referer.startswith(req.base_url):
-                        # only redirect to referer if the latter is from the
-                        # same instance
-                        referer = None
-                    req.redirect(referer or env.href.wiki())
-            req.authname = authenticator.authname
-            req.perm = PermissionCache(env, req.authname)
-
-            newsession = req.args.has_key('newsession')
-            req.session = Session(env, db, req, newsession)
-
-            try:
-                dispatcher = RequestDispatcher(env)
-                dispatcher.dispatch(req)
-            finally:
-                # Give the session a chance to persist changes
-                req.session.save()
-
-        except RequestDone:
-            pass
-
-    finally:
-        db.close()
 
 def send_pretty_error(e, env, req=None):
     """Send a "pretty" HTML error page to the client."""
@@ -499,7 +256,7 @@ def send_pretty_error(e, env, req=None):
         req.write('\n')
         req.write(tb.getvalue())
 
-def send_project_index(req, dir, options):
+def send_project_index(req, options, env_paths=None):
     from trac.web.clearsilver import HDFWrapper
 
     if 'TRAC_ENV_INDEX_TEMPLATE' in options:
@@ -518,43 +275,49 @@ def send_project_index(req, dir, options):
         template = req.hdf.parse('''<html>
 <head><title>Available Projects</title></head>
 <body><h1>Available Projects</h1><ul><?cs
- each:project = projects ?><li><a href="<?cs
-  var:project.href ?>"><?cs var:project.name ?></a></li><?cs
+ each:project = projects ?><li><?cs
+  if:project.href ?>
+   <a href="<?cs var:project.href ?>" title="<?cs var:project.description ?>">
+    <?cs var:project.name ?></a><?cs
+  else ?>
+   <small><?cs var:project.name ?>: <em>Error</em> <br />
+   (<?cs var:project.description ?>)</small><?cs
+  /if ?>
+  </li><?cs
  /each ?></ul></body>
 </html>''')
 
+    if not env_paths and 'TRAC_ENV_PARENT_DIR' in options:
+        dir = options['TRAC_ENV_PARENT_DIR']
+        env_paths = [os.path.join(dir, f) for f in os.listdir(dir)]
+
+    href = Href(req.idx_location)
     try:
         projects = []
-        for ids, project in enum(os.listdir(dir)):
-            env_path = os.path.join(dir, project)
+        for env_path in env_paths:
             if not os.path.isdir(env_path):
                 continue
+            env_dir, project = os.path.split(env_path)
             try:
-                env = open_environment(env_path)
-                projects.append({
+                env = _open_environment(env_path)
+                proj = {
                     'name': env.config.get('project', 'name'),
                     'description': env.config.get('project', 'descr'),
-                    'href': href_join(req.idx_location, project)
-                })
-            except TracError, e:
-                raise
-# FIXME how should this be done in a cross-frontend way?
-                #req.log_error('Error opening environment at %s: %s'
-                              #% (env_path, e))
+                    'href': href(project)
+                }
+            except Exception, e:
+                proj = {'name': project, 'description': str(e)}
+            projects.append(proj)
         projects.sort(lambda x, y: cmp(x['name'], y['name']))
         req.hdf['projects'] = projects
 
+        # TODO maybe this should be 404 if index wasn't specifically requested
         req.display(template, response=200)
     except RequestDone:
         pass
 
 
-env_cache = {}
-env_cache_lock = threading.Lock()
-
 def get_environment(req, options, threaded=True):
-    global env_cache, env_cache_lock
-
     if 'TRAC_ENV' in options:
         env_path = options['TRAC_ENV']
     elif 'TRAC_ENV_PARENT_DIR' in options:
@@ -562,25 +325,12 @@ def get_environment(req, options, threaded=True):
         env_name = req.cgi_location.split('/')[-1]
         env_path = os.path.join(env_parent_dir, env_name)
         if not len(env_name) or not os.path.exists(env_path):
-            send_project_index(req, env_parent_dir, options)
             return None
     else:
         raise TracError, \
-              'Missing PythonOption "TracEnv" or "TracEnvParentDir". Trac ' \
-              'requires one of these options to locate the Trac environment(s).' \
-              + str(options)
+              'The environment options "TRAC_ENV" or "TRAC_ENV_PARENT_DIR" ' \
+              'or the mod_python options "TracEnv" or "TracEnvParentDir" ' \
+              'are missing.  Trac requires one of these options to locate ' \
+              'the Trac environment(s).'
 
-    if not threaded:
-        return open_environment(env_path)
-
-    env = None
-    env_cache_lock.acquire()
-    try:
-        if not env_path in env_cache:
-            env_cache[env_path] = open_environment(env_path)
-        env = env_cache[env_path]
-    finally:
-        env_cache_lock.release()
-    return env
-
-
+    return _open_environment(env_path, threaded)

@@ -19,7 +19,8 @@
    if:link.type ?> type="<?cs var:link.type ?>"<?cs /if ?> /><?cs
   /each ?><?cs
  /each ?><style type="text/css"><?cs include:"site_css.cs" ?></style>
- <script src="<?cs var:htdocs_location ?>js/trac.js" type="text/javascript"></script>
+ <script type="text/javascript" src="<?cs
+   var:chrome.href ?>/common/js/trac.js"></script>
 </head>
 <body>
 <?cs include "site_header.cs" ?>
@@ -27,9 +28,10 @@
 
 <div id="header"><?cs
  if:chrome.logo.src ?><a id="logo" href="<?cs
-  var:chrome.logo.link ?>"><img src="<?cs var:chrome.logo.src ?>" width="<?cs
-  var:chrome.logo.width ?>" height="<?cs var:chrome.logo.height ?>" alt="<?cs
-  var:chrome.logo.alt ?>" /></a><hr /><?cs
+  var:chrome.logo.link ?>"><img src="<?cs var:chrome.logo.src ?>"<?cs
+  if:chrome.logo.width ?> width="<?cs var:chrome.logo.width ?>"<?cs /if ?><?cs
+  if:chrome.logo.height ?> height="<?cs var:chrome.logo.height ?>"<?cs
+  /if ?> alt="<?cs var:chrome.logo.alt ?>" /></a><hr /><?cs
  elif:project.name ?><h1><a href="<?cs var:chrome.logo.link ?>"><?cs
   var:project.name ?></a></h1><?cs
  /if ?></div>

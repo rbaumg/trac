@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004, 2005 Edgewall Software
+# Copyright (C) 2004-2005 Edgewall Software
 # Copyright (C) 2004 Daniel Lundin <daniel@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Daniel Lundin <daniel@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -40,10 +35,9 @@ class Session(dict):
     db = None
     _old = {}
 
-    def __init__(self, env, db, req, newsession=0):
+    def __init__(self, env, req, newsession=False):
         dict.__init__(self)
         self.env = env
-        self.db = db
         self.req = req
         self.sid = None
         self._old = {}
@@ -66,7 +60,8 @@ class Session(dict):
         self.req.outcookie[COOKIE_KEY]['expires'] = expires
 
     def get_session(self, sid, authenticated=False):
-        cursor = self.db.cursor()
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
         self.sid = sid
         cursor.execute("SELECT var_name,var_value FROM session "
                        "WHERE sid=%s AND authenticated=%s",
@@ -86,7 +81,8 @@ class Session(dict):
         assert new_sid, 'Session ID cannot be empty'
         if new_sid == self.sid:
             return
-        cursor = self.db.cursor()
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
         cursor.execute("SELECT sid FROM session WHERE sid=%s "
                        "AND authenticated=0", (new_sid,))
         if cursor.fetchone():
@@ -96,7 +92,7 @@ class Session(dict):
         self.env.log.debug('Changing session ID %s to %s' % (self.sid, new_sid))
         cursor.execute("UPDATE session SET sid=%s WHERE sid=%s "
                        "AND authenticated=0", (new_sid, self.sid))
-        self.db.commit()
+        db.commit()
         self.sid = new_sid
         self.bake_cookie()
 
@@ -110,7 +106,8 @@ class Session(dict):
 
         self.env.log.debug('Promoting anonymous session %s to authenticated '
                            'session for user %s' % (sid, self.req.authname))
-        cursor = self.db.cursor()
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
         cursor.execute("SELECT COUNT(*) FROM session WHERE sid=%s "
                        "AND authenticated=1", (self.req.authname,))
         if cursor.fetchone()[0]:
@@ -120,7 +117,7 @@ class Session(dict):
             cursor.execute("UPDATE session SET sid=%s,authenticated=1 "
                            "WHERE sid=%s AND authenticated=0",
                            (self.req.authname, sid))
-        self.db.commit()
+        db.commit()
         self.bake_cookie(0) # expire the cookie
 
     def save(self):
@@ -145,7 +142,8 @@ class Session(dict):
             if len(self.items()) == 1:
                 del self['last_visit']
 
-        cursor = self.db.cursor()
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
         authenticated = int(self.req.authname != 'anonymous')
 
         # Find all new or modified session variables and persist their values to
@@ -188,4 +186,4 @@ class Session(dict):
                            "var_name='last_visit' AND var_value < %s)",
                            (mintime,))
 
-            self.db.commit()
+            db.commit()

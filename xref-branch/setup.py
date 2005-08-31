@@ -50,10 +50,9 @@ __default_macros_dir__ = %(macros)r
 
          # Run actual install
          install.run(self)
-
          print
          print "Thank you for choosing Trac %s. Enjoy your stay!" % VERSION
-         print trac.__credits__
+         print
 
 class my_install_scripts (install_scripts):
     def initialize_options (self):
@@ -168,6 +167,7 @@ class generic_bdist_rpm(bdist_rpm):
         self.packager = "Edgewall Software <info@edgewall.com>"
         for x in rpm_distros[self.distro].keys():
             setattr(self, x, rpm_distros[self.distro][x])
+        self.install_script = "scripts/rpm-install.sh"
 
     def run(self):
         bdist_rpm.run(self)
@@ -210,7 +210,8 @@ facilities.
       license=LICENSE,
       url=URL,
       packages=['trac', 'trac.mimeview', 'trac.scripts', 'trac.ticket',
-                'trac.upgrades', 'trac.versioncontrol', 'trac.web',
+                'trac.upgrades', 'trac.web',
+                'trac.versioncontrol', 'trac.versioncontrol.web_ui', 
                 'trac.wiki'],
       data_files=[(_p('share/trac/templates'), glob('templates/*')),
                   (_p('share/trac/htdocs'), glob(_p('htdocs/*.*')) + [_p('htdocs/README')]),

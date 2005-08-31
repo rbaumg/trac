@@ -1,21 +1,16 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004 Edgewall Software
-# Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2004 Edgewall Software
+# Copyright (C) 2003-2004 Jonas Borgström <jonas@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
@@ -123,42 +118,12 @@ def to_utf8(text, charset='iso-8859-15'):
             u = unicode(text, 'iso-8859-15')
         return u.encode('utf-8')
 
-def href_join(u1, *tail):
-    """Join a list of url components and removes redundant '/' characters"""
-    for u2 in tail:
-        u1 = rstrip(u1, '/') + '/' + lstrip(u2, '/')
-    return u1
-
 def sql_escape(text):
     """
     Escapes the given string so that it can be safely used in an SQL
     statement
     """
     return text.replace("'", "''").replace("\\", "\\\\")
-
-def sql_to_hdf (db, sql, hdf, prefix):
-    """
-    Execute a sql query and insert the first result column
-    into the hdf at the given prefix
-    """
-    cursor = db.cursor()
-    cursor.execute(sql)
-    for idx, row in enum(cursor):
-        hdf['%s.%d.name' % (prefix, idx)] = row[0]
-
-def hdf_add_if_missing(hdf, prefix, value):
-    """Loop through the hdf values and add @value if id doesn't exist"""
-    if not value:
-        return
-    node = hdf.getObj(prefix + '.0')
-    i = 0
-    while node:
-        child = node.child()
-        if child and child.value() == value:
-            return
-        node = node.next()
-        i += 1
-    hdf.setValue(prefix + '.%d.name' % i, value)
 
 def shorten_line(text, maxlen = 75):
     if not text:
@@ -182,18 +147,13 @@ def shorten_line(text, maxlen = 75):
             shortline = text[:i]+' ...'
     return shortline
 
-def quote_cookie_value(path):
-    """
-    Cookie values can not contain " ,;" characters.
-    """
-    return path.replace(' ', '%20').replace(';', '%3B').replace(',', '%3C')
-
 def hex_entropy(bytes=32):
     import md5
     import random
     return md5.md5(str(random.random() + time.time())).hexdigest()[:bytes]
 
 def http_date(t):
+    """Format t as a rfc822 timestamp"""
     t = time.gmtime(t)
     weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',

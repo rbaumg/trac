@@ -2,20 +2,15 @@
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
@@ -34,6 +29,40 @@ from trac.core import TracError
 from trac.util import enum
 
 __all__ = ['get_cnx_pool', 'init_db']
+
+
+class Table(object):
+    """Declare a table in a database schema."""
+
+    def __init__(self, name, key=[]):
+        self.name = name
+        self.columns = []
+        self.indexes = []
+        self.key = key
+        if isinstance(key, (str, unicode)):
+            self.key = [key]
+
+    def __getitem__(self, objs):
+        self.columns = [o for o in objs if isinstance(o, Column)]
+        self.indexes = [o for o in objs if isinstance(o, Index)]
+        return self
+
+class Column(object):
+    """Declare a table column in a database schema."""
+
+    def __init__(self, name, type='text', size=None, unique=False,
+                 auto_increment=False):
+
+        self.name = name
+        self.type = type
+        self.size = size
+        self.auto_increment = auto_increment
+
+class Index(object):
+    """Declare an index for a database schema."""
+
+    def __init__(self, columns):
+        self.columns = columns
 
 
 class IterableCursor(object):
@@ -171,7 +200,7 @@ class ConnectionPool(object):
 
 try:
     import pysqlite2.dbapi2 as sqlite
-    using_pysqlite2 = True
+    have_pysqlite = 2
 
     class PyFormatCursor(sqlite.Cursor):
         def execute(self, sql, args=None):
@@ -182,9 +211,27 @@ try:
             if args:
                 sql = sql % tuple(['?'] * len(args[0]))
             sqlite.Cursor.executemany(self, sql, args or [])
-
+        def _convert_row(self, row):
+            return tuple([(isinstance(v, unicode) and [v.encode('utf-8')] or [v])[0]
+                          for v in row])
+        def fetchone(self):
+            row = sqlite.Cursor.fetchone(self)
+            return row and self._convert_row(row) or None
+        def fetchmany(self, num):
+            rows = sqlite.Cursor.fetchmany(self, num)
+            return rows != None and [self._convert_row(row)
+                                     for row in rows] or None
+        def fetchall(self):
+            rows = sqlite.Cursor.fetchall(self)
+            return rows != None and [self._convert_row(row)
+                                     for row in rows] or None
+                
 except ImportError:
-    using_pysqlite2 = False
+    try:
+        import sqlite
+        have_pysqlite = 1
+    except ImportError:
+        have_pysqlite = 0
 
 
 class SQLiteConnection(ConnectionWrapper):
@@ -193,7 +240,7 @@ class SQLiteConnection(ConnectionWrapper):
     __slots__ = ['cnx']
 
     def __init__(self, path, params={}):
-        global using_pysqlite2
+        assert have_pysqlite > 0
         self.cnx = None
         if path != ':memory:':
             if not os.access(path, os.F_OK):
@@ -202,15 +249,14 @@ class SQLiteConnection(ConnectionWrapper):
             dbdir = os.path.dirname(path)
             if not os.access(path, os.R_OK + os.W_OK) or \
                    not os.access(dbdir, os.R_OK + os.W_OK):
-                raise TracError, 'The web server user requires read _and_ ' \
-                                 'write permission to the database %s and ' \
-                                 'the directory this file is located in.' \
-                                 % path
+                from getpass import getuser
+                raise TracError, 'The user %s requires read _and_ write ' \
+                                 'permission to the database file %s and the ' \
+                                 'directory it is located in.' \
+                                 % (getuser(), path)
 
         timeout = int(params.get('timeout', 10000))
-        if using_pysqlite2:
-            global sqlite
-
+        if have_pysqlite == 2:
             # Convert unicode to UTF-8 bytestrings. This is case-sensitive, so
             # we need two converters
             sqlite.register_converter('text', str)
@@ -219,11 +265,10 @@ class SQLiteConnection(ConnectionWrapper):
             cnx = sqlite.connect(path, detect_types=sqlite.PARSE_DECLTYPES,
                                  check_same_thread=False, timeout=timeout)
         else:
-            import sqlite
             cnx = sqlite.connect(path, timeout=timeout)
         ConnectionWrapper.__init__(self, cnx)
 
-    if using_pysqlite2:
+    if have_pysqlite == 2:
         def cursor(self):
             return self.cnx.cursor(PyFormatCursor)
     else:
@@ -236,7 +281,7 @@ class SQLiteConnection(ConnectionWrapper):
     def like(self):
         return 'LIKE'
 
-    if using_pysqlite2:
+    if have_pysqlite == 2:
         def get_last_id(self, cursor, table, column='id'):
             return cursor.lastrowid
     else:
@@ -249,7 +294,6 @@ class SQLiteConnection(ConnectionWrapper):
             if os.path.exists(path):
                 raise TracError, 'Database already exists at %s' % path
             os.makedirs(os.path.split(path)[0])
-        import sqlite
         cnx = sqlite.connect(path, timeout=int(params.get('timeout', 10000)))
         cursor = cnx.cursor()
         from trac.db_default import schema
@@ -281,6 +325,9 @@ class SQLiteConnection(ConnectionWrapper):
     to_sql = classmethod(to_sql)
 
 
+psycopg = None
+PgSQL = None
+
 class PostgreSQLConnection(ConnectionWrapper):
     """Connection wrapper for PostgreSQL."""
 
@@ -288,10 +335,32 @@ class PostgreSQLConnection(ConnectionWrapper):
 
     def __init__(self, path, user=None, password=None, host=None, port=None,
                  params={}):
-        from pyPgSQL import libpq, PgSQL
         if path.startswith('/'):
             path = path[1:]
-        cnx = PgSQL.connect('', user, password, host, path, port)
+        # We support both psycopg and PgSQL but prefer psycopg
+        global psycopg
+        global PgSQL
+        if not psycopg and not PgSQL:
+            try:
+                try:
+                    import psycopg2 as psycopg
+                except ImportError:
+                    import psycopg
+            except ImportError:
+                from pyPgSQL import PgSQL
+        if psycopg:
+            dsn = []
+            if path:
+                dsn.append('dbname=' + path)
+            if user:
+                dsn.append('user=' + user)
+            if password:
+                dsn.append('password=' + password)
+            if host:
+                dsn.append('host=' + host)
+            cnx = psycopg.connect(' '.join(dsn))
+        else:
+            cnx = PgSQL.connect('', user, password, host, path, port)
         ConnectionWrapper.__init__(self, cnx)
 
     def cast(self, column, type):
@@ -308,7 +377,6 @@ class PostgreSQLConnection(ConnectionWrapper):
         return cursor.fetchone()[0]
 
     def init_db(cls, **args):
-        from pyPgSQL import libpq, PgSQL
         self = cls(**args)
         cursor = self.cursor()
         from trac.db_default import schema

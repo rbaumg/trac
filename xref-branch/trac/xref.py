@@ -234,7 +234,7 @@ class XRefModule(Component):
         relations_out.sort(lambda x,y: cmp(y['time'], x['time']))
         req.hdf['xref.relations.out'] = relations_out
 
-        add_stylesheet(req, 'css/timeline.css')
+        add_stylesheet(req, 'common/css/timeline.css')
         return 'xref.cs', None
 
 

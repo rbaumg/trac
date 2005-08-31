@@ -2,26 +2,21 @@
 #
 # Copyright (C) 2004 Edgewall Software
 # Copyright (C) 2004 Daniel Lundin <daniel@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Daniel Lundin <daniel@edgewall.com>
-#
-# Syntax highlighting module, based on the SilverCity module.
-# Get it at: http://silvercity.sourceforge.net/
-#
+
+"""Syntax highlighting module, based on the SilverCity module.
+Get it at: http://silvercity.sourceforge.net/
+"""
 
 from __future__ import generators
 
@@ -39,6 +34,8 @@ __all__ = ['SilverCityRenderer']
 types = {
     'text/css':['CSS'],
     'text/html':['HyperText', {'asp.default.language':1}],
+    'application/xml':['XML'],
+    'application/xhtml+xml':['HyperText', {'asp.default.language':1}],
     'application/x-javascript':['CPP'], # Kludgy.
     'text/x-asp':['HyperText', {'asp.default.language':2}],
     'text/x-c++hdr':['CPP'],
@@ -59,11 +56,11 @@ types = {
     'image/svg+xml':['XML']
 }
 
+CRLF_RE = re.compile('\r$', re.MULTILINE)
+
 
 class SilverCityRenderer(Component):
-    """
-    Syntax highlighting based on SilverCity.
-    """
+    """Syntax highlighting based on SilverCity."""
 
     implements(IHTMLPreviewRenderer)
 
@@ -89,6 +86,11 @@ class SilverCityRenderer(Component):
         except (KeyError, AttributeError):
             err = "No SilverCity lexer found for mime-type '%s'." % mimetype
             raise Exception, err
+
+        # SilverCity generates extra empty line against some types of
+        # the line such as comment or #include with CRLF. So we
+        # standardize to LF end-of-line style before call.
+        content = CRLF_RE.sub('', content)
 
         buf = StringIO()
         generator().generate_html(buf, content)

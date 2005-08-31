@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2004 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -60,8 +55,8 @@ class ComponentMeta(type):
     def __new__(cls, name, bases, d):
         """Create the component class."""
         xtnpts = {}
-        for base in [b for b in bases
-                     if hasattr(b, '_extension_points')]:
+        for base in [base for base in bases
+                     if hasattr(base, '_extension_points')]:
             xtnpts.update(base._extension_points)
         for key, value in d.items():
             if isinstance(value, ExtensionPoint):
@@ -80,18 +75,32 @@ class ComponentMeta(type):
             # Allow components to have a no-argument initializer so that
             # they don't need to worry about accepting the component manager
             # as argument and invoking the super-class initializer
-            def maybe_init(self, compmgr, init=d.get('__init__'), cls=new_class):
+            init = d.get('__init__')
+            if not init:
+                # Because we're replacing the initializer, we need to make sure
+                # that any inherited initializers are also called.
+                for init in [b.__init__._original for b in new_class.mro()
+                             if issubclass(b, Component)
+                             and b.__dict__.has_key('__init__')]:
+                    break
+            def maybe_init(self, compmgr, init=init, cls=new_class):
                 if not cls in compmgr.components:
                     compmgr.components[cls] = self
                     if init:
                         init(self)
+            maybe_init._original = init
             setattr(new_class, '__init__', maybe_init)
+
+        if d.get('abstract'):
+            # Don't put abstract component classes in the registry
+            return new_class
 
         ComponentMeta._components.append(new_class)
         for interface in d.get('_implements', []):
-            if not interface in ComponentMeta._registry:
-                ComponentMeta._registry[interface] = []
-            ComponentMeta._registry[interface].append(new_class)
+            ComponentMeta._registry.setdefault(interface, []).append(new_class)
+        for base in [base for base in bases if hasattr(base, '_implements')]:
+            for interface in base._implements:
+                ComponentMeta._registry.setdefault(interface, []).append(new_class)
 
         return new_class
 
@@ -117,7 +126,7 @@ def implements(*interfaces):
 
 class Component(object):
     """Base class for components.
-    
+
     Every component can declare what extension points it provides, as well as
     what extension points of other components it extends.
     """
@@ -129,14 +138,14 @@ class Component(object):
         """
         # If this component is also the component manager, just invoke that
         if issubclass(cls, ComponentManager):
-            self = object.__new__(cls)
+            self = super(Component, cls).__new__(cls)
             self.compmgr = self
             return self
 
         # The normal case where the component is not also the component manager
         compmgr = args[0]
         if not cls in compmgr.components:
-            self = object.__new__(cls)
+            self = super(Component, cls).__new__(cls)
             self.compmgr = compmgr
             compmgr.component_activated(self)
             return self

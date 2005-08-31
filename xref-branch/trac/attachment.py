@@ -1,29 +1,23 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
 
 from __future__ import generators
 import os
-import os.path
 import re
 import shutil
 import time
@@ -34,9 +28,9 @@ from trac.core import *
 from trac.env import IEnvironmentSetupParticipant
 from trac.object import TracObject
 from trac.mimeview import *
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
-from trac.wiki.api import IWikiSyntaxProvider
+from trac.wiki import IWikiSyntaxProvider
 
 
 class Attachment(object):
@@ -214,7 +208,6 @@ class AttachmentModule(Component):
                INavigationContributor, IWikiSyntaxProvider)
 
     CHUNK_SIZE = 4096
-    DISP_MAX_FILE_SIZE = 256 * 1024
 
     # IEnvironmentSetupParticipant methods
 
@@ -278,7 +271,7 @@ class AttachmentModule(Component):
         else:
             self._render_view(req, attachment)
 
-        add_stylesheet(req, 'css/code.css')
+        add_stylesheet(req, 'common/css/code.css')
         return 'attachment.cs', None
 
     # IWikiSyntaxProvider methods
@@ -419,7 +412,11 @@ class AttachmentModule(Component):
                        % (attachment.filename, mimetype))
         fd = attachment.open()
         try:
-            data = fd.read(self.DISP_MAX_FILE_SIZE)
+            max_preview_size = int(self.config.get('mimeviewer',
+                                                   'max_preview_size',
+                                                   '262144'))
+            data = fd.read(max_preview_size)
+            max_size_reached = len(data) == max_preview_size
             charset = detect_unicode(data) or self.config.get('trac',
                                                               'default_charset')
             
@@ -432,9 +429,9 @@ class AttachmentModule(Component):
                 data = util.to_utf8(data, charset)
                 add_link(req, 'alternate', attachment.href(format='txt'),
                          'Plain Text', mimetype)
-            if len(data) >= self.DISP_MAX_FILE_SIZE:
+            if max_size_reached:
                 req.hdf['attachment.max_file_size_reached'] = 1
-                req.hdf['attachment.max_file_size'] = self.DISP_MAX_FILE_SIZE
+                req.hdf['attachment.max_file_size'] = max_preview_size
                 vdata = ''
             else:
                 mimeview = Mimeview(self.env)
@@ -446,29 +443,33 @@ class AttachmentModule(Component):
 
     def _format_link(self, formatter, ns, link, label):
         ids = link.split(':', 2)
+        params = ''
         if len(ids) == 3:
             parent_type, parent_id, filename = ids
         else:
-            # FIXME: the formatter should know to which object belongs
-            #        the text being formatted
-            #        (this info will also be required for TracCrossReferences)
-            # Kludge for now: try to get the source object from the 
-            #                 request's path_info, or revert to sane defaults
+            # FIXME: the formatter should know which object the text being
+            #        formatter belongs to
             parent_type, parent_id = 'wiki', 'WikiStart'
             if formatter.req:
-                path_info = formatter.req.path_info.split('/',2)
+                path_info = formatter.req.path_info.split('/', 2)
                 if len(path_info) > 1:
                     parent_type = path_info[1]
                 if len(path_info) > 2:
                     parent_id = path_info[2]
-            filename = link
+            idx = link.find('?')
+            if idx < 0:
+                filename = link
+            else:
+                filename = link[:idx]
+                params = link[idx:]
         try:
             # FIXME: source = formatter.source
             source = TracObject.factory(self.env, parent_type, parent_id)
             attachment = Attachment(source, filename)
-            return '<a class="attachment" title="%s" href="%s">%s</a>' \
-                   % ('Attachment ' + attachment.title,
-                      attachment.href(), label)
+            return '<a class="attachment" title="Attachment %s" href="%s">%s</a>' \
+                   % (util.escape(attachment.title),
+                      util.escape(attachment.href() + params),
+                      util.escape(label))
         except TracError:
             return '<a class="missing attachment" href="%s" rel="nofollow">%s</a>' \
                    % (self.env.href.wiki(), label)

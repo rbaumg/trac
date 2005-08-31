@@ -1,40 +1,36 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
+#         Christian Boos <cboos@neuf.fr>
 
 from __future__ import generators
 import time
 import re
 import posixpath
+from urllib import urlencode
 
 from trac import mimeview, util
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet
-from trac.web.main import IRequestHandler
-from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
-
+from trac.wiki import wiki_to_html, IWikiSyntaxProvider
 
 class DiffArgs(dict):
     def __getattr__(self,str):
@@ -50,28 +46,56 @@ class ChangesPermission(Component):
         return ['CHANGESET_VIEW']
     
 
-class DiffMixin(object):
+class AbstractDiffModule(Component):
+    """Provide flexible functionality for showing sets of differences.
+
+    If the differences shown are coming from a specific changeset,
+    then that changeset informations can be shown too.
+
+    In addition, it is possible to show only a subset of the changeset:
+    Only the changes affecting a given path will be shown.
+    This is called the ''restricted'' changeset.
+
+    But the differences can also be computed in a more general way,
+    between two arbitrary paths and/or between two arbitrary revisions.
+    In that case, there's no changeset information displayed.
+    """
+
+    abstract = True
+
+    implements(IRequestHandler)
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        raise NotImplementedError
+
     def process_request(self, req):
-        """
-        There are different request parameters combinations,
-        which corresponds to different (chgset,restricted) pairs:
-         * only the path: latest changeset for that path
-           (chgset=True,restricted=False)
-         * the path and the rev: changeset for that path in that revision
-           (chgset=True,restricted=True)
-         * the path, old and new: diffs from path@old to path@new
-           (chgset=False,restricted=True)
-         * the old_path, old, path and new: diffs from old_path@old to path@new
-           (chgset=False,restricted=False)
-           
+        """The appropriate mode of operation is inferred from
+        the request parameters:
+         * If `old` and `new` parameters are given, it will be an
+           arbitrary set of differences: `chgset` is False.
+           * If `old_path` is given and is different from `path`,
+             it's a generalized diff, from `old_path@old`
+             to `path@new`: `restricted` is False.
+           * Otherwise those are differences between two arbitrary revisions
+             of a given path: `restricted` is True.
+         * Otherwise, we are dealing with a changeset only: `chgset` is True.
+           * If the `path` is not empty or not the root, then only
+             the changes affecting that path (i.e. itself, children or
+             ancestors) will be considered: `restricted` is True.
+           * Otherwise, it's the full changeset: `restricted` is False.
+         
         In any case, the given path@rev pair must exist.
         """
+        req.perm.assert_permission('CHANGESET_VIEW')
+        
         # -- retrieve arguments
         path = req.args.get('path')
-        rev = req.args.get('rev')       # ''Last changes'' mode
-        old = req.args.get('old')       # ''Arbitrary Diff'' mode
+        rev = req.args.get('rev')
+        old = req.args.get('old')
         new = req.args.get('new')
-        old_path = req.args.get('old_path', path)
+        old_path = req.args.get('old_path')
 
         # -- normalize and check for special case
         repos = self.env.get_repository(req.authname)
@@ -79,30 +103,27 @@ class DiffMixin(object):
         rev = repos.normalize_rev(rev)
         old_path = repos.normalize_path(old_path)
         
-        if old_path == path and old and old == new: # ''Last Changes'' mode
+        if old_path == path and old and old == new: # revert to Changeset
             rev = old
             old_path = old = new = None
 
         diff_options = get_diff_options(req)
 
-        # -- setup the view mode (chgset,restricted)
+        # -- setup the `chgset` and `restricted` flags, see docstring above.
         chgset = not old and not new and not old_path
-        if chgset:                      # -- ''Arbitrary Diff'' mode
+        if chgset:
             restricted = path != '' and path != '/' # (subset or not)
-        else:                           # -- ''Last Changes'' mode
+        else:
             restricted = old_path == path # (same path or not)
 
         # -- redirect if changing the diff options
         if req.args.has_key('update'):
             if chgset:
                 if restricted:
-                    print 'redirect restricted'
                     req.redirect(self.env.href.diff(path, rev=rev))
                 else:
-                    print 'redirect chgset'
                     req.redirect(self.env.href.changeset(rev))
             else:
-                print 'redirect diff'
                 req.redirect(self.env.href.diff(path, new=new,
                                                 old_path=old_path, old=old))
 
@@ -166,14 +187,17 @@ class DiffMixin(object):
         if chgset:
             diff_params = 'rev=%s' % rev
         else:
-            diff_params = 'new=%s&old_path=%s&old=%s' % (new, old_path, old)
+            diff_params = urlencode({'path': path,
+                                     'new': new,
+                                     'old_path': old_path,
+                                     'old': old})
         add_link(req, 'alternate', '?format=diff&'+diff_params, 'Unified Diff',
                  'text/plain', 'diff')
         add_link(req, 'alternate', '?format=zip&'+diff_params, 'Zip Archive',
                  'application/zip', 'zip')
-        add_stylesheet(req, 'css/changeset.css')
-        add_stylesheet(req, 'css/diff.css')
-        add_stylesheet(req, 'css/code.css')
+        add_stylesheet(req, 'common/css/changeset.css')
+        add_stylesheet(req, 'common/css/diff.css')
+        add_stylesheet(req, 'common/css/code.css')
         return 'diff.cs', None
 
 
@@ -232,7 +256,8 @@ class DiffMixin(object):
                     prev = repos.get_node(path, rev).get_previous()
                     if prev:
                         prev_path, prev_rev = prev[:2]
-                        prev_href = self.env.href.diff(prev_path, rev=prev_rev)
+                        prev_href = self.env.href.changeset(prev_rev,
+                                                            path=prev_path)
                     else:
                         prev_path = prev_rev = None
                 else:
@@ -251,7 +276,8 @@ class DiffMixin(object):
                 else:
                     next_rev = repos.next_rev(chgset.rev)
                     next_href = self.env.href.changeset(next_rev)
-                    add_link(req, 'last', self.env.href.diff(path, rev=youngest_rev),
+                    add_link(req, 'last',
+                             self.env.href.diff(path, rev=youngest_rev),
                              'Changeset %s' % youngest_rev)
                 if next_rev:
                     add_link(req, 'next', next_href, _changeset_title(next_rev))
@@ -295,6 +321,10 @@ class DiffMixin(object):
                 info['browser_href.new'] = new_href
             return info
 
+        hidden_properties = [p.strip() for p
+                             in self.config.get('browser', 'hide_properties',
+                                                'svk:merge').split(',')]
+
         def _prop_changes(old_node, new_node):
             old_props = old_node.get_properties()
             new_props = new_node.get_properties()
@@ -308,6 +338,9 @@ class DiffMixin(object):
                 for k,v in new_props.items():
                     if not k in old_props:
                         changed_props[k] = {'new': v}
+                for k in hidden_properties:
+                    if k in changed_props:
+                        del changed_props[k]
             return changed_props
 
         def _content_changes(old_node, new_node):
@@ -333,8 +366,9 @@ class DiffMixin(object):
 
             if old_content != new_content:
                 context = 3
-                for option in diff_options[1]:
-                    if option[:2] == '-U':
+                options = diff_options[1]
+                for option in options:
+                    if option.startswith('-U'):
                         context = int(option[2:])
                         break
                 tabwidth = int(self.config.get('diff', 'tab_width',
@@ -343,9 +377,9 @@ class DiffMixin(object):
                 return hdf_diff(old_content.splitlines(),
                                 new_content.splitlines(),
                                 context, tabwidth,
-                                ignore_blank_lines='-B' in diff_options[1],
-                                ignore_case='-i' in diff_options[1],
-                                ignore_space_changes='-b' in diff_options[1])
+                                ignore_blank_lines='-B' in options,
+                                ignore_case='-i' in options,
+                                ignore_space_changes='-b' in options)
             else:
                 return []
 
@@ -417,10 +451,13 @@ class DiffMixin(object):
 
             if old_content != new_content:
                 context = 3
-                for option in diff_options[1]:
-                    if option[:2] == '-U':
+                options = diff_options[1]
+                for option in options:
+                    if option.startswith('-U'):
                         context = int(option[2:])
                         break
+                if not old_node_info[0]:
+                    old_node_info = new_node_info # support for 'A'dd changes
                 req.write('Index: ' + new_path + util.CRLF)
                 req.write('=' * 67 + util.CRLF)
                 req.write('--- %s (revision %s)' % old_node_info +
@@ -429,9 +466,9 @@ class DiffMixin(object):
                           util.CRLF)
                 for line in unified_diff(old_content.splitlines(),
                                          new_content.splitlines(), context,
-                                         ignore_blank_lines='-B' in diff_options[1],
-                                         ignore_case='-i' in diff_options[1],
-                                         ignore_space_changes='-b' in diff_options[1]):
+                                         ignore_blank_lines='-B' in options,
+                                         ignore_case='-i' in options,
+                                         ignore_space_changes='-b' in options):
                     req.write(line + util.CRLF)
 
     def _render_zip(self, req, filename, repos, diff):
@@ -463,21 +500,18 @@ class DiffMixin(object):
         req.write(buf.getvalue())
 
 
-class DiffModule(Component,DiffMixin):
+class DiffModule(AbstractDiffModule):
 
-    implements(IRequestHandler, IWikiSyntaxProvider)
+    implements(IWikiSyntaxProvider)
 
-    # IRequestHandler methods
+    # (reimplemented) IRequestHandler methods
 
     def match_request(self, req):
         match = re.match(r'/diff(?:(/.*)|$)', req.path_info)
         if match:
-            req.args['path'] = match.group(1)
+            if match.group(1):
+                req.args['path'] = match.group(1)
             return 1
-
-    def process_request(self, req):
-        req.perm.assert_permission('CHANGESET_VIEW')
-        return DiffMixin.process_request(self, req)
 
     # IWikiSyntaxProvider methods
     
@@ -511,3 +545,38 @@ class DiffModule(Component,DiffMixin):
                                    old_path=old_path, old=old_rev)
         return '<a class="changeset" title="%s" href="%s">%s</a>' \
                    % ('Diff', href, label)
+
+
+class AnyDiffModule(Component):
+
+    implements(IRequestHandler)
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        return re.match(r'/anydiff$', req.path_info)
+
+    def process_request(self, req):
+        # -- retrieve arguments
+        new_path = req.args.get('new_path')
+        new_rev = req.args.get('new_rev')
+        old_path = req.args.get('old_path')
+        old_rev = req.args.get('old_rev')
+
+        # -- normalize 
+        repos = self.env.get_repository(req.authname)
+        new_path = repos.normalize_path(new_path)
+        new_rev = repos.normalize_rev(new_rev)
+        old_path = repos.normalize_path(old_path)
+        old_rev = repos.normalize_rev(old_rev)
+
+        # -- prepare rendering
+        req.hdf['anydiff'] = {
+            'new_path': new_path,
+            'new_rev': new_rev,
+            'old_path': old_path,
+            'old_rev': old_rev,
+            'diff_href': self.env.href.diff(),
+            }
+
+        return 'anydiff.cs', None

@@ -1,32 +1,30 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2005 Matthew Good <trac@matt-good.net>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
+#         Matthew Good <trac@matt-good.net>
 #
 # Todo:
 # - External auth using mod_proxy / squid.
 
 from trac import util, __version__
 from trac.env import open_environment
-from trac.web.main import Request, dispatch_request, send_pretty_error
+from trac.web.api import Request
 from trac.web.cgi_frontend import TracFieldStorage
-from trac.web import href
+from trac.web.main import dispatch_request, get_environment, \
+                          send_pretty_error, send_project_index
 
 import os
 import re
@@ -91,7 +89,7 @@ class DigestAuth:
 
     def do_auth(self, req):
         if not 'Authorization' in req.headers or \
-               req.headers['Authorization'][:6] != 'Digest':
+               not req.headers['Authorization'].startswith('Digest'):
             self.send_auth_request(req)
             return None
         auth = self.parse_auth_header(req.headers['Authorization'][7:])
@@ -128,7 +126,7 @@ class TracHTTPServer(ThreadingMixIn, HTTPServer):
 
     projects = None
 
-    def __init__(self, server_address, env_paths, auths):
+    def __init__(self, server_address, env_parent_dir, env_paths, auths):
         HTTPServer.__init__(self, server_address, TracHTTPRequestHandler)
 
         if self.server_port == 80:
@@ -136,22 +134,35 @@ class TracHTTPServer(ThreadingMixIn, HTTPServer):
         else:
             self.http_host = '%s:%d' % (self.server_name, self.server_port)
 
+        self.env_parent_dir = env_parent_dir and {'TRAC_ENV_PARENT_DIR':
+                                                  env_parent_dir}
+        self.auths = auths
+
         self.projects = {}
-        for path in env_paths:
+        siblings = {}
+        for env_path in env_paths:
             # Remove trailing slashes
-            while path and not os.path.split(path)[1]:
-                path = os.path.split(path)[0]
-            project = os.path.split(path)[1]
-            # We assume the projenv filenames follow the following
-            # naming convention: /some/path/project
-            auth = auths.get(project, None)
-            env = open_environment(path)
-            env.href = href.Href('/' + project)
-            env.abs_href = href.Href('http://%s/%s' % (self.http_host, project))
-            env.config.set('trac', 'htdocs_location', '')
-            self.projects[project] = env
-            self.projects[project].auth = auth
-            env.siblings = self.projects
+            while env_path and not os.path.split(env_path)[1]:
+                env_path = os.path.split(env_path)[0]
+            project = os.path.split(env_path)[1]
+            self.projects[project] = env_path
+            env = get_environment(None, self.get_env_opts(project))
+            siblings[project] = env
+        for p in siblings.values():
+            p.siblings = siblings
+
+    def get_env_opts(self, project=None):
+        if self.env_parent_dir:
+            opts = self.env_parent_dir.items()
+        else:
+            opts = [('TRAC_ENV', self.projects[project])]
+        return dict(os.environ.items() + opts) # TODO: backport
+
+    def send_project_index(self, req):
+        if self.env_parent_dir:
+            return send_project_index(req, self.get_env_opts())
+        else:
+            return send_project_index(req, os.environ, self.projects.values())
 
 
 class TracHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -165,6 +176,12 @@ class TracHTTPRequestHandler(BaseHTTPRequestHandler):
     log = None
     project_name = None
 
+    def finish(self):
+        """We need to help the garbage collector a little."""
+        BaseHTTPRequestHandler.finish(self)
+        self.wfile = None
+        self.rfile = None
+
     def do_POST(self):
         self._do_trac_req()
 
@@ -172,41 +189,44 @@ class TracHTTPRequestHandler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def do_GET(self):
-        if self.path[0:13] == '/':
-            self._do_project_index()
-        else:
-            self._do_trac_req()
-
-    def _do_project_index(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/html')
-        self.end_headers()
-        self.wfile.write('<html><head><title>Available Projects</title></head>')
-        self.wfile.write('<body><h1>Available Projects</h1><ul>')
-        for proj in self.server.projects.keys():
-            self.wfile.write('<li><a href="%s">%s</a></li>' % (urllib.quote(proj), proj))
-        self.wfile.write('</ul></body><html>')
+        self._do_trac_req()
 
     def _do_trac_req(self):
+        if self.path == '/':
+            path_info = '/'
+            req = TracHTTPRequest(self, '', '')
+            self.server.send_project_index(req)
+            return
+
         m = self.url_re.findall(self.path)
         if not m:
             self.send_error(400, 'Bad Request')
             return
+
         project_name, path_info, query_string = m[0]
         project_name = urllib.unquote(project_name)
-        if not self.server.projects.has_key(project_name):
-            self.send_error(404, 'Not Found')
-            return
         path_info = urllib.unquote(path_info)
-        env = self.server.projects[project_name]
-
         req = TracHTTPRequest(self, project_name, query_string)
+
+        try:
+            opts = self.server.get_env_opts(project_name)
+        except KeyError:
+            # unrecognized project
+            self.server.send_project_index(req)
+            return
+
+        env = get_environment(req, opts)
+        if not env:
+            self.server.send_project_index(req)
+            return
+
         req.remote_user = None
         if path_info == '/login':
-            if not env.auth:
+            auth = self.server.auths.get(project_name)
+            if not auth:
                 raise util.TracError('Authentication not enabled. '
                                      'Please use the tracd --auth option.\n')
-            req.remote_user = env.auth.do_auth(self)
+            req.remote_user = auth.do_auth(self)
             if not req.remote_user:
                 return
 
@@ -246,6 +266,7 @@ class TracHTTPRequest(Request):
             self.incookie.load(self.__handler.headers['Cookie'])
 
         self.cgi_location = '/' + project_name
+        self.idx_location = '/'
 
         environ = {'REQUEST_METHOD': self.method,
                    'QUERY_STRING': query_string}

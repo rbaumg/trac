@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -27,17 +22,18 @@ import re
 
 from trac import mimeview, util
 from trac.core import *
+from trac.Search import ISearchSource, query_to_sql, shorten_result
 from trac.Timeline import ITimelineEventProvider
 from trac.versioncontrol import Changeset, Node
+from trac.versioncontrol.svn_authz import SubversionAuthorizer
+from trac.web import IRequestHandler
 from trac.web.chrome import INavigationContributor
-from trac.Search import ISearchSource, query_to_sql, shorten_result
-from trac.web.main import IRequestHandler
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
-from trac.Diff import DiffMixin
+from trac.versioncontrol.web_ui.diff import AbstractDiffModule
 
-class ChangesetModule(Component,DiffMixin):
+class ChangesetModule(AbstractDiffModule):
 
-    implements(INavigationContributor, IRequestHandler,
+    implements(INavigationContributor, 
                ITimelineEventProvider, IWikiSyntaxProvider, ISearchSource)
 
     # INavigationContributor methods
@@ -48,17 +44,13 @@ class ChangesetModule(Component,DiffMixin):
     def get_navigation_items(self, req):
         return []
 
-    # IRequestHandler methods
+    # (reimplemented) IRequestHandler methods
 
     def match_request(self, req):
         match = re.match(r'/changeset/([0-9]+)$', req.path_info)
         if match:
             req.args['rev'] = match.group(1)
             return 1
-
-    def process_request(self, req):
-        req.perm.assert_permission('CHANGESET_VIEW')
-        return DiffMixin.process_request(self, req)
 
     # ITimelineEventProvider methods
 
@@ -105,22 +97,18 @@ class ChangesetModule(Component,DiffMixin):
                           message
                 rev = repos.previous_rev(rev)
 
-    # IWikiSyntaxProvider methods
 
+    # IWikiSyntaxProvider methods
+    
     def get_wiki_syntax(self):
-        yield (r"!?\[(?P<it_changeset>[a-zA-Z_-]{0,3})\d+\]|(?:\b|!)r\d+\b",
-               (lambda x, y, z:
-                self._format_link(x, 'changeset',
-                                  y[0] == 'r' and y[1:] or y[1:-1], y, z)))
+        yield (r"!?\[\d+\]|(?:\b|!)r\d+\b", (lambda x, y, z:
+               self._format_link(x, 'changeset',
+                                 y[0] == 'r' and y[1:] or y[1:-1], y)))
 
     def get_link_resolvers(self):
         yield ('changeset', self._format_link)
 
-    def _format_link(self, formatter, ns, rev, label, fullmatch=None):
-        intertrac = formatter.shorthand_intertrac_helper(ns, rev, label,
-                                                         fullmatch)
-        if intertrac:
-            return intertrac
+    def _format_link(self, formatter, ns, rev, label):
         cursor = formatter.db.cursor()
         cursor.execute('SELECT message FROM revision WHERE rev=%s', (rev,))
         row = cursor.fetchone()
@@ -132,7 +120,7 @@ class ChangesetModule(Component,DiffMixin):
             return '<a class="missing changeset" href="%s" rel="nofollow">%s</a>' \
                    % (formatter.href.changeset(rev), label)
 
-    # ISearchProvider methods
+    # ISearchPrivider methods
 
     def get_search_filters(self, req):
         if req.perm.has_permission('CHANGESET_VIEW'):
@@ -141,6 +129,7 @@ class ChangesetModule(Component,DiffMixin):
     def get_search_results(self, req, query, filters):
         if not 'changeset' in filters:
             return
+        authzperm = SubversionAuthorizer(self.env, req.authname)
         db = self.env.get_db_cnx()
         sql = "SELECT rev,time,author,message " \
               "FROM revision WHERE %s OR %s" % \
@@ -149,6 +138,8 @@ class ChangesetModule(Component,DiffMixin):
         cursor = db.cursor()
         cursor.execute(sql)
         for rev, date, author, log in cursor:
+            if not authzperm.has_permission_for_changeset(rev):
+                continue
             yield (self.env.href.changeset(rev),
                    '[%s]: %s' % (rev, util.escape(util.shorten_line(log))),
                    date, author,

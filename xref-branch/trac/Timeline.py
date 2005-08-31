@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -29,8 +24,8 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.util import enum, escape, http_date, shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.web.main import IRequestHandler
 
 
 class ITimelineEventProvider(Interface):
@@ -83,7 +78,7 @@ class TimelineModule(Component):
     # IRequestHandler methods
 
     def match_request(self, req):
-        return req.path_info == '/timeline'
+        return re.match(r'/timeline/?', req.path_info) is not None
 
     def process_request(self, req):
         req.perm.assert_permission('TIMELINE_VIEW')
@@ -148,15 +143,15 @@ class TimelineModule(Component):
 
         # Get the email addresses of all known users
         email_map = {}
-        for username,name,email in self.env.get_known_users():
+        for username, name, email in self.env.get_known_users():
             if email:
                 email_map[username] = email
 
         idx = 0
-        for kind,href,title,date,author,message in events:
+        for kind, href, title, date, author, message in events:
             t = time.localtime(date)
-            event = {'kind': kind, 'title': title,
-                     'author': author or 'anonymous', 'href': href,
+            event = {'kind': kind, 'title': title, 'href': escape(href),
+                     'author': escape(author or 'anonymous'),
                      'date': time.strftime('%x', t),
                      'time': time.strftime('%H:%M', t), 'message': message}
 
@@ -168,10 +163,10 @@ class TimelineModule(Component):
                 if author:
                     # For RSS, author must be an email address
                     if author.find('@') != -1:
-                        event['author.email'] = author
-                    elif author in email_map.keys():
-                        event['author.email'] = email_map[author]
-                event['date'] = http_date(time.mktime(t))
+                        event['author.email'] = escape(author)
+                    elif email_map.has_key(author):
+                        event['author.email'] = escape(email_map[author])
+                event['date'] = http_date(date)
 
             req.hdf['timeline.events.%s' % idx] = event
             idx += 1
@@ -179,7 +174,7 @@ class TimelineModule(Component):
         if format == 'rss':
             return 'timeline_rss.cs', 'application/rss+xml'
 
-        add_stylesheet(req, 'css/timeline.css')
+        add_stylesheet(req, 'common/css/timeline.css')
         rss_href = self.env.href.timeline([(f, 'on') for f in filters],
                                           daysback=90, max=50, format='rss')
         add_link(req, 'alternate', rss_href, 'RSS Feed', 'application/rss+xml',

@@ -1,26 +1,20 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
-#
 
 from __future__ import generators
 try:
@@ -33,7 +27,7 @@ import re
 
 from trac.core import *
 from trac.object import ITracObjectManager
-from trac.util import to_utf8
+from trac.util import to_utf8, TRUE
 
 
 class IWikiChangeListener(Interface):
@@ -120,7 +114,7 @@ class WikiSystem(Component):
         try:
             now = time.time()
             if now > self._last_index_update + WikiSystem.INDEX_UPDATE_INTERVAL:
-                self.log.debug('Updating wiki page index (%s)' % id(self))
+                self.log.debug('Updating wiki page index')
                 db = self.env.get_db_cnx()
                 cursor = db.cursor()
                 cursor.execute("SELECT DISTINCT name FROM wiki")
@@ -237,6 +231,8 @@ class WikiSystem(Component):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
+        ignore_missing = self.config.get('wiki', 'ignore_missing_pages')
+        ignore_missing = ignore_missing in TRUE
         only_one = True
         for wikipagenames in self.wikipagenames_providers:
             if not only_one:
@@ -245,14 +241,18 @@ class WikiSystem(Component):
                                  wikipagenames.__class__.__name__)
             else:
                 yield (wikipagenames.get_wiki_page_names_syntax(),
-                       lambda x, y, z: self._format_link(x, 'wiki', y, y),
+                       lambda x, y, z: self._format_link(x, 'wiki', y, y,
+                                                         ignore_missing),
                        lambda x, y, z: self._parse_link(x, 'wiki', y, y))
                 only_one = False
 
     def get_link_resolvers(self):
-        yield ('wiki', self._format_link, self._parse_link)
+        yield ('wiki', self._format_fancy_link, self._parse_link)
 
-    def _format_link(self, formatter, ns, page, label):
+    def _format_fancy_link(self, f, n, p, l):
+        return self._format_link(f, n, p, l, False)
+
+    def _format_link(self, formatter, ns, page, label, ignore_missing):
         anchor = ''
         if page.find('#') != -1:
             anchor = page[page.find('#'):]
@@ -261,6 +261,8 @@ class WikiSystem(Component):
         label = urllib.unquote(label)
 
         if not self.has_page(page):
+            if ignore_missing:
+                return label
             return '<a class="missing wiki" href="%s" rel="nofollow">%s?</a>' \
                    % (formatter.href.wiki(page) + anchor, label)
         else:
@@ -295,6 +297,11 @@ class WikiSystem(Component):
         return src
 
 
+WIKI_START = r"!?(?<!/)\b"
+WIKI_TARGET = r"(?:#[A-Za-z0-9]+)?"
+WIKI_END = r"(?=\Z|\s|[.,;:!?\)}\]])"
+WIKI_INTERWIKI = r"(?!:\S)"
+
 class StandardWikiPageNames(Component):
     """
     Standard Trac WikiPageNames rule
@@ -303,13 +310,13 @@ class StandardWikiPageNames(Component):
     implements(IWikiPageNameSyntaxProvider)
 
     def get_wiki_page_names_syntax(self):
-        return (r"!?(^|(?<=[^A-Za-z]))"     # where to start
+        return (WIKI_START +                # where to start
                 r"[A-Z][a-z]+"              # initial WikiPageNames word
-                r"(?:[A-Z][a-z]*[a-z/])+"   # additional WikiPageNames word
-                r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
-                r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end
-                r"(?!:\S)")                 # InterWiki support 
-
+                r"(?:[A-Z][a-z]*[a-z/])+" + # additional WikiPageNames word
+                WIKI_TARGET +               # optional trailing section link
+                WIKI_END +                  # where to end
+                WIKI_INTERWIKI)             # InterWiki support
+    
 class FlexibleWikiPageNames(Component):
     """
     Standard Trac WikiPageNames rule, with digits
@@ -326,12 +333,10 @@ class FlexibleWikiPageNames(Component):
     implements(IWikiPageNameSyntaxProvider)
 
     def get_wiki_page_names_syntax(self):
-        return (r"!?(^|(?<=[^A-Za-z\d]))"   # where to start
-                r"(?:[A-Z\d]{2,}[a-z]+"                  # 1st way
-                r"|[A-Z\d]+[a-z]+(?:/?[A-Z\d]+[a-z]*)+)" # 2nd way
-                r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
-                r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end 
-                r"(?!:\S)")                 # InterWiki support 
+        return (WIKI_START +
+                r"(?:[A-Z\d]{2,}[a-z]+"                    # 1st way
+                r"|[A-Z\d]+[a-z]+(?:/?[A-Z\d]+[a-z]*)+)" + # 2nd way
+                WIKI_TARGET + WIKI_END + WIKI_INTERWIKI)
 
 class SubWikiPageNames(Component):
     """
@@ -345,10 +350,8 @@ class SubWikiPageNames(Component):
     implements(IWikiPageNameSyntaxProvider)
 
     def get_wiki_page_names_syntax(self):
-        return (r"!?(^|(?<=[^A-Za-z]))"     # where to start
-                r"(?:[A-Z][A-Z]+[a-z\d]+[A-Z]*"  # 1st and 3rd way
-                r"|[A-Z][a-z]+(?:[A-Z][a-z]+)+)" # 2nd way
-                r"(?:#[A-Za-z0-9]+)?"       # optional trailing section link
-                r"(?=\Z|\s|[.,;:!?\)}\]])"  # where to end 
-                r"(?!:\S)")                 # InterWiki support 
+        return (WIKI_START +
+                r"(?:[A-Z][A-Z]+[a-z\d]+[A-Z]*"    # 1st and 3rd way
+                r"|[A-Z][a-z]+(?:[A-Z][a-z]+)+)" + # 2nd way
+                WIKI_TARGET + WIKI_END + WIKI_INTERWIKI)
 

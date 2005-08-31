@@ -1,35 +1,29 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004 Edgewall Software
-# Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2004 Edgewall Software
+# Copyright (C) 2003-2004 Jonas Borgström <jonas@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from __future__ import generators
 import re
 import time
-import string
 
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.util import TracError, escape, shorten_line
+from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.wiki import IWikiSyntaxProvider
-from trac.web.main import IRequestHandler
 
 
 class ISearchSource(Interface):
@@ -66,7 +60,7 @@ def query_to_sql(db, q, name):
         keywords = q.split(' ')
         x = map(lambda x, name=name: name + ' ' + db.like() +
                 '\'%' + x + '%\'', keywords)
-        sql_q = string.join(x, ' AND ')
+        sql_q = ' AND '.join(x)
     return sql_q
 
 def shorten_result(text='', keywords=[], maxlen=240, fuzz=60):
@@ -124,7 +118,7 @@ class SearchModule(Component):
     # IRequestHandler methods
 
     def match_request(self, req):
-        return req.path_info == '/search'
+        return re.match(r'/search/?', req.path_info) is not None
 
     def process_request(self, req):
         req.perm.assert_permission('SEARCH_VIEW')
@@ -145,9 +139,14 @@ class SearchModule(Component):
                 
         req.hdf['title'] = 'Search'
 
-        if 'q' in req.args:
-            query = req.args.get('q')
+        query = req.args.get('q')
+        if query:
             page = int(req.args.get('page', '1'))
+            redir = self.quickjump(query)
+            if redir:
+                req.redirect(redir)
+            elif query.startswith('!'):
+                query = query[1:]
             # Refuse queries that obviously would result in a huge result set
             if len(query) < 3 and len(query.split()) == 1:
                 raise TracError('Search query too short. '
@@ -163,7 +162,7 @@ class SearchModule(Component):
             results = results[(page-1) * page_size: page * page_size]
 
             req.hdf['title'] = 'Search Results'
-            req.hdf['search.q'] = query.replace('"', "&#34;")
+            req.hdf['search.q'] = req.args.get('q').replace('"', "&#34;")
             req.hdf['search.page'] = page
             req.hdf['search.n_hits'] = n
             req.hdf['search.n_pages'] = n_pages
@@ -193,52 +192,44 @@ class SearchModule(Component):
                   'excerpt': result[4]
                 } for result in results]
 
-        add_stylesheet(req, 'css/search.css')
+        add_stylesheet(req, 'common/css/search.css')
         return 'search.cs', None
 
-    def quickjump(self, query):
-        keywords = query.split(' ')
-        if len(keywords) == 1:
-            kwd = keywords[0]
-            redir = None
-            # Prepending a '!' disables quickjump feature
-            if kwd[0] == '!':
-                keywords[0] = kwd[1:]
-                query = query[1:]
-            # Ticket quickjump
-            elif kwd[0] == '#' and kwd[1:].isdigit():
-                redir = self.env.href.ticket(kwd[1:])
-            elif kwd[0:len('ticket:')] == 'ticket:' and kwd[len('ticket:'):].isdigit():
-                redir = self.env.href.ticket(kwd[len('ticket:'):])
-            elif kwd[0:len('bug:')] == 'bug:' and kwd[len('bug:'):].isdigit():
-                redir = self.env.href.ticket(kwd[len('bug:'):])
-            # Changeset quickjump
-            elif kwd[0] == '[' and kwd[-1] == ']' and kwd[1:-1].isdigit():
-                redir = self.env.href.changeset(kwd[1:-1])
-            elif kwd[0:len('changeset:')] == 'changeset:' and kwd[len('changeset:'):].isdigit():
-                redir = self.env.href.changeset(kwd[len('changeset:'):])
-            # Report quickjump
-            elif kwd[0] == '{' and kwd[-1] == '}' and kwd[1:-1].isdigit():
-                redir = self.env.href.report(kwd[1:-1])
-            elif kwd[0:len('report:')] == 'report:' and kwd[len('report:'):].isdigit():
-                redir = self.env.href.report(kwd[len('report:'):])
-            # Milestone quickjump
-            elif kwd[0:len('milestone:')] == 'milestone:':
-                redir = self.env.href.milestone(kwd[len('milestone:'):])
-            # Source quickjump
-            elif kwd[0:len('source:')] == 'source:':
-                redir = self.env.href.browser(kwd[len('source:'):])
-            # Wiki quickjump
-            elif kwd[0:len('wiki:')] == 'wiki:':
-                r = "((^|(?<=[^A-Za-z]))[!]?[A-Z][a-z/]+(?:[A-Z][a-z/]+)+)"
-                if re.match (r, kwd[len('wiki:'):]):
-                    redir = self.env.href.wiki(kwd[len('wiki:'):])
-            elif kwd[0].isupper() and kwd[1].islower():
-                r = "((^|(?<=[^A-Za-z]))[!]?[A-Z][a-z/]+(?:[A-Z][a-z/]+)+)"
-                if re.match (r, kwd):
-                    redir = self.env.href.wiki(kwd)
-            return redir
-        return None
+    def quickjump(self, kwd):
+        if len(kwd.split()) != 1:
+            return None
+        # Ticket quickjump
+        if kwd[0] == '#' and kwd[1:].isdigit():
+            return self.env.href.ticket(kwd[1:])
+        elif kwd[0:len('ticket:')] == 'ticket:' and kwd[len('ticket:'):].isdigit():
+            return self.env.href.ticket(kwd[len('ticket:'):])
+        elif kwd[0:len('bug:')] == 'bug:' and kwd[len('bug:'):].isdigit():
+            return self.env.href.ticket(kwd[len('bug:'):])
+        # Changeset quickjump
+        elif kwd[0] == '[' and kwd[-1] == ']' and kwd[1:-1].isdigit():
+            return self.env.href.changeset(kwd[1:-1])
+        elif kwd[0:len('changeset:')] == 'changeset:' and kwd[len('changeset:'):].isdigit():
+            return self.env.href.changeset(kwd[len('changeset:'):])
+        # Report quickjump
+        elif kwd[0] == '{' and kwd[-1] == '}' and kwd[1:-1].isdigit():
+            return self.env.href.report(kwd[1:-1])
+        elif kwd[0:len('report:')] == 'report:' and kwd[len('report:'):].isdigit():
+            return self.env.href.report(kwd[len('report:'):])
+        # Milestone quickjump
+        elif kwd[0:len('milestone:')] == 'milestone:':
+            return self.env.href.milestone(kwd[len('milestone:'):])
+        # Source quickjump
+        elif kwd[0:len('source:')] == 'source:':
+            return self.env.href.browser(kwd[len('source:'):])
+        # Wiki quickjump
+        elif kwd[0:len('wiki:')] == 'wiki:':
+            r = "((^|(?<=[^A-Za-z]))[!]?[A-Z][a-z/]+(?:[A-Z][a-z/]+)+)"
+            if re.match (r, kwd[len('wiki:'):]):
+                return self.env.href.wiki(kwd[len('wiki:'):])
+        elif kwd[0].isupper() and kwd[1].islower():
+            r = "((^|(?<=[^A-Za-z]))[!]?[A-Z][a-z/]+(?:[A-Z][a-z/]+)+)"
+            if re.match (r, kwd):
+                return self.env.href.wiki(kwd)
 
     # IWikiSyntaxProvider methods
     
@@ -249,6 +240,10 @@ class SearchModule(Component):
         yield ('search', self._format_link)
 
     def _format_link(self, formatter, ns, query, label):
-        return '<a class="search" href="%s">%s</a>' \
-               % (formatter.href.search(query), label)
+        if query and query[0] == '?':
+            href = formatter.href.search() + \
+                   query.replace('&amp;', '&').replace(' ', '+')
+        else:
+            href = formatter.href.search(q=query)
+        return '<a class="search" href="%s">%s</a>' % (href, label)
 

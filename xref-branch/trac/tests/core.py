@@ -2,20 +2,15 @@
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
@@ -53,6 +48,18 @@ class ComponentTestCase(unittest.TestCase):
         from trac.core import ComponentMeta
         assert Component not in ComponentMeta._components
         self.assertRaises(TracError, self.compmgr.__getitem__, Component)
+
+    def test_abstract_component_not_registered(self):
+        """
+        Make sure that a Component class marked as abstract does not appear in
+        the component registry.
+        """
+        from trac.core import ComponentMeta
+        class AbstractComponent(Component):
+            abstract = True
+        assert AbstractComponent not in ComponentMeta._components
+        self.assertRaises(TracError, self.compmgr.__getitem__,
+                          AbstractComponent)
 
     def test_unregistered_component(self):
         """
@@ -95,6 +102,23 @@ class ComponentTestCase(unittest.TestCase):
         self.assertEqual('test', ComponentA(self.compmgr).data)
         ComponentA(self.compmgr).data = 'newtest'
         self.assertEqual('newtest', ComponentA(self.compmgr).data)
+
+    def test_inherited_component_initializer(self):
+        """
+        Makes sure that a the `__init__` method of a components' super-class
+        gets called if the component doesn't override it.
+        """
+        class ComponentA(Component):
+            def __init__(self):
+                self.data = 'foo'
+        class ComponentB(ComponentA):
+            def __init__(self):
+                self.data = 'bar'
+        class ComponentC(ComponentB):
+            pass
+        self.assertEqual('bar', ComponentC(self.compmgr).data)
+        ComponentC(self.compmgr).data = 'baz'
+        self.assertEqual('baz', ComponentC(self.compmgr).data)
 
     def test_implements_called_outside_classdef(self):
         """
@@ -208,6 +232,19 @@ class ComponentTestCase(unittest.TestCase):
         tests = iter(ConcreteComponent(self.compmgr).tests)
         self.assertEquals('x', tests.next().test())
         self.assertRaises(StopIteration, tests.next)
+
+    def test_inherited_implements(self):
+        """
+        Verify that a component with a super-class implementing an extension
+        point interface is also registered as implementing that interface.
+        """
+        class BaseComponent(Component):
+            implements(ITest)
+            abstract = True
+        class ConcreteComponent(BaseComponent):
+            pass
+        from trac.core import ComponentMeta
+        assert ConcreteComponent in ComponentMeta._registry[ITest]
 
     def test_component_manager_component(self):
         """
