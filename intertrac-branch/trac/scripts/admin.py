@@ -1,25 +1,18 @@
-#!/usr/bin/env python
 # -*- coding: iso8859-1 -*-
-__author__ = 'Daniel Lundin <daniel@edgewall.com>, Jonas Borgström <jonas@edgewall.com>'
-__copyright__ = 'Copyright (c) 2005 Edgewall Software'
-__license__ = """
- Copyright (C) 2003, 2004, 2005 Edgewall Software
- Copyright (C) 2003, 2004 Jonas Borgström <jonas@edgewall.com>
- Copyright (C) 2003, 2004 Daniel Lundin <daniel@edgewall.com>
+# 
+# Copyright (C) 2003-2005 Edgewall Software
+# All rights reserved.
+#
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
+#
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
+#
 
- Trac is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License as
- published by the Free Software Foundation; either version 2 of
- the License, or (at your option) any later version.
-
- Trac is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License
- along with this program; if not, write to the Free Software
- Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA."""
+__copyright__ = 'Copyright (c) 2003-2005 Edgewall Software'
 
 from __future__ import generators
 import os
@@ -40,6 +33,7 @@ from trac.env import Environment
 from trac.Milestone import Milestone
 from trac.perm import PermissionSystem
 from trac.ticket.model import *
+from trac.wiki import WikiPage
 
 try:
     sum
@@ -55,7 +49,6 @@ except NameError:
 class TracAdmin(cmd.Cmd):
     intro = ''
     license = trac.__license_long__
-    credits = trac.__credits__
     doc_header = 'Trac Admin Console %(ver)s\n' \
                  'Available Commands:\n' \
                  % {'ver':trac.__version__ }
@@ -312,7 +305,6 @@ class TracAdmin(cmd.Cmd):
                 print "Invoking trac-admin without command starts "\
                        "interactive mode."
             self.print_doc (docs)
-            print self.credits
 
     
     ## About / Version
@@ -323,7 +315,6 @@ class TracAdmin(cmd.Cmd):
         print 'Trac Admin Console %s' % trac.__version__
         print '================================================================='
         print self.license
-        print self.credits
 
 
     ## Quit / EOF
@@ -672,6 +663,8 @@ class TracAdmin(cmd.Cmd):
         else:
             if argv[1] in ('dump', 'load'):
                 comp = self.get_dir_list(argv[-1], 1)
+            elif argv[1] == 'remove':
+                comp = self.get_wiki_list()
             elif argv[1] in ('export', 'import'):
                 if argc == 3:
                     comp = self.get_wiki_list()
@@ -716,13 +709,8 @@ class TracAdmin(cmd.Cmd):
                            [(r[0], r[1], self._format_datetime(r[2])) for r in rows])
 
     def _do_wiki_remove(self, name):
-        cnx = self.db_open()
-        cursor = cnx.cursor()
-        cursor.execute('SELECT name FROM wiki WHERE name=%s', name)
-        if not cursor.fetchone():
-            raise Exception("No such wiki page '%s'" % name)
-        cursor.execute("DELETE FROM wiki WHERE name=%s", (name,))
-        cnx.commit()
+        page = WikiPage(self.env_open(), name)
+        page.delete()
 
     def _do_wiki_import(self, filename, title, cursor=None):
         if not os.path.isfile(filename):

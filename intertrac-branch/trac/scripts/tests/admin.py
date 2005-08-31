@@ -1,24 +1,17 @@
-#!/usr/bin/env python
-
-__author__ = 'Tim Moloney <t.moloney@verizon.net>'
-__copyright__ = 'Copyright (c) 2004 Edgewall Software'
-__license__ = """
- Copyright (C) 2003, 2004 Edgewall Software
- Copyright (C) 2004 Tim Moloney <t.moloney@verizon.net>
-
- Trac is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License as
- published by the Free Software Foundation; either version 2 of
- the License, or (at your option) any later version.
-
- Trac is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License
- along with this program; if not, write to the Free Software
- Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA."""
+# -*- coding: iso8859-1 -*-
+# 
+# Copyright (C) 2004-2005 Edgewall Software
+# All rights reserved.
+#
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
+#
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
+#
+# Author: Tim Moloney <t.moloney@verizon.net>
 
 
 from trac.db_default import data as default_data
@@ -125,7 +118,7 @@ class TracadminTestCase(unittest.TestCase):
     def tearDown(self):
         self.env = None
 
-    def _execute(self, cmd):
+    def _execute(self, cmd, strip_trailing_space=True):
         try:
             _err = sys.stderr
             _out = sys.stdout
@@ -134,7 +127,10 @@ class TracadminTestCase(unittest.TestCase):
                 self._admin.docmd(cmd)
             except SystemExit, e:
                 pass
-            return STRIP_TRAILING_SPACE.sub('', out.getvalue())
+            if strip_trailing_space:
+                return STRIP_TRAILING_SPACE.sub('', out.getvalue())
+            else:
+                return out.getvalue()
         finally:
             sys.stderr = _err
             sys.stdout = _out
@@ -152,15 +148,14 @@ class TracadminTestCase(unittest.TestCase):
         a result, there is only this one test.
         """
 
-        from trac import __version__, __license_long__, __credits__
+        from trac import __version__, __license_long__
 
         expected_results = """
 Trac Admin Console %s
 =================================================================
 %s
-%s
-""" % (__version__, __license_long__, __credits__)
-        test_results = self._execute('about')
+""" % (__version__, __license_long__)
+        test_results = self._execute('about', strip_trailing_space=False)
         self.assertEquals(expected_results, test_results)
 
     # Help test

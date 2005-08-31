@@ -3,20 +3,15 @@
 # Copyright (C) 2004-2005 Edgewall Software
 # Copyright (C) 2004 Daniel Lundin <daniel@edgewall.com>
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Daniel Lundin <daniel@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -69,6 +64,7 @@ MIME_MAP = {
     'make':'text/x-makefile', 'mk':'text/x-makefile', 'Makefile':'text/x-makefile',
     'mail':'text/x-mail',
     'pas':'text/x-pascal',
+    'pdf':'application/pdf',
     'pl':'text/x-perl', 'pm':'text/x-perl', 'PL':'text/x-perl', 'perl':'text/x-perl',
     'php':'text/x-php', 'php4':'text/x-php', 'php3':'text/x-php',
     'ps':'application/postscript',
@@ -79,6 +75,7 @@ MIME_MAP = {
     'rb':'text/x-ruby', 'ruby':'text/x-ruby',
     'rfc':'text/x-rfc',
     'rst': 'text/x-rst',
+    'rtf':'application/rtf',
     'scm':'text/x-scheme',
     'sh':'application/x-sh',
     'sql':'text/x-sql',
@@ -325,7 +322,9 @@ class PlainTextRenderer(Component):
     implements(IHTMLPreviewRenderer)
 
     def get_quality_ratio(self, mimetype):
-        return 1
+        if mimetype.startswith('text/'):
+            return 1
+        return 0
 
     def render(self, req, mimetype, content, filename=None, rev=None):
         if is_binary(content):

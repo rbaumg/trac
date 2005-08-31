@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -217,7 +212,6 @@ class AttachmentModule(Component):
                INavigationContributor, IWikiSyntaxProvider)
 
     CHUNK_SIZE = 4096
-    DISP_MAX_FILE_SIZE = 256 * 1024
 
     # IEnvironmentSetupParticipant methods
 
@@ -278,7 +272,7 @@ class AttachmentModule(Component):
         else:
             self._render_view(req, attachment)
 
-        add_stylesheet(req, 'css/code.css')
+        add_stylesheet(req, 'common/css/code.css')
         return 'attachment.cs', None
 
     # IWikiSyntaxProvider methods
@@ -419,7 +413,11 @@ class AttachmentModule(Component):
                        % (attachment.filename, mimetype))
         fd = attachment.open()
         try:
-            data = fd.read(self.DISP_MAX_FILE_SIZE)
+            max_preview_size = int(self.config.get('mimeviewer',
+                                                   'max_preview_size',
+                                                   '262144'))
+            data = fd.read(max_preview_size)
+            max_size_reached = len(data) == max_preview_size
             charset = detect_unicode(data) or self.config.get('trac', 'default_charset')
             
             if fmt in ('raw', 'txt'):
@@ -431,9 +429,9 @@ class AttachmentModule(Component):
                 data = util.to_utf8(data, charset)
                 add_link(req, 'alternate', attachment.href(format='txt'),
                          'Plain Text', mimetype)
-            if len(data) >= self.DISP_MAX_FILE_SIZE:
+            if max_size_reached:
                 req.hdf['attachment.max_file_size_reached'] = 1
-                req.hdf['attachment.max_file_size'] = self.DISP_MAX_FILE_SIZE
+                req.hdf['attachment.max_file_size'] = max_preview_size
                 vdata = ''
             else:
                 mimeview = Mimeview(self.env)

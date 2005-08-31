@@ -1,30 +1,27 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
+#         Christian Boos <cboos@neuf.fr>
 
 from __future__ import generators
 import time
 import re
 import posixpath
+from urllib import urlencode
 
 from trac import mimeview, util
 from trac.core import *
@@ -33,8 +30,7 @@ from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet
-from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
-
+from trac.wiki import wiki_to_html, IWikiSyntaxProvider
 
 class DiffArgs(dict):
     def __getattr__(self,str):
@@ -191,14 +187,17 @@ class AbstractDiffModule(Component):
         if chgset:
             diff_params = 'rev=%s' % rev
         else:
-            diff_params = 'new=%s&old_path=%s&old=%s' % (new, old_path, old)
+            diff_params = urlencode({'path': path,
+                                     'new': new,
+                                     'old_path': old_path,
+                                     'old': old})
         add_link(req, 'alternate', '?format=diff&'+diff_params, 'Unified Diff',
                  'text/plain', 'diff')
         add_link(req, 'alternate', '?format=zip&'+diff_params, 'Zip Archive',
                  'application/zip', 'zip')
-        add_stylesheet(req, 'css/changeset.css')
-        add_stylesheet(req, 'css/diff.css')
-        add_stylesheet(req, 'css/code.css')
+        add_stylesheet(req, 'common/css/changeset.css')
+        add_stylesheet(req, 'common/css/diff.css')
+        add_stylesheet(req, 'common/css/code.css')
         return 'diff.cs', None
 
 
@@ -257,7 +256,8 @@ class AbstractDiffModule(Component):
                     prev = repos.get_node(path, rev).get_previous()
                     if prev:
                         prev_path, prev_rev = prev[:2]
-                        prev_href = self.env.href.diff(prev_path, rev=prev_rev)
+                        prev_href = self.env.href.changeset(prev_rev,
+                                                            path=prev_path)
                     else:
                         prev_path = prev_rev = None
                 else:

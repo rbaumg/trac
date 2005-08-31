@@ -1,21 +1,16 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
@@ -106,7 +101,7 @@ class NewticketModule(Component):
                 field['options'] = options
             req.hdf['newticket.fields.' + name] = field
 
-        add_stylesheet(req, 'css/ticket.css')
+        add_stylesheet(req, 'common/css/ticket.css')
         return 'newticket.cs', None
 
     # Internal methods
@@ -211,7 +206,7 @@ class TicketModule(Component):
                              'Ticket #%s' % tickets[-1])
                 add_link(req, 'up', req.session['query_href'])
 
-        add_stylesheet(req, 'css/ticket.css')
+        add_stylesheet(req, 'common/css/ticket.css')
         return 'ticket.cs', None
 
     # ITimelineEventProvider methods
@@ -260,18 +255,24 @@ class TicketModule(Component):
                      'closed': 'closedticket'}
             verbs = {'new': 'created', 'reopened': 'reopened',
                      'closed': 'closed'}
-            for t,id,resolution,state,type,message,author,summary in cursor:
+            for t, id, resolution, status, type, message, author, summary \
+                    in cursor:
                 title = 'Ticket <em title="%s">#%s</em> (%s) %s by %s' % (
-                        util.escape(summary), id, type, verbs[state],
+                        util.escape(summary), id, type, verbs[status],
                         util.escape(author))
                 if format == 'rss':
                     href = self.env.abs_href.ticket(id)
-                    message = wiki_to_html(message or '--', self.env, db)
+                    if status != 'new':
+                        message = wiki_to_html(message or '--', self.env, db)
                 else:
                     href = self.env.href.ticket(id)
-                    message = wiki_to_oneliner(util.shorten_line(message),
-                                               self.env, db)
-                yield kinds[state], href, title, t, author, message
+                    message = util.shorten_line(message)
+                    if status != 'new':
+                        message = ': '.join(filter(None, [
+                            resolution,
+                            wiki_to_oneliner(message, self.env, db)
+                        ]))
+                yield kinds[status], href, title, t, author, message
 
     # Internal methods
 
@@ -380,7 +381,8 @@ class TicketModule(Component):
             elif field == 'description':
                 changes[-1]['fields'][field] = ''
             else:
-                changes[-1]['fields'][field] = {'old': old, 'new': new}
+                changes[-1]['fields'][field] = {'old': util.escape(old),
+                                                'new': util.escape(new)}
         req.hdf['ticket.changes'] = changes
 
         # List attached files

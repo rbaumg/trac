@@ -1,23 +1,18 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004, 2005 Edgewall Software
-# Copyright (C) 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Daniel Lundin <daniel@edgewall.com>
+# Copyright (C) 2004-2005 Edgewall Software
+# Copyright (C) 2004-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Daniel Lundin <daniel@edgewall.com>
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -111,7 +106,7 @@ class AboutModule(Component):
 
  <?cs else ?>
   <a href="http://trac.edgewall.com" style="border: none; float: right; margin-left: 2em">
-   <img style="display: block" src="<?cs var:htdocs_location ?>trac_banner.png"
+   <img style="display: block" src="<?cs var:chrome.href ?>/common/trac_banner.png"
      alt="Trac: Integrated SCM &amp; Project Management"/>
   </a>
 <h1>About Trac <?cs var:trac.version ?></h1>
@@ -131,7 +126,7 @@ It provides an interface to the Subversion revision control systems, integrated 
   <p>Copyright &copy; 2003-2005 <a href="http://www.edgewall.com/">Edgewall
   Software</a></p>
   <a href="http://www.edgewall.com/">
-   <img style="display: block; margin: 30px" src="<?cs var:htdocs_location ?>edgewall.png"
+   <img style="display: block; margin: 30px" src="<?cs var:chrome.href ?>/common/edgewall.png"
      alt="Edgewall Software"/></a>
  <?cs /if ?>
 </div>
@@ -172,7 +167,7 @@ It provides an interface to the Subversion revision control systems, integrated 
         elif page == 'plugins':
             self._render_plugins(req)
 
-        add_stylesheet(req, 'css/about.css')
+        add_stylesheet(req, 'common/css/about.css')
         template = req.hdf.parse(self.about_cs)
         return template, None
 

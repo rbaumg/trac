@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -81,12 +76,17 @@ class WikiModule(Component):
         db = self.env.get_db_cnx()
         page = WikiPage(self.env, pagename, version, db)
 
-        add_stylesheet(req, 'css/wiki.css')
+        add_stylesheet(req, 'common/css/wiki.css')
 
         if req.method == 'POST':
             if action == 'edit':
+                latest_version = WikiPage(self.env, pagename, None, db).version
                 if req.args.has_key('cancel'):
                     req.redirect(self.env.href.wiki(page.name))
+                elif int(version) != latest_version:
+                    print version, latest_version
+                    action = 'collision'
+                    self._render_editor(req, db, page)
                 elif req.args.has_key('preview'):
                     action = 'preview'
                     self._render_editor(req, db, page, preview=True)
@@ -184,14 +184,6 @@ class WikiModule(Component):
             # WIKI_ADMIN
             page.readonly = int(req.args.has_key('readonly'))
 
-        # We store the page version when we start editing a page.
-        # This way we can stop users from saving changes if they are
-        # not based on the latest version any more
-        version = int(req.args.get('version'))
-        if version != page.version:
-            raise TracError('Sorry, cannot create new version. This page has '
-                            'already been modified by someone else.')
-
         page.save(req.args.get('author'), req.args.get('comment'),
                   req.remote_addr)
         req.redirect(self.env.href.wiki(page.name))
@@ -224,7 +216,7 @@ class WikiModule(Component):
             raise TracError, "Version %s of page %s does not exist" \
                              % (req.args.get('version'), page.name)
 
-        add_stylesheet(req, 'css/diff.css')
+        add_stylesheet(req, 'common/css/diff.css')
 
         req.hdf['title'] = escape(page.name) + ' (diff)'
 
@@ -292,7 +284,6 @@ class WikiModule(Component):
             page.readonly = req.args.has_key('readonly')
 
         author = req.args.get('author', get_reporter_id(req))
-        version = req.args.get('edit_version', None)
         comment = req.args.get('comment', '')
         editrows = req.args.get('editrows')
         if editrows:

@@ -1,22 +1,17 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2003, 2004, 2005 Edgewall Software
-# Copyright (C) 2003, 2004, 2005 Jonas Borgström <jonas@edgewall.com>
-# Copyright (C) 2004, 2005 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2003-2005 Edgewall Software
+# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
@@ -38,6 +33,19 @@ from trac.wiki.api import WikiSystem, IWikiChangeListener, IWikiMacroProvider
 
 __all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline']
 
+#
+# Customization of the Wiki syntax  ***use with care***
+#
+BOLDITALIC_TOKEN = "'''''"
+BOLD_TOKEN = "'''"
+ITALIC_TOKEN = "''"
+UNDERLINE_TOKEN = "__"
+STRIKE_TOKEN = "~~"
+SUBSCRIPT_TOKEN = ",,"
+SUPERSCRIPT_TOKEN = r"\^"
+INLINE_TOKEN = "`"
+
+LINK_SCHEME = r"[\w.+-]+" # as per RFC 2396
 
 def system_message(msg, text):
     return """<div class="system-message">
@@ -129,19 +137,26 @@ class Formatter(object):
     flavor = 'default'
 
     # Rules provided by IWikiSyntaxProviders are inserted between pre_rules and post_rules
-    _pre_rules = [r"(?P<bolditalic>''''')",
-                  r"(?P<bold>''')",
-                  r"(?P<italic>'')",
-                  r"(?P<underline>!?__)",
-                  r"(?P<strike>!?~~)",
-                  r"(?P<subscript>!?,,)",
-                  r"(?P<superscript>!?\^)",
+    _pre_rules = [r"(?P<bolditalic>%s)" % BOLDITALIC_TOKEN,
+                  r"(?P<bold>%s)" % BOLD_TOKEN,
+                  r"(?P<italic>%s)" % ITALIC_TOKEN,
+                  r"(?P<underline>!?%s)" % UNDERLINE_TOKEN,
+                  r"(?P<strike>!?%s)" % STRIKE_TOKEN,
+                  r"(?P<subscript>!?%s)" % SUBSCRIPT_TOKEN,
+                  r"(?P<superscript>!?%s)" % SUPERSCRIPT_TOKEN,
                   r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
-                  r"(?P<inlinecode2>!?`(?P<inline2>.*?)`)",
+                  r"(?P<inlinecode2>!?%s(?P<inline2>.*?)%s)" % (INLINE_TOKEN,
+                                                                INLINE_TOKEN),
                   r"(?P<htmlescapeentity>!?&#\d+;)"]
-    _post_rules = [r"(?P<shref>!?((?P<sns>\w+):(?P<stgt>'[^']+'|\"[^\"]+\"|((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))",
-                   r"(?P<lhref>(?<![\[!])\[(?:(?P<lns>\w+):(?P<ltgt>[^\] ]+)|(?P<rel>[/.][^ [\]]*))(?: (?P<label>.*?))?\])",
-                   r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)(\]\]|\((?P<macroargs>.*?)\)\]\]))",
+    _post_rules = [(r"(?P<shref>!?((?P<sns>%s):" % LINK_SCHEME +
+                    r"(?P<stgt>'[^']+'|\"[^\"]+\"|"
+                    r"((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))"),
+                   (r"(?P<lhref>!?\[(?:(?P<lns>%s):" % LINK_SCHEME +  # r"(?P<lhref>(?<![\[!])\[ FIXME might be needed
+                    r"(?P<ltgt>'[^']+'|\"[^\"]+\"|[^\] ]+)"
+                    r"|(?P<rel>[/.][^ [\]]*))"
+                    r"(?: (?P<label>.*?))?\])"),
+                   (r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)"
+                    r"(\]\]|\((?P<macroargs>.*?)\)\]\]))"),
                    r"(?P<heading>^\s*(?P<hdepth>=+)\s.*\s(?P=hdepth)\s*$)",
                    r"(?P<list>^(?P<ldepth>\s+)(?:\*|\d+\.) )",
                    r"(?P<definition>^\s+(.+)::)\s*",
@@ -243,6 +258,8 @@ class Formatter(object):
     def _lhref_formatter(self, match, fullmatch):
         ns = fullmatch.group('lns')
         target = fullmatch.group('ltgt') 
+        if target and target[0] in "'\"":
+            target = target[1:-1]
         label = fullmatch.group('label') or target
         rel = fullmatch.group('rel')
         if rel:

@@ -38,7 +38,7 @@
     </tr>
    </table>
    <div class="buttons">
-      <input type="submit" value="Diff" title="View Differences" />
+      <input type="submit" value="View changes" />
    </div>
   </form>
  </div>

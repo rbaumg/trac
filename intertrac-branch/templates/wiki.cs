@@ -151,6 +151,9 @@
     var:wiki.page_name ?></a></h1>
   <?cs if:len(wiki.history) ?><form method="get" action="">
    <input type="hidden" name="action" value="diff" />
+   <div class="buttons">
+    <input type="submit" value="View changes" />
+   </div>
    <table id="wikihist" class="listing" summary="Change history">
     <thead><tr>
      <th class="diff"></th>
@@ -184,13 +187,18 @@
   </form><?cs /if ?>
  
  <?cs else ?>
-  <?cs if wiki.action == "edit" || wiki.action == "preview" ?>
+  <?cs if wiki.action == "edit" || wiki.action == "preview" || wiki.action == "collision" ?>
    <h1>Editing "<?cs var:wiki.page_name ?>"</h1><?cs
     if wiki.action == "preview" ?>
      <fieldset id="preview">
       <legend>Preview (<a href="#edit">skip</a>)</legend>
       <div class="wikipage"><?cs var:wiki.page_html ?></div>
      </fieldset><?cs
+     elif wiki.action =="collision"?>
+     <div class="system-message">
+       Sorry, this page has been modified by somebody else since you started 
+       editing. Your changes cannot be saved.
+     </div><?cs
     /if ?>
    <form id="edit" action="<?cs var:wiki.current_href ?>" method="post">
     <fieldset class="iefix">
@@ -245,13 +253,18 @@
       </div>
      <?cs /if ?>
     </fieldset>
-    <div class="buttons">
+    <div class="buttons"><?cs
+     if wiki.action == "collision" ?>
+     <input type="submit" name="preview" value="Preview" disabled="" />&nbsp;
+     <input type="submit" name="save" value="Submit changes" disabled="" />&nbsp;
+     <?cs else ?>
      <input type="submit" name="preview" value="Preview" />&nbsp;
      <input type="submit" name="save" value="Submit changes" />&nbsp;
+     <?cs /if ?>
      <input type="submit" name="cancel" value="Cancel" />
     </div>
     <script type="text/javascript" src="<?cs
-      var:htdocs_location ?>js/wikitoolbar.js"></script>
+      var:chrome.href ?>/common/js/wikitoolbar.js"></script>
    </form>
   <?cs /if ?>
   <?cs if wiki.action == "view" ?>

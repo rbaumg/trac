@@ -2,20 +2,15 @@
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
@@ -33,6 +28,40 @@ except ImportError:
 from trac.core import TracError
 
 __all__ = ['get_cnx_pool', 'init_db']
+
+
+class Table(object):
+    """Declare a table in a database schema."""
+
+    def __init__(self, name, key=[]):
+        self.name = name
+        self.columns = []
+        self.indexes = []
+        self.key = key
+        if isinstance(key, (str, unicode)):
+            self.key = [key]
+
+    def __getitem__(self, objs):
+        self.columns = [o for o in objs if isinstance(o, Column)]
+        self.indexes = [o for o in objs if isinstance(o, Index)]
+        return self
+
+class Column(object):
+    """Declare a table column in a database schema."""
+
+    def __init__(self, name, type='text', size=None, unique=False,
+                 auto_increment=False):
+
+        self.name = name
+        self.type = type
+        self.size = size
+        self.auto_increment = auto_increment
+
+class Index(object):
+    """Declare an index for a database schema."""
+
+    def __init__(self, columns):
+        self.columns = columns
 
 
 class IterableCursor(object):
