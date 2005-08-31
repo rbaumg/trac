@@ -61,10 +61,16 @@ class TitleIndexMacro(Component):
         pages.sort()
 
         buf = StringIO()
+        db = self.env.get_db_cnx()
         buf.write('<ul>')
-        for page in pages:
-            buf.write('<li><a href="%s">' % escape(self.env.href.wiki(page)))
-            buf.write(escape(page))
+        for pagename in pages:
+            page = WikiPage(self.env, None) # no fetch
+            page.id = page.name = pagename
+            buf.write('<li><a href="%s">%s</a>' % (escape(page.href()),
+                                                   page.shortname()))
+            buf.write(' <small><a href="%s">(%d backlinks)</a></small>' \
+                      % (escape(self.env.href.xref(page.type, page.id)),
+                         page.count_backlinks(db)))
             buf.write('</a></li>\n')
         buf.write('</ul>')
 
