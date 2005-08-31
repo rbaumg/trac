@@ -151,7 +151,7 @@ class Formatter(object):
     _post_rules = [(r"(?P<shref>!?((?P<sns>%s):" % LINK_SCHEME +
                     r"(?P<stgt>'[^']+'|\"[^\"]+\"|"
                     r"((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))"),
-                   (r"(?P<lhref>!?\[(?:(?P<lns>%s):" % LINK_SCHEME +  # r"(?P<lhref>(?<![\[!])\[ FIXME might be needed
+                   (r"(?P<lhref>!?\[(?:(?P<lns>%s):" % LINK_SCHEME +
                     r"(?P<ltgt>'[^']+'|\"[^\"]+\"|[^\] ]+)"
                     r"|(?P<rel>[/.][^ [\]]*))"
                     r"(?: (?P<label>.*?))?\])"),
