@@ -54,17 +54,17 @@ schema = [
         Column('var_value'),
         Index(['sid', 'var_name'])],
     Table('xref')[
-        Column('src_type'),
-        Column('src_id'),
+        Column('source_type'),
+        Column('source_id'),
         Column('facet'),
         Column('context'),
         Column('time', type='int'),
         Column('author'),
         Column('relation'),
-        Column('dest_type'),
-        Column('dest_id'),
-        Index(['src_type', 'src_id']),
-        Index(['dest_type', 'dest_id'])],
+        Column('target_type'),
+        Column('target_id'),
+        Index(['source_type', 'source_id']),
+        Index(['target_type', 'target_id'])],
 
     # Attachments
     Table('attachment', key=('type', 'id', 'filename'))[

@@ -24,11 +24,11 @@
   (TracCrossReferences).
  
   A cross-reference is a link created in one Trac object (the ''source'')
-  pointing to another Trac object (the ''destination'').
+  pointing to another Trac object (the ''target'').
   When the link is considered in the reversed direction,
   one can design it by the term `backlink`.
   By extension, the backlink can refer to the source Trac object, and
-  a link can refer to the destination Trac object.
+  a link can refer to the target Trac object.
 
   Usually, this link is created after processing a Wiki text
   attached to the source object (a ''facet'').
@@ -38,9 +38,9 @@
   .--------------------.           .============.           .----------------.
   | TracObject  ,------| backlink  | TracObject |    link   | TracObject (b) |
   |            ( facet |---------->|            |---------->|                |
-  | (a) source  \__f___|           |    (me)    |           |  destination   |
+  | (a) source  \__f___|           |    (me)    |           |  target   |
   '--------------------'           '============'           '----------------'
-                              me: destination for (a)
+                              me: target for (a)
    (a) link to (me)        (a) reached through a backlink
    stored in facet f            me: source for (b)
                             (b) reached through a link
@@ -69,7 +69,7 @@
      * (no facet, only as a target)
 
   A cross-reference is also called a relation if a specific semantic is
-  attached to the link from the source object to the destination object
+  attached to the link from the source object to the target object
   (stored in the `relation` field).
   If the `relation` is unset, the cross-reference semantic can be inferred
   from the `context` (usually the Wiki text in which the link was created).
@@ -256,14 +256,14 @@ class BacklinksMacro(Component):
         buf = StringIO()
         first = True
         for backlink in source.find_backlinks(db):
-            dst_type,dst_id,facet,context,time,author,relation = backlink
+            target_type,target_id,facet,context,time,author,relation = backlink
             if not first:
                 buf.write(', ')
             else:
                 first = False
-            dst = TracObject.factory(self.env, dst_type, dst_id)
+            target = TracObject.factory(self.env, target_type, target_id)
             buf.write('<a class="%s" href="%s">%s</a>' \
-                          % (dst.htmlclass(), dst.href(), dst.shortname()))
+                          % (target.htmlclass(), target.href(), target.shortname()))
         return buf.getvalue()
 
 
@@ -285,10 +285,10 @@ class OrphanedPagesMacro(Component):
         cursor = db.cursor()
         cursor.execute("SELECT DISTINCT(name) FROM wiki"
                        " WHERE name NOT IN ("
-                       "   SELECT DISTINCT(dest_id) FROM xref"
-                       "    WHERE dest_type='wiki'"
-                       "      AND (src_type='wiki' AND dest_id!=src_id"
-                       "           OR src_type!='wiki'))")
+                       "   SELECT DISTINCT(target_id) FROM xref"
+                       "    WHERE target_type='wiki'"
+                       "      AND (source_type='wiki' AND target_id!=source_id"
+                       "           OR source_type!='wiki'))")
         buf = StringIO()
         first = True
         for id, in cursor:
@@ -318,22 +318,22 @@ class MissingLinksMacro(Component):
 
         db = self.env.get_db_cnx()
         cursor = db.cursor()
-        cursor.execute("SELECT dest_id,src_type,src_id FROM xref "
-                       " WHERE dest_type='wiki' "
-                       " AND dest_id NOT IN (SELECT DISTINCT(name) FROM wiki) "
-                       " ORDER BY dest_id,src_type,src_id ")
+        cursor.execute("SELECT target_id,source_type,source_id FROM xref "
+                       " WHERE target_type='wiki' "
+                       " AND target_id NOT IN (SELECT DISTINCT(name) FROM wiki) "
+                       " ORDER BY target_id,source_type,source_id ")
         missing = []
         previous_page = None
-        previous_src = None
-        for page,src_type,src_id in cursor:
-            src = (src_type, src_id)
+        previous_source = None
+        for page,source_type,source_id in cursor:
+            source = (source_type, source_id)
             if page != previous_page:
-                missing.append((WikiPage(self.env, page),[src]))
+                missing.append((WikiPage(self.env, page),[source]))
                 previous_page = page
             else:
-                if src != previous_src:
-                    missing[-1][1].append(src)
-            previous_src = src
+                if source != previous_source:
+                    missing[-1][1].append(source)
+            previous_source = source
 
         buf = StringIO()
         buf.write('<dl>')

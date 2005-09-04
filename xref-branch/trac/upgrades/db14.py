@@ -1,25 +1,24 @@
-sql = """
--- Initial creation of the general cross-reference table
-CREATE TABLE xref (
-         src_type        text,
-         src_id          text,
-         facet           text,
-         context         text,
-         time            integer,
-         author          text,
-         relation        text,
-         dest_type       text,
-         dest_id         text
-);
-
-CREATE INDEX xref_src_idx       ON xref(src_id,src_type);
-CREATE INDEX xref_dest_idx      ON xref(dest_id,dest_type);
-"""
+sql = [
+#-- Initial creation of the general cross-reference table
+"""CREATE TABLE xref (
+         source_type       text,
+         source_id         text,
+         facet             text,
+         context           text,
+         time              integer,
+         author            text,
+         relation          text,
+         target_type       text,
+         target_id         text
+);""",
+"""CREATE INDEX xref_source_idx      ON xref(source_id,source_type);""",
+"""CREATE INDEX xref_target_idx      ON xref(target_id,target_type);""",
+]
 
 def do_upgrade(env, ver, cursor):
-    cursor.execute(sql)
+    for s in sql:
+        cursor.execute(s)
 
-    # Numbering of ticket comments (using the spare 'oldvalue' field)
     # (ticket comment:n facet) and later threading support
     cursor.execute("SELECT ticket, time, author FROM ticket_change "
                    "WHERE field = 'comment' "

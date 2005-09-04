@@ -126,11 +126,11 @@ class TracObject:
     
     def count_backlinks(self, db, relation=None, facet=None):
         """Count how many backlinks point to this object."""
-        return self._xref_count('dest', db, relation, facet)
+        return self._xref_count('target', db, relation, facet)
 
     def count_links(self, db, relation=None, facet=None):
         """Count how many links orginate from this object"""
-        return self._xref_count('src', db, relation, facet)
+        return self._xref_count('source', db, relation, facet)
 
     def find_backlinks(self, db, relation=None, facet=None):
         """Retrieve all the links pointing to this object.
@@ -138,7 +138,7 @@ class TracObject:
         If `relation` is given, only the links having this semantic
         are retrieved.
         """
-        return self._xref_find('dest', 'src', db, relation, facet)
+        return self._xref_find('target', 'source', db, relation, facet)
 
     def find_links(self, db, relation=None, facet=None):
         """Retrieve all the outgoing relationships for this object.
@@ -146,18 +146,18 @@ class TracObject:
         If `relation` is given, only the links having this semantic
         are retrieved.
         """
-        return self._xref_find('src', 'dest', db, relation, facet)
+        return self._xref_find('source', 'target', db, relation, facet)
 
     def has_relation(self, db, relation, other=None):
         """e.g. obj.has_relation('is-a', component)"""
         other_clause = ''
         tuple = (self.type, self.id, relation)
         if other:
-            other_clause = " AND dest_type=%s AND dest_id=%s"
+            other_clause = " AND target_type=%s AND target_id=%s"
             tuple += (other.type, other.id)
         cursor = db.cursor()
         cursor.execute("SELECT count(*) FROM xref "
-                       " WHERE src_type=%s AND src_id=%s"
+                       " WHERE source_type=%s AND source_id=%s"
                        "   AND relation=%s " + other_clause, tuple)
         return cursor.fetchone()[0]
 
@@ -192,7 +192,7 @@ class TracObject:
         tuple, relation_clause = self._relation_clause(tuple, relation)
         tuple, facet_clause = self._facet_clause(tuple, facet)
         cursor.execute("DELETE FROM xref"
-                       " WHERE src_type=%s AND src_id=%s"
+                       " WHERE source_type=%s AND source_id=%s"
                        + relation_clause + facet_clause,
                        tuple)
         print "(-) -- %s:%s --[%s]--> *:*" % (self.type, self.id, relation)
@@ -266,7 +266,7 @@ class ITracObjectManager(Interface):
 
     def rebuild_xrefs():
         """
-        Generator that yields (src, facet, time, author, wikitext) tuples,
+        Generator that yields (source, facet, time, author, wikitext) tuples,
         one for each facet of each object controlled by this Object Manager.
         """
 
@@ -289,9 +289,9 @@ class TracObjectSystem(Component):
         from trac.xref import XRefParser
         xf = XRefParser(self.env, db)
         for mgr in self.object_managers:
-            for src, facet, time, author, wikitext in mgr.rebuild_xrefs(db):
-                src.delete_links(db, facet=facet)
-                xf.parse(src, facet, time, author, wikitext)
+            for source, facet, time, author, wikitext in mgr.rebuild_xrefs(db):
+                source.delete_links(db, facet=facet)
+                xf.parse(source, facet, time, author, wikitext)
         db.commit()
 
     def _get_object_factories(self):
