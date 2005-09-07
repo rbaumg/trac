@@ -3,16 +3,14 @@
 
 <div id="ctxtnav" class="nav">
  <h2>Report Navigation</h2>
- <ul>
-  <li class="first"><?cs
+ <ul><?cs
    if:chrome.links.up.0.href ?><li class="first"><a href="<?cs
     var:chrome.links.up.0.href ?>">Available Reports</a><?cs
    else ?>Available Reports<?cs
   /if ?></li><?cs
   if:report.query_href ?><li class="last"><a href="<?cs
    var:report.query_href ?>">Custom Query</a></li><?cs
-  /if ?>
- </ul>
+  /if ?></ul>
 </div>
 
 <div id="content" class="report">
@@ -96,7 +94,7 @@
      <div class="buttons"><?cs
       if:report.can_modify ?><form action="" method="get"><div>
        <input type="hidden" name="action" value="edit" />
-       <input type="submit" value="Edit report" />
+       <input type="submit" value="Edit report" accesskey="e" />
       </div></form><?cs /if ?><?cs
       if:report.can_create ?><form action="" method="get"><div>
        <input type="hidden" name="action" value="copy" />

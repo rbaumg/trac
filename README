@@ -1,4 +1,4 @@
-This is the private branch for Christian Boos <cboos@wanadoo.fr>, 
+This is the private branch for Christian Boos < cboos at neuf dot fr >, 
 cboos on #trac
 
 See the wiki page ChristianBoos for more info.
@@ -8,11 +8,60 @@ See the wiki page ChristianBoos for more info.
 
 === Anydiff Branch ===
 
- * to be integrated in trunk
+ * create patch against 0.9b1
+ * create ticket for integration in trunk
 
 === InterTrac Branch ===
  
- * to be integrated in trunk
+ * create patch against 0.9b1
+ * create ticket for integration in trunk
+
+=== TracCrossReferences Branch ===
+ 
+ * Finish to add the Cross-references navigation link everywhere
+ * Finish to add the management of cross-references on Changeset, 
+   Report and Milestone
+ * Get #787 done, and also manage cross-references on the attachment
+   description facets
+ * Implement the `<<...>>` syntax
+ * Implement the ![[Relation]] macros and related
+ * Find a model for storing facets in the db, e.g: 
+   {{{
+#!sql
+CREATE TABLE facet (
+  type    text,
+  id      text, 
+  name    text,
+  value   text
+)
+   }}}
+ * Use a kind of model description table:
+   {{{
+#!sql
+CREATE TABLE model (
+  type    text,
+  facet   text,
+  kind    text
+)
+   }}}
+
+=== Trac Object Branch ===
+
+ * Based on the (old) TracCrossReferences branch
+ * badly out of sync... but has still some interesting bits
+
+----
+
+== DONE ==
+
+=== Category Branch ===
+
+The TicketTypes feature was integrated in the trunk in r1691. 
+
+=== Anydiff Branch ===
+
+ * The link syntax described in #199 will be done
+   using an IWikiLinkProvider (depends on InterTrac branch).
 
 === TracCrossReferences Branch ===
 
@@ -34,22 +83,4 @@ See the wiki page ChristianBoos for more info.
          dest_id         text,   -- destination id
    );
    }}}
-
-
-=== Trac Object Branch ===
-
- * Based on the (old) TracCrossReferences branch
- * badly out of sync...
-
-
-== DONE ==
-
-=== Category Branch ===
-
-The TicketTypes feature was integrated in the trunk in r1691. 
-
-=== Anydiff Branch ===
-
- * The link syntax described in #199 will be done
-   using an IWikiLinkProvider (depends on InterTrac branch).
 

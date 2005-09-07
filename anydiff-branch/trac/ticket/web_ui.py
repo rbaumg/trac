@@ -42,7 +42,8 @@ class NewticketModule(Component):
     def get_navigation_items(self, req):
         if not req.perm.has_permission('TICKET_CREATE'):
             return
-        yield 'mainnav', 'newticket', '<a href="%s">New Ticket</a>' \
+        yield 'mainnav', 'newticket', \
+              '<a href="%s" accesskey="7">New Ticket</a>' \
               % (self.env.href.newticket())
 
     # IRequestHandler methods
@@ -264,6 +265,8 @@ class TicketModule(Component):
                     href = self.env.abs_href.ticket(id)
                     if status != 'new':
                         message = wiki_to_html(message or '--', self.env, db)
+                    else:
+                        message = util.escape(message)
                 else:
                     href = self.env.href.ticket(id)
                     message = util.shorten_line(message)
@@ -272,6 +275,8 @@ class TicketModule(Component):
                             resolution,
                             wiki_to_oneliner(message, self.env, db)
                         ]))
+                    else:
+                        message = util.escape(message)
                 yield kinds[status], href, title, t, author, message
 
     # Internal methods
