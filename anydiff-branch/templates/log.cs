@@ -136,7 +136,7 @@
   </tbody>
  </table>
  <div class="buttons"><input type="submit" value="View changes" 
-      title="Diff from Old Revision to New Revision (select them below)" />
+      title="Diff from Old Revision to New Revision (select them above)" />
  </div>
  </form><?cs
  if:len(links.prev) || len(links.next) ?><div id="paging" class="nav"><ul><?cs

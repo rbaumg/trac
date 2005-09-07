@@ -313,7 +313,8 @@ class SubversionRepository(Repository):
                 expect_deletion = True
                 rev = self.previous_rev(rev)
 
-    def get_deltas(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=0):
+    def get_deltas(self, old_path, old_rev, new_path, new_rev,
+                   ignore_ancestry=0):
         old_node = new_node = None
         old_rev = self.normalize_rev(old_rev)
         new_rev = self.normalize_rev(new_rev)
@@ -341,7 +342,7 @@ class SubversionRepository(Repository):
             new_root = fs.revision_root(self.fs_ptr, new_rev, self.pool)
             def authz_cb(root, path, pool): return 1
             text_deltas = 0 # as this is anyway re-done in Diff.py...
-            entry_props = 0 # ("... typically used only for working copy updates")
+            entry_props = 0 # "... typically used only for working copy updates"
             repos.svn_repos_dir_delta(old_root, old_path, '',
                                       new_root, new_path,
                                       e_ptr, e_baton, authz_cb,
@@ -353,11 +354,14 @@ class SubversionRepository(Repository):
             for path, kind, change in editor.deltas:
                 old_node = new_node = None
                 if change != Changeset.ADD:
-                    old_node = self.get_node(posixpath.join(old_path, path), old_rev)
+                    old_node = self.get_node(posixpath.join(old_path, path),
+                                             old_rev)
                 if change != Changeset.DELETE:
-                    new_node = self.get_node(posixpath.join(new_path, path), new_rev)
+                    new_node = self.get_node(posixpath.join(new_path, path),
+                                             new_rev)
                 else:
-                    kind = _kindmap[fs.check_path(old_root, old_node.path, self.pool)]
+                    kind = _kindmap[fs.check_path(old_root, old_node.path,
+                                                  self.pool)]
                 yield  (old_node, new_node, kind, change)
         else:
             old_root = fs.revision_root(self.fs_ptr, old_rev, self.pool)
@@ -550,7 +554,8 @@ class DiffChangeEditor(delta.Editor):
     def open_root(self, base_revision, dir_pool):
         return ('/', Changeset.EDIT)
 
-    def add_directory(self, path, dir_baton, copyfrom_path, copyfrom_rev, dir_pool):
+    def add_directory(self, path, dir_baton, copyfrom_path, copyfrom_rev,
+                      dir_pool):
         self.deltas.append((path, Node.DIRECTORY, Changeset.ADD))
         return (path, Changeset.ADD)
 
@@ -565,7 +570,8 @@ class DiffChangeEditor(delta.Editor):
     def delete_entry(self, path, revision, dir_baton, pool):
         self.deltas.append((path, None, Changeset.DELETE))
 
-    def add_file(self, path, dir_baton, copyfrom_path, copyfrom_revision, dir_pool):
+    def add_file(self, path, dir_baton, copyfrom_path, copyfrom_revision,
+                 dir_pool):
         self.deltas.append((path, Node.FILE, Changeset.ADD))
 
     def open_file(self, path, dir_baton, dummy_rev, file_pool):
