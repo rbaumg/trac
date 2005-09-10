@@ -101,15 +101,20 @@ class ChangesetModule(AbstractDiffModule):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        yield (r"!?\[\d+\]|(?:\b|!)r\d+\b(?!:\d)",
+        yield (r"!?\[(?P<it_changeset>[a-zA-Z_-]{0,3})\d+\]|" # [1] or [T1]
+               r"(?:\b|!)r\d+\b(?!:\d)",                      # r1 but not r1:2
                lambda x, y, z: self._format_link(x, 'changeset',
                                                  y[0] == 'r' and y[1:]
-                                                 or y[1:-1], y))
+                                                 or y[1:-1], y, z))
 
     def get_link_resolvers(self):
         yield ('changeset', self._format_link)
 
-    def _format_link(self, formatter, ns, rev, label):
+    def _format_link(self, formatter, ns, rev, label, fullmatch=None):
+        intertrac = formatter.shorthand_intertrac_helper(ns, rev, label,
+                                                         fullmatch)
+        if intertrac:
+            return intertrac
         cursor = formatter.db.cursor()
         cursor.execute('SELECT message FROM revision WHERE rev=%s', (rev,))
         row = cursor.fetchone()
