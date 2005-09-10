@@ -748,7 +748,7 @@ def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
     return out.getvalue()
 
 
-# InterWiki support
+# -- InterWiki support
 
 class InterWikiMap(Component):
 
@@ -775,11 +775,11 @@ class InterWikiMap(Component):
         def setarg(match):
             num = int(match.group()[1:])
             return 0 < num <= len(args) and args[num-1] or ''
-        url2 = re.sub(InterWikiMap._argspec_re, setarg, url)
-        if url2 == url: 
+        url_with_args = re.sub(InterWikiMap._argspec_re, setarg, url)
+        if url_with_args == url: 
             return url + target, title
         else:
-            return url2, title
+            return url_with_args, title
 
     # IWikiChangeListener methods
 
@@ -829,10 +829,15 @@ class InterWikiMap(Component):
         keys = self._interwiki_map.keys()
         keys.sort()
         buf = StringIO()
-        buf.write('<dl>')
+        buf.write('<table><tr><th>Prefix</th><td>Site</td></tr>\n')
         for k in keys:
             prefix, url, title = self._interwiki_map[k]
-            buf.write('<dt><a href="%s">%s</a></dt>'
-                      '<dd>%s</dd>' % (url, prefix, title))
-        buf.write('</dl>')
+            shortened_url = url and url[:-1]
+            description = title == prefix and shortened_url or title
+            buf.write('<tr>\n' +
+                      ('<td><a href="%sRecentChanges">%s</a></td>'
+                       '<td><a href="%s">%s</a></td>\n') \
+                      % (url, prefix, shortened_url, description) +
+                      '</tr>\n')
+        buf.write('</table>\n')
         return buf.getvalue()

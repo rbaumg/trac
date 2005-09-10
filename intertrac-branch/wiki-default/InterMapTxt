@@ -34,9 +34,12 @@ Also note that !InterWiki prefixes are case insensitive.
 
 {{{
 Trac http://projects.edgewall.com/trac/$1/$2   # The Official Trac for Trac
+TracML http://thread.gmane.org/gmane.comp.version-control.subversion.trac.general/ # Trac Mailing List Archive
 
 #
 # From MeatBall:InterMapTxt, rev 276 (19th of August 2005):
+#
+# TODO: this list requires some cleanup... many wikis are not active anymore
 #
 AbbeNormal http://ourpla.net/cgi/pikie?
 AcadWiki http://xarch.tu-graz.ac.at/autocad/wiki/
