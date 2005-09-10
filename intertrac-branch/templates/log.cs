@@ -32,7 +32,7 @@
    <label>and back to <input type="text" id="stop_rev" name="stop_rev" value="<?cs
     var:log.stop_rev ?>" size="5" /></label>
    <br />
-   <div class="choice" ?>
+   <div class="choice">
     <fieldset>
      <legend>Mode:</legend>
      <label for="stop_on_copy">
@@ -117,7 +117,7 @@
           if:idx == #0 ?> checked="checked" <?cs /if ?> /></td>
      <td class="change" style="padding-left:<?cs var:indent ?>em">
       <a title="View log starting at this revision" href="<?cs var:item.log_href ?>">
-       <div class="<?cs var:item.change ?>"></div>
+       <span class="<?cs var:item.change ?>"></span>
        <span class="comment">(<?cs var:item.change ?>)</span>
       </a>
      </td>
@@ -136,7 +136,7 @@
   </tbody>
  </table>
  <div class="buttons"><input type="submit" value="View changes" 
-      title="Diff from Old Revision to New Revision (select them below)" />
+      title="Diff from Old Revision to New Revision (select them above)" />
  </div>
  </form><?cs
  if:len(links.prev) || len(links.next) ?><div id="paging" class="nav"><ul><?cs

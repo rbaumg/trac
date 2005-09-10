@@ -28,6 +28,7 @@ from trac.wiki import IWikiSyntaxProvider
 from trac.versioncontrol import Changeset
 from trac.versioncontrol.web_ui.util import *
 
+LOG_LIMIT = 100
 
 class LogModule(Component):
 
@@ -65,7 +66,7 @@ class LogModule(Component):
         format = req.args.get('format')
         stop_rev = req.args.get('stop_rev')
         verbose = req.args.get('verbose')
-        limit = int(req.args.get('limit') or 100)
+        limit = LOG_LIMIT
         old = req.args.get('old')
         new = req.args.get('new')
 
@@ -215,7 +216,10 @@ class LogModule(Component):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        return []
+        yield (r"!?\[\d+:\d+\]|(?:\b|!)r\d+:\d+\b",
+               lambda x, y, z: self._format_link(x, 'log',
+                                                 '#'+(y[0] == 'r' and y[1:]
+                                                      or y[1:-1]), y))
 
     def get_link_resolvers(self):
         yield ('log', self._format_link)

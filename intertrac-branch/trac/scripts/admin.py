@@ -27,9 +27,10 @@ import traceback
 import urllib
 
 import trac
-from trac import perm, util
+from trac import perm, util, db_default
 from trac.config import default_dir
 from trac.env import Environment
+from trac.config import Configuration
 from trac.Milestone import Milestone
 from trac.perm import PermissionSystem
 from trac.ticket.model import *
@@ -1016,6 +1017,7 @@ class TracAdmin(cmd.Cmd):
         if arg[0] in ['-b', '--no-backup']:
             do_backup = False
         self.db_open()
+        self._update_sample_config()
         try:
             if not self.__env.needs_upgrade():
                 print "Database is up to date, no upgrade necessary."
@@ -1025,6 +1027,17 @@ class TracAdmin(cmd.Cmd):
         except Exception, e:
             print "Upgrade failed:", e
             traceback.print_exc()
+
+    def _update_sample_config(self):
+        filename = os.path.join(self.__env.path, 'conf', 'trac.ini.sample')
+        try:
+            file(filename, 'w').close() # Create the config file
+            config = Configuration(filename)
+            for section, name, value in db_default.default_config:
+                config.set(section, name, value)
+            config.save()
+        except IOError, e:
+            print "Warning: couldn't write sample configuration file (%s)" % e
 
     _help_hotcopy = [('hotcopy <backupdir>',
                       'Make a hot backup copy of an environment')]

@@ -72,6 +72,7 @@
  <div><?cs 
   if:!diff.chgset ?>
    <input type="hidden" name="old_path" value="<?cs var:diff.old_path ?>" />
+   <input type="hidden" name="path" value="<?cs var:diff.new_path ?>" />
    <input type="hidden" name="old" value="<?cs var:diff.old_rev ?>" />
    <input type="hidden" name="new" value="<?cs var:diff.new_rev ?>" /><?cs
   /if ?>

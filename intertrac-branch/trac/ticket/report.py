@@ -344,9 +344,8 @@ class ReportModule(Component):
                         value['ticket_href'] = self.env.href.ticket(id_val)
                 elif column == 'description':
                     value['parsed'] = wiki_to_html(cell, self.env, req, db)
-                elif column == 'reporter':
-                    value['reporter'] = cell
-                    value['reporter.rss'] = cell.find('@') and cell or ''
+                elif column == 'reporter' and cell.find('@') != -1:
+                    value['rss'] = util.escape(cell)
                 elif column == 'report':
                     value['report_href'] = self.env.href.report(cell)
                 elif column in ['time', 'date','changetime', 'created', 'modified']:
@@ -487,9 +486,10 @@ class ReportModule(Component):
         if item:
             item = item.child()
             while item:
-                nodename = 'report.items.%s.summary' % item.name()
-                summary = req.hdf.get(nodename, '')
-                req.hdf[nodename] = util.escape(summary)
+                for col in ('summary', 'description.parsed'):
+                    nodename = 'report.items.%s.%s' % (item.name(), col)
+                    value = req.hdf.get(nodename, '')
+                    req.hdf[nodename] = util.escape(value)
                 item = item.next()
 
     def _render_sql(self, req, id, title, description, sql):

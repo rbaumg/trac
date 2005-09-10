@@ -478,7 +478,6 @@ class AbstractDiffModule(Component):
         req.send_header('Content-Type', 'application/zip')
         req.send_header('Content-Disposition',
                         'filename=%s.zip' % filename)
-        req.end_headers()
 
         try:
             from cStringIO import StringIO
@@ -497,6 +496,11 @@ class AbstractDiffModule(Component):
                 zipinfo.compress_type = ZIP_DEFLATED
                 zipfile.writestr(zipinfo, new_node.get_content().read())
         zipfile.close()
+
+        buf.seek(0, 2) # be sure to be at the end
+        req.send_header("Content-Length", buf.tell())
+        req.end_headers()
+        
         req.write(buf.getvalue())
 
 

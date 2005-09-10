@@ -18,8 +18,9 @@ VERSION = str(trac.__version__)
 URL = trac.__url__
 LICENSE = trac.__license__
 
-if sys.version_info<(2,1):
-    print >>sys.stderr, "You need at least Python 2.1 for %s %s" % (PACKAGE, VERSION)
+if sys.version_info < (2, 3):
+    print >>sys.stderr, 'You need at least Python 2.3 for %s %s' \
+                        % (PACKAGE, VERSION)
     sys.exit(3)
 
 def _p(unix_path):
@@ -142,7 +143,7 @@ distutils.command.bdist_wininst.bdist_wininst = my_bdist_wininst
 # parameters for various rpm distributions
 rpm_distros = {
     'suse_options': { 'version_suffix': 'SuSE',
-                      'requires': """python >= 2.1
+                      'requires': """python >= 2.3
                         subversion >= 1.0.0
                         pysqlite >= 0.4.3
                         clearsilver >= 0.9.3

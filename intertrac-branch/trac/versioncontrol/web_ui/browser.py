@@ -94,19 +94,25 @@ class BrowserModule(Component):
         hidden_properties = [p.strip() for p
                              in self.config.get('browser', 'hide_properties',
                                                 'svk:merge').split(',')]
+
         req.hdf['title'] = path
-        req.hdf['browser'] = {
+        browser_hdf = {
             'path': path,
             'revision': rev,
             'props': dict([(util.escape(name), util.escape(value))
                            for name, value in node.get_properties().items()
-                           if not name in hidden_properties]),
+                           if not name in hidden_properties])
+            }
+        browser_hrefs = {
             'href': self.env.href.browser(path,rev=rev),
             'restricted_changeset_href': self.env.href.changeset(node.rev,
                                                                  path=path),
             'anydiff_href': self.env.href.anydiff(),
             'log_href': self.env.href.log(path)
-        }
+            }
+        browser_hdf.update(dict([(key, util.escape(href)) for key, href in
+                                 browser_hrefs.items()]))
+        req.hdf['browser'] = browser_hdf
 
         path_links = get_path_links(self.env.href, path, rev)
         if len(path_links) > 1:
@@ -143,8 +149,9 @@ class BrowserModule(Component):
                 'size': util.pretty_size(entry.content_length),
                 'rev': entry.rev,
                 'permission': 1, # FIXME
-                'log_href': self.env.href.log(entry.path, rev=rev),
-                'browser_href': self.env.href.browser(entry.path, rev=rev)
+                'log_href': util.escape(self.env.href.log(entry.path, rev=rev)),
+                'browser_href': util.escape(self.env.href.browser(entry.path,
+                                                                  rev=rev))
             })
         changes = get_changes(self.env, repos, [i['rev'] for i in info])
 
@@ -179,12 +186,12 @@ class BrowserModule(Component):
         changeset = repos.get_changeset(node.rev)  
         req.hdf['file'] = {  
             'rev': node.rev,  
-            'changeset_href': self.env.href.changeset(node.rev),  
-            'date': time.strftime('%x %X', time.localtime(changeset.date)),  
-            'age': util.pretty_timedelta(changeset.date),  
-            'author': changeset.author or 'anonymous',  
-            'message': wiki_to_html(changeset.message or '--', self.env, req,  
-                                    escape_newlines=True)  
+            'changeset_href': util.escape(self.env.href.changeset(node.rev)),
+            'date': time.strftime('%x %X', time.localtime(changeset.date)),
+            'age': util.pretty_timedelta(changeset.date),
+            'author': changeset.author or 'anonymous',
+            'message': wiki_to_html(changeset.message or '--', self.env, req,
+                                    escape_newlines=True)
         } 
         mime_type = node.content_type
         if not mime_type or mime_type == 'application/octet-stream':
@@ -244,7 +251,7 @@ class BrowserModule(Component):
 
             raw_href = self.env.href.browser(node.path, rev=rev and node.rev,
                                              format='raw')
-            req.hdf['file.raw_href'] = raw_href
+            req.hdf['file.raw_href'] = util.escape(raw_href)
             add_link(req, 'alternate', raw_href, 'Original Format', mime_type)
 
             add_stylesheet(req, 'common/css/code.css')
@@ -267,5 +274,5 @@ class BrowserModule(Component):
         path, rev = get_path_rev(path)
         label = urllib.unquote(label)
         return '<a class="source" href="%s">%s</a>' \
-               % (formatter.href.browser(path, rev=rev), label)
+               % (util.escape(formatter.href.browser(path, rev=rev)), label)
 
