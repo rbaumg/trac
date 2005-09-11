@@ -19,6 +19,12 @@ like wiki pages, tickets, reports, settings, etc. A Trac environment consist of
 a directory containing an SQLite database, human-readable configuration file,
 log-files and attachments.
 
+Before create a Trac environment, you need to have a Subversion
+repository. This can be made with:
+
+    $ mkdir /path/to/repos
+    $ svnadmin create /path/to/repos
+
 A new Trac environment is created with trac-admin:
 
     $ trac-admin /path/to/projectenv initenv
