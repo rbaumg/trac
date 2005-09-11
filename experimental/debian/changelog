@@ -2,6 +2,8 @@ trac (0.9-0beta1+r2227-2) UNRELEASED; urgency=low
 
   * debian/README.Debian: cite the need of a ready to use Subversion
     repository to setup Trac environment. (Closes: #327205)
+  * debian/control: add depends of python2.3 package to leave lintain
+    happy.
 
  -- Otavio Salvador <otavio@debian.org>  Sun, 11 Sep 2005 00:59:36 -0300
 
