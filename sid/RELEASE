@@ -1,8 +1,8 @@
-Trac 0.8.4 Release Notes
-========================
-Jun 19, 2005
+Trac 0.9-beta1 Release Notes
+============================
+Sept 5, 2005
 
-We're proud to present our latest release - Trac 0.8.4.
+We're proud to present our latest beta release - Trac 0.9-beta1.
 
 Trac is an enhanced wiki and issue tracking system, integrated with
 Subversion, for software development projects. Trac uses a minimalistic
@@ -20,7 +20,7 @@ For more information, please visit the main Trac web site:
 
   <http://trac.edgewall.com/>
 
-The software, published under the GNU General Public License, is
+The software, published under the modified BSD License, is
 available at:
 
   <http://projects.edgewall.com/trac/download/>
@@ -36,37 +36,17 @@ For questions, comments and user discussions, please use the Trac mailing list
 
 What's New
 ----------
+A brief summary of major changes for this release:
 
-This release contains a security update. Trac <= 0.8.3 could be tricked into 
-uploading files outside the environment directory. All users are recommended 
-to upgrade. Vulnerability found by the Hardened-PHP project.
+ * License changed from GPL to modified BSD.
+ * Improved modularity and extendibility (plugin support).
+ * Postgresql database support.
+ * FastCGI frontend support.
 
 For a more complete list of improvements, see the ChangeLog at:
 
  <http://projects.edgewall.com/trac/wiki/ChangeLog>
 
-
-About Edgewall
---------------
-Edgewall is a highly experienced team of software developers specializing in
-emerging internet and web technologies.
-
-We build professional, innovative and creative solutions for the web based on
-open source components, operating systems and frameworks.
-
-Specific areas of expertise include:
-
-    * Python development, including Python extensions and integration.
-    * Web services and application development.
-    * C and C++ application development for UNIX and Linux.
-    * Cross-platform application development and porting.
-    * Open Source development practices, methods and tools.
-
-Edgewall also offers professional Trac support and consulting, including
-customization, integration and custom feature development.
-
-For more information, visit our web site at <http://www.edgewall.com/>
-or email us at <mailto:info@edgewall.com>.
 
 Acknowledgements
 ----------------
@@ -83,9 +63,3 @@ over the last version.
 Please let us know. :-)
 
 /The Trac Team <http://trac.edgewall.com/>
-
--- 
-Copyright (c) 2005 Edgewall Software
-Edgewall Software - Professional GNU/Linux & Open Source Consulting
-<http://www.edgewall.com/>
-

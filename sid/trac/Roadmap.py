@@ -1,115 +1,114 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004 Edgewall Software
-# Copyright (C) 2004 Christopher Lenz <cmlenz@gmx.de>
+# Copyright (C) 2004-2005 Edgewall Software
+# Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For the exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
-from __future__ import nested_scopes
+from __future__ import generators
 import re
 from time import localtime, strftime, time
 
-from __init__ import __version__
-import perm
-import Milestone
-from util import add_to_hdf, CRLF, TracError
-from Module import Module
-from Ticket import Ticket
-from Wiki import wiki_to_html
+from trac import __version__
+from trac.core import *
+from trac.Milestone import Milestone, calc_ticket_stats, get_query_links, \
+                           get_tickets_for_milestone, milestone_to_hdf
+from trac.perm import IPermissionRequestor
+from trac.util import enum, escape, pretty_timedelta, CRLF
+from trac.ticket import Ticket
+from trac.web import IRequestHandler
+from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 
 
-class Roadmap(Module):
-    template_name = 'roadmap.cs'
+class RoadmapModule(Component):
 
-    def render(self):
-        self.perm.assert_permission(perm.ROADMAP_VIEW)
-        self.req.hdf.setValue('title', 'Roadmap')
+    implements(INavigationContributor, IPermissionRequestor, IRequestHandler)
 
-        if self.perm.has_permission(perm.MILESTONE_CREATE):
-            self.req.hdf.setValue('roadmap.href.newmilestone',
-                                   self.env.href.milestone(None, 'new'))
+    # INavigationContributor methods
 
-        icalhref = '?format=ics'
-        show = self.args.get('show', 'current')
-        if show == 'all':
-            icalhref += '&show=all'
-            self.req.hdf.setValue('roadmap.href.list',
-                                   self.env.href.roadmap())
-            query = "SELECT name, time, descr FROM milestone " \
-                    "WHERE name != '' " \
-                    "ORDER BY (IFNULL(time, 0) = 0) ASC, time ASC, name"
-        else:
-            self.req.hdf.setValue('roadmap.showall', '1')
-            self.req.hdf.setValue('roadmap.href.list',
-                                   self.env.href.roadmap('all'))
-            query = "SELECT name, time, descr FROM milestone " \
-                    "WHERE name != '' " \
-                    "AND (time IS NULL OR time = 0 OR time > %d) " \
-                    "ORDER BY (IFNULL(time, 0) = 0) ASC, time ASC, name" % time()
+    def get_active_navigation_item(self, req):
+        return 'roadmap'
 
-        if self.req.authname and self.req.authname != 'anonymous':
-            icalhref += '&user=' + self.req.authname
-        self.add_link('alternate', icalhref, 'iCalendar', 'text/calendar', 'ics')
+    def get_navigation_items(self, req):
+        if not req.perm.has_permission('ROADMAP_VIEW'):
+            return
+        yield 'mainnav', 'roadmap', '<a href="%s" accesskey="3">Roadmap</a>' \
+                                    % self.env.href.roadmap()
 
-        cursor = self.db.cursor()
-        cursor.execute(query)
-        self.milestones = []
-        while 1:
-            row = cursor.fetchone()
-            if not row:
-                break
-            milestone = {
-                'name': row['name'],
-                'href': self.env.href.milestone(row['name']),
-                'time': row['time'] and int(row['time'])
-            }
-            descr = row['descr']
-            if descr:
-                milestone['descr'] = wiki_to_html(descr, self.req.hdf,
-                                                  self.env, self.db)
-                milestone['descr_text'] = descr
-            if milestone['time'] > 0:
-                milestone['date'] = strftime('%x', localtime(milestone['time']))
-            self.milestones.append(milestone)
-        cursor.close()
-        add_to_hdf(self.milestones, self.req.hdf, 'roadmap.milestones')
+    # IPermissionRequestor methods
 
-        milestone_no = 0
-        for milestone in self.milestones:
-            tickets = Milestone.get_tickets_for_milestone(self.env, self.db,
-                                                          milestone['name'],
-                                                          'owner')
-            stats = Milestone.calc_ticket_stats(tickets)
-            add_to_hdf(stats, self.req.hdf,
-                       'roadmap.milestones.%d.stats' % int(milestone_no))
-            queries = Milestone.get_query_links(self.env, milestone['name'])
-            add_to_hdf(queries, self.req.hdf,
-                       'roadmap.milestones.%d.queries' % int(milestone_no))
-            milestone['tickets'] = tickets
-            milestone_no += 1
+    def get_permission_actions(self):
+        return ['ROADMAP_VIEW']
 
-    def display_ics(self):
-        self.req.send_response(200)
-        self.req.send_header('Content-Type', 'text/calendar;charset=utf-8')
-        self.req.end_headers()
+    # IRequestHandler methods
 
-        priority_mapping = { 'highest': '1', 'high': '3', 'normal': '5',
-                             'low': '7', 'lowest': '9' }
-    
+    def match_request(self, req):
+        return re.match(r'/roadmap/?', req.path_info) is not None
+
+    def process_request(self, req):
+        req.perm.assert_permission('ROADMAP_VIEW')
+        req.hdf['title'] = 'Roadmap'
+
+        showall = req.args.get('show') == 'all'
+        req.hdf['roadmap.showall'] = showall
+
+        db = self.env.get_db_cnx()
+        milestones = []
+        for idx, milestone in enum(Milestone.select(self.env, showall)):
+            hdf = milestone_to_hdf(self.env, db, req, milestone)
+            milestones.append(hdf)
+        req.hdf['roadmap.milestones'] = milestones
+
+        for idx,milestone in enum(milestones):
+            prefix = 'roadmap.milestones.%d.' % idx
+            tickets = get_tickets_for_milestone(self.env, db, milestone['name'],
+                                                'owner')
+            req.hdf[prefix + 'stats'] = calc_ticket_stats(tickets)
+            for k, v in get_query_links(self.env, milestone['name']).items():
+                req.hdf[prefix + 'queries.' + k] = escape(v)
+            milestone['tickets'] = tickets # for the iCalendar view
+
+        if req.args.get('format') == 'ics':
+            self.render_ics(req, db, milestones)
+            return
+
+        add_stylesheet(req, 'common/css/roadmap.css')
+
+        # FIXME should use the 'webcal:' scheme, probably
+        username = None
+        if req.authname and req.authname != 'anonymous':
+            username = req.authname
+        icshref = self.env.href.roadmap(show=req.args.get('show'),
+                                        user=username, format='ics')
+        add_link(req, 'alternate', icshref, 'iCalendar', 'text/calendar', 'ics')
+
+        return 'roadmap.cs', None
+
+    # Internal methods
+
+    def render_ics(self, req, db, milestones):
+        req.send_response(200)
+        req.send_header('Content-Type', 'text/calendar;charset=utf-8')
+        req.end_headers()
+
+        from trac.ticket import Priority
+        priorities = {}
+        for priority in Priority.select(self.env):
+            priorities[priority.name] = float(priority.value)
+        def get_priority(ticket):
+            value = priorities.get(ticket['priority'])
+            if value:
+                return int(value * 9 / len(priorities))
+
         def get_status(ticket):
             status = ticket['status']
             if status == 'new' or status == 'reopened' and not ticket['owner']:
@@ -128,7 +127,7 @@ class Roadmap(Module):
             while text:
                 if not firstline: text = ' ' + text
                 else: firstline = 0
-                self.req.write(text[:75] + CRLF)
+                req.write(text[:75] + CRLF)
                 text = text[75:]
 
         def write_date(name, value, params={}):
@@ -138,47 +137,51 @@ class Roadmap(Module):
         def write_utctime(name, value, params={}):
             write_prop(name, strftime('%Y%m%dT%H%M%SZ', value), params)
 
-        host = self.req.base_url[self.req.base_url.find('://') + 3:]
-        user = self.args.get('user', 'anonymous')
+        host = req.base_url[req.base_url.find('://') + 3:]
+        user = req.args.get('user', 'anonymous')
 
         write_prop('BEGIN', 'VCALENDAR')
         write_prop('VERSION', '2.0')
         write_prop('PRODID', '-//Edgewall Software//NONSGML Trac %s//EN'
                    % __version__)
         write_prop('X-WR-CALNAME',
-                   self.env.get_config('project', 'name') + ' - Roadmap')
-        for milestone in self.milestones:
-            uid = '<%s/milestone/%s@%s>' % (self.req.cgi_location,
+                   self.config.get('project', 'name') + ' - Roadmap')
+        for milestone in milestones:
+            uid = '<%s/milestone/%s@%s>' % (req.cgi_location,
                                             milestone['name'], host)
-            if milestone.has_key('date'):
+            if milestone.has_key('due'):
                 write_prop('BEGIN', 'VEVENT')
                 write_prop('UID', uid)
-                if milestone.has_key('date'):
-                    write_date('DTSTART', localtime(milestone['time']))
+                write_date('DTSTART', localtime(milestone['due']))
                 write_prop('SUMMARY', 'Milestone %s' % milestone['name'])
-                write_prop('URL', self.req.base_url + '/milestone/' + milestone['name'])
-                if milestone.has_key('descr'):
-                    write_prop('DESCRIPTION', milestone['descr_text'])
+                write_prop('URL', req.base_url + '/milestone/' +
+                           milestone['name'])
+                if milestone.has_key('description_source'):
+                    write_prop('DESCRIPTION', milestone['description_source'])
                 write_prop('END', 'VEVENT')
-            for ticket in [ticket for ticket in milestone['tickets']
-                          if ticket['owner'] == user]:
-                ticket = Ticket(self.db, ticket['id'])
+            for tkt_id in [ticket['id'] for ticket in milestone['tickets']
+                           if ticket['owner'] == user]:
+                ticket = Ticket(self.env, tkt_id)
                 write_prop('BEGIN', 'VTODO')
                 if milestone.has_key('date'):
                     write_prop('RELATED-TO', uid)
-                    write_date('DUE', localtime(milestone['time']))
-                write_prop('SUMMARY', 'Ticket #%i: %s' % (ticket['id'],
+                    write_date('DUE', localtime(milestone['due']))
+                write_prop('SUMMARY', 'Ticket #%i: %s' % (ticket.id,
                                                           ticket['summary']))
-                write_prop('URL', self.req.base_url + '/ticket/' + str(ticket['id']))
+                write_prop('URL', self.env.abs_href.ticket(ticket.id))
                 write_prop('DESCRIPTION', ticket['description'])
-                write_prop('PRIORITY', priority_mapping[ticket['priority']])
+                priority = get_priority(ticket)
+                if priority:
+                    write_prop('PRIORITY', str(priority))
                 write_prop('STATUS', get_status(ticket))
                 if ticket['status'] == 'closed':
-                    cursor = self.db.cursor()
+                    cursor = db.cursor()
                     cursor.execute("SELECT time FROM ticket_change "
-                                   "WHERE ticket = %i AND field = 'status' "
-                                   "ORDER BY time desc LIMIT 1", ticket['id'])
+                                   "WHERE ticket=%s AND field='status' "
+                                   "ORDER BY time desc LIMIT 1",
+                                   (ticket.id,))
                     row = cursor.fetchone()
-                    if row: write_utctime('COMPLETED', localtime(row['time']))
+                    if row:
+                        write_utctime('COMPLETED', localtime(row[0]))
                 write_prop('END', 'VTODO')
         write_prop('END', 'VCALENDAR')

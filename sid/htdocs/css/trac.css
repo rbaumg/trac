@@ -3,6 +3,7 @@ body {
  background: #fff;
  color: #000;
  margin: 10px;
+ padding: 0;
 }
 body, th, td {
  font: normal 13px verdana,arial,'Bitstream Vera Sans',helvetica,sans-serif;
@@ -19,7 +20,7 @@ hr { border: none;  border-top: 1px solid #ccb; margin: 2em 0 }
 address { font-style: normal }
 img { border: none }
 
-.underline { text-decoration: underline; }
+.underline { text-decoration: underline }
 ol.loweralpha { list-style-type: lower-alpha }
 ol.upperalpha { list-style-type: upper-alpha }
 ol.lowerroman { list-style-type: lower-roman }
@@ -41,29 +42,38 @@ h4 :link, h4 :visited, h5 :link, h5 :visited, h6 :link, h6 :visited {
  color: inherit;
 }
 
-.ext-link { background: url(../extlink.gif) no-repeat 0 58%; padding-left: 16px }
-* html .ext-link { background-position: 0 .35em } /* IE hack, see #937 */
+@media screen {
+ a.ext-link .icon {
+  background: url(../extlink.gif) left center no-repeat;
+  padding-left: 16px;
+ }
+ * html a.ext-link .icon { display: inline-block; }
+}
 
 /* Forms */
 input, textarea, select { margin: 2px }
 input, select { vertical-align: middle }
-input[type=submit], input[type=reset] {
+input[type=button], input[type=submit], input[type=reset] {
  background: #eee;
  color: #222;
  border: 1px outset #ccc;
  padding: .1em .5em;
 }
-input[type=submit]:hover, input[type=reset]:hover { background: #ccb }
-input[type=text], input.textwidget, textarea {
- background: #fff;
- color: #000;
- border: 1px solid #d7d7d7;
+input[type=button]:hover, input[type=submit]:hover, input[type=reset]:hover {
+ background: #ccb;
 }
+input[type=button][disabled], input[type=submit][disabled],
+input[type=reset][disabled] {
+ background: #f6f6f6;
+ border-style: solid;
+ color: #999;
+}
+input[type=text], input.textwidget, textarea { border: 1px solid #d7d7d7 }
 input[type=text], input.textwidget { padding: .25em .5em }
 input[type=text]:focus, textarea:focus { border: 1px solid #886 }
 option { border-bottom: 1px dotted #d7d7d7 }
 fieldset { border: 1px solid #d7d7d7; padding: .5em; margin: 0 }
-fieldset.iefix { border: none; padding: 0; margin: 0 }
+fieldset.iefix { background: transparent; border: none; padding: 0; margin: 0 }
 * html fieldset.iefix { width: 98% }
 fieldset.iefix p { margin: 0 }
 legend { color: #999; padding: 0 .25em; font-size: 90%; font-weight: bold }
@@ -74,12 +84,15 @@ label.disabled { color: #d7d7d7 }
 
 /* Header */
 #header hr { display: none }
+#header h1 { margin: 1.5em 0 -1.5em; }
 #header img { border: none; margin: 0 0 -3em }
 #header :link, #header :visited, #header :link:hover, #header :visited:hover {
  background: transparent;
+ color: #555;
  margin-bottom: 2px;
  border: none;
 }
+#header h1 :link:hover, #header h1 :visited:hover { color: #000 }
 
 /* Quick search */
 #search {
@@ -125,14 +138,14 @@ label.disabled { color: #d7d7d7 }
  background-color: #ccc;
  border-right: 1px solid #ddd;
 }
-#mainnav .active:link, #mainnav .active:visited {
+#mainnav .active :link, #mainnav .active :visited {
  background: #333 url(../topbar_gradient2.png) 0 0 repeat-x;
  border-top: none;
  border-right: 1px solid #000;
  color: #eee;
  font-weight: bold;
 }
-#mainnav .active:link:hover, #mainnav .active:visited:hover {
+#mainnav .active :link:hover, #mainnav .active :visited:hover {
  border-right: 1px solid #000;
 }
 
@@ -224,7 +237,12 @@ label.disabled { color: #d7d7d7 }
 }
 * html #prefs { width: 26em } /* Set width only for IE */
 #prefs input, #prefs select { font-size: 9px; vertical-align: middle }
-#prefs fieldset { border: none; margin: .5em; padding: 0 }
+#prefs fieldset {
+ background: transparent;
+ border: none;
+ margin: .5em;
+ padding: 0;
+}
 #prefs fieldset legend {
  background: transparent;
  color: #000;
@@ -236,15 +254,36 @@ label.disabled { color: #d7d7d7 }
 #prefs .buttons { text-align: right }
 
 /* Wiki */
-a.missing:link,a.missing:visited { background: #fafaf0; color: #998 }
-a.missing:hover { color: #000; }
+.wikipage { padding-left: 18px }
+.wikipage h1, .wikipage h2, .wikipage h3 { margin-left: -18px }
 
-#content.wiki { line-height: 140% }
+a.missing:link, a.missing:visited { background: #fafaf0; color: #998 }
+a.missing:hover { color: #000; }
+a.closed:link, a.closed:visited { text-decoration: line-through }
+
+dl.wiki dt { font-weight: bold }
+dl.compact dt { float: left; padding-right: .5em }
+dl.compact dd { margin: 0; padding: 0 }
+
+pre.wiki, pre.literal-block {
+ background: #f7f7f7;
+ border: 1px solid #d7d7d7;
+ margin: 1em 1.75em;
+ padding: .25em;
+ overflow: auto;
+}
+table.wiki {
+ border: 2px solid #ccc;
+ border-collapse: collapse;
+ border-spacing: 0;
+}
+table.wiki td { border: 1px solid #ccc;  padding: .1em .25em; }
+
 .wikitoolbar {
  border: solid #d7d7d7;
  border-width: 1px 1px 1px 0;
- float: left;
  height: 18px;
+ width: 156px;
 }
 .wikitoolbar :link, .wikitoolbar :visited {
  background: transparent url(../edit_toolbar.png) no-repeat;
@@ -272,7 +311,9 @@ a.missing:hover { color: #000; }
 #attachment label { padding-left: .2em }
 #attachment fieldset { margin-top: 2em }
 #attachment fieldset .field { float: left; margin: 0 1em .5em 0 }
+#attachment .options { float: left; padding: 0 0 1em 1em }
 #attachment br { clear: left }
+.attachment #preview { margin-top: 1em }
 
 /* Styles for tabular listings such as those used for displaying directory
    contents and report results. */
@@ -317,21 +358,6 @@ table.listing tbody tr { border-top: 1px solid #ddd }
 table.listing tbody tr.even { background-color: #fcfcfc }
 table.listing tbody tr.odd { background-color: #f7f7f7 }
 table.listing tbody tr:hover { background: #eed !important }
-
-.wikipage p { margin-left: 1em }
-pre.wiki, pre.literal-block {
- background: #f7f7f7;
- border: 1px solid #d7d7d7;
- margin: 1em 1.75em;
- padding: .25em;
- overflow: auto;
-}
-table.wiki {
- border: 2px solid #ccc;
- border-collapse: collapse;
- border-spacing: 0;
-}
-table.wiki td { border: 1px solid #ccc;  padding: .1em .25em; }
 
 /* Styles for the error page (and rst errors) */
 #content.error .message, div.system-message {

@@ -1,59 +1,76 @@
 # -*- coding: iso8859-1 -*-
 #
-# Copyright (C) 2004 Edgewall Software
-# Copyright (C) 2004 Daniel Lundin <daniel@edgewall.com>
+# Copyright (C) 2004-2005 Edgewall Software
+# Copyright (C) 2004-2005 Daniel Lundin <daniel@edgewall.com>
+# All rights reserved.
 #
-# Trac is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of the
-# License, or (at your option) any later version.
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution. The terms
+# are also available at http://trac.edgewall.com/license.html.
 #
-# Trac is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# This software consists of voluntary contributions made by many
+# individuals. For exact contribution history, see the revision
+# history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Daniel Lundin <daniel@edgewall.com>
 
-import time
+from __future__ import generators
 
-import perm
-from util import TracError
-from Module import Module
+from trac.core import *
+from trac.util import escape
+from trac.web import IRequestHandler
+from trac.web.chrome import INavigationContributor
 
+class SettingsModule(Component):
 
-class Settings(Module):
-    template_name = 'settings.cs'
+    implements(INavigationContributor, IRequestHandler)
 
-    _form_fields = ['newsid','name', 'email', 'tz']
+    _form_fields = ['newsid','name', 'email']
 
-    def render(self):
-        self.req.hdf.setValue('title', 'Settings')
-        action = self.args.get('action')
-        self.log.debug('Session action: %s' % action)
-        if action == 'save':
-            self.save_settings()
-        elif action == 'load':
-            self.load_session()
-        elif action == 'login':
-            self.req.redirect (self.env.href.login())
-        elif action == 'newsession':
-            raise TracError, 'new session'
+    # INavigationContributor methods
 
-    def save_settings(self):
+    def get_active_navigation_item(self, req):
+        return 'settings'
+
+    def get_navigation_items(self, req):
+        yield 'metanav', 'settings', '<a href="%s">Settings</a>' \
+              % escape(self.env.href.settings())
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        return req.path_info == '/settings'
+
+    def process_request(self, req):
+        action = req.args.get('action')
+
+        if req.method == 'POST':
+            if action == 'save':
+                self._do_save(req)
+            elif action == 'load':
+                self._do_load(req)
+
+        req.hdf['title'] = 'Settings'
+        req.hdf['settings'] = req.session
+        if req.authname == 'anonymous':
+            req.hdf['settings.session_id'] = req.session.sid
+
+        return 'settings.cs', None
+
+    # Internal methods
+
+    def _do_save(self, req):
         for field in self._form_fields:
-            val = self.args.get(field)
+            val = req.args.get(field)
             if val:
-                if field =='newsid':
-                    self.req.session.change_sid(val)
+                if field == 'newsid' and val:
+                    req.session.change_sid(val)
                 else:
-                    self.req.session[field] = val
-        self.req.session.populate_hdf() # Update HDF
+                    req.session[field] = val
+        req.redirect(self.env.href.settings())
 
-    def load_session(self):
-        oldsid = self.args.get('loadsid')
-        self.req.session.get_session(oldsid)
+    def _do_load(self, req):
+        if req.authname == 'anonymous':
+            oldsid = req.args.get('loadsid')
+            req.session.get_session(oldsid)
+        req.redirect(self.env.href.settings())
