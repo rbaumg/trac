@@ -9,7 +9,7 @@ trac (0.9-0beta1+r2227-1) experimental; urgency=low
       python2.3-sqlite;
     - Add suggests of libapache2-mod-python
   
- -- Otavio Salvador <otavio@debian.org>  Sat, 10 Sep 2005 23:40:41 -0300
+ -- Otavio Salvador <otavio@debian.org>  Sun, 11 Sep 2005 00:41:11 -0300
 
 trac (0.8.4-2) unstable; urgency=low
 
