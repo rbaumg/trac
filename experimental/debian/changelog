@@ -1,3 +1,11 @@
+trac (0.9-0beta1+r2227-1) experimental; urgency=low
+
+  * New upstream release
+    - 10_stolen_from_0.8-branch.patch: not need anymore.
+    - 11_fix_misleading_error.patch: not need anymore.
+
+ -- Otavio Salvador <otavio@debian.org>  Sat, 10 Sep 2005 23:40:41 -0300
+
 trac (0.8.4-2) unstable; urgency=low
 
   * Add 10_stolen_from_0.8-branch.patch sync with r2041.
