@@ -207,8 +207,9 @@ class WikiSystem(Component):
                        lambda x, y, z: self._format_link(x, 'wiki', y, y,
                                                          ignore_missing))
             pc = p.__class__
-            providers.append('%s.%s = yes # %s' % (pc.__module__, pc.__name__,
-                                                   pc.__doc__.split('\n')[0]))
+            providers.append('# %s\n%s.%s = yes' % (pc.__doc__.split('\n')[0],
+                                                    pc.__module__, pc.__name__)
+                                                    )
         if len(providers) > 1:
             self.log.warning('More than one IWikiPageNameSyntaxProvider '
                              'implementation available:\n'
