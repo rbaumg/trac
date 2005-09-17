@@ -42,6 +42,7 @@ class ComponentAdminPage(Component):
                 if req.args.get('save'):
                     comp.name = req.args.get('name')
                     comp.owner = req.args.get('owner')
+                    comp.description = req.args.get('description')
                     comp.update()
                     req.redirect(self.env.href.admin(cat, page))
                 elif req.args.get('cancel'):
@@ -49,7 +50,8 @@ class ComponentAdminPage(Component):
 
             req.hdf['admin.component'] = {
                 'name': comp.name,
-                'owner': comp.owner
+                'owner': comp.owner,
+                'description': comp.description
             }
         else:
             if req.method == 'POST':

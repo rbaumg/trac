@@ -21,7 +21,7 @@ if admin.component.name ?>
      <label for="description">Description (you may use <a tabindex="42" href="<?cs
        var:trac.href.wiki ?>/WikiFormatting">WikiFormatting</a> here):</label>
      <p><textarea id="description" name="description" class="wikitext" rows="6" cols="60"><?cs
-       var:admin.version.description ?></textarea></p>
+       var:admin.component.description ?></textarea></p>
     </fieldset>
    </div>
    <script type="text/javascript" src="<?cs
