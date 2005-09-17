@@ -5,17 +5,23 @@ if:admin.version.name ?>
   <fieldset>
    <legend>Modify Version:</legend>
    <div class="field">
-    <label>Name: <input type="text" name="name"value="<?cs
+    <label>Name:<br /> <input type="text" name="name"value="<?cs
       var:admin.version.name ?>" /></label>
    </div>
    <div class="field">
-    <label>Time: <input type="text" name="time" value="<?cs
+    <label>Time:<br /> <input type="text" name="time" value="<?cs
       var:admin.version.time ?>"></label>
    </div>
    <div class="field">
-    <label>Description: <input type="text" name="description" value="<?cs
-      var:admin.version.description ?>"></label>
+    <fieldset class="iefix">
+     <label for="description">Description (you may use <a tabindex="42" href="<?cs
+       var:trac.href.wiki ?>/WikiFormatting">WikiFormatting</a> here):</label>
+     <p><textarea id="description" name="description" class="wikitext" rows="6" cols="60"><?cs
+       var:admin.version.description ?></textarea></p>
+    </fieldset>
    </div>
+   <script type="text/javascript" src="<?cs
+     var:chrome.href ?>/common/js/wikitoolbar.js"></script>
    <div class="buttons">
     <input type="submit" name="cancel" value="Cancel">
     <input type="submit" name="save" value="Save">

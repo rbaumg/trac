@@ -118,7 +118,8 @@ class VersionAdminPage(Component):
             if req.method == 'POST':
                 if req.args.get('save'):
                     ver.name = req.args.get('name')
-                    # FIXME: parse the "time" field
+                    if req.args.get('time'):
+                        ver.time =  util.parse_date(req.args.get('time'))
                     ver.description = req.args.get('description')
                     ver.update()
                     req.redirect(self.env.href.admin(cat, page))
@@ -127,7 +128,7 @@ class VersionAdminPage(Component):
 
             req.hdf['admin.version'] = {
                 'name': ver.name,
-                'time': ver.time,
+                'time': ver.time and util.format_datetime(ver.time) or '',
                 'description': ver.description
             }
         else:
@@ -136,6 +137,8 @@ class VersionAdminPage(Component):
                 if req.args.get('add') and req.args.get('name'):
                     ver = ticket.Version(self.env)
                     ver.name = req.args.get('name')
+                    if req.args.get('time'):
+                        ver.time = util.parse_date(req.args.get('time'))
                     ver.insert()
                     req.redirect(self.env.href.admin(cat, page))
                          
@@ -163,11 +166,11 @@ class VersionAdminPage(Component):
 
             default = self.config.get('ticket', 'default_version')
             req.hdf['admin.versions'] = \
-                [{'name': c.name, 'time': c.time,
-                  'is_default': c.name == default,
-                  'href': self.env.href.admin(cat, page, c.name)
-                 } for c in ticket.Version.select(self.env)]
-            
+                [{'name': v.name, 'time': util.format_datetime(v.time),
+                  'is_default': v.name == default,
+                  'href': self.env.href.admin(cat, page, v.name)
+                 } for v in ticket.Version.select(self.env)]
+
         return 'admin_version.cs', None
 
 

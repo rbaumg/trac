@@ -22,6 +22,7 @@ p.help { color: #666; font-size: 90%; margin: 1em .5em .5em }
 
 form.addnew { clear: right; float: right; margin: -2em 0 4em; width: 33% }
 form.mod { margin-top: 1em; }
+form.mod .field { margin: .5em 0; }
 table.listing { clear: none; width: 64% }
 table.listing .sel, table.listing .default { text-align: center; width: 1% }
 

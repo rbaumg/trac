@@ -5,17 +5,27 @@ if admin.component.name ?>
   <fieldset>
    <legend>Modify Component:</legend>
    <div class="field">
-    <label>Name:<input type="text" name="name" value="<?cs
+    <label>Name:<br /><input type="text" name="name" value="<?cs
       var:admin.component.name ?>"></label>
    </div>
    <div class="field">
-    <label>Owner:<?cs
+    <label>Owner:<br /><?cs
      if:len(admin.owners) ?><?cs
       call:hdf_select(admin.owners, "owner", "", 0) ?><?cs
      else ?><input type="text" name="owner" value="<?cs
       var:admin.component.owner ?>" /><?cs
      /if ?></label>
    </div>
+   <div class="field">
+    <fieldset class="iefix">
+     <label for="description">Description (you may use <a tabindex="42" href="<?cs
+       var:trac.href.wiki ?>/WikiFormatting">WikiFormatting</a> here):</label>
+     <p><textarea id="description" name="description" class="wikitext" rows="6" cols="60"><?cs
+       var:admin.version.description ?></textarea></p>
+    </fieldset>
+   </div>
+   <script type="text/javascript" src="<?cs
+     var:chrome.href ?>/common/js/wikitoolbar.js"></script>
    <div class="buttons">
     <input type="submit" name="cancel" value="Cancel" />
     <input type="submit" name="save" value="Save" />
