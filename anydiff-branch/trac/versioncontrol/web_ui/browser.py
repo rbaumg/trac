@@ -105,8 +105,7 @@ class BrowserModule(Component):
             }
         browser_hrefs = {
             'href': self.env.href.browser(path,rev=rev),
-            'restricted_changeset_href': self.env.href.changeset(node.rev,
-                                                                 path=path),
+            'restr_changeset_href': self.env.href.changeset(node.rev, path),
             'anydiff_href': self.env.href.anydiff(),
             'log_href': self.env.href.log(path)
             }

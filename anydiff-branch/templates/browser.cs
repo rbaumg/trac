@@ -3,7 +3,7 @@
 
 <div id="ctxtnav" class="nav">
  <ul>
-  <li class="first"><a href="<?cs var:browser.restricted_changeset_href ?>">
+  <li class="first"><a href="<?cs var:browser.restr_changeset_href ?>">
    Last Change</a></li>
   <li class="last"><a href="<?cs var:browser.log_href ?>">
    Revision Log</a></li>

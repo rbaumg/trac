@@ -256,8 +256,7 @@ class AbstractDiffModule(Component):
                     prev = repos.get_node(path, rev).get_previous()
                     if prev:
                         prev_path, prev_rev = prev[:2]
-                        prev_href = self.env.href.changeset(prev_rev,
-                                                            path=prev_path)
+                        prev_href = self.env.href.changeset(prev_rev, prev_path)
                     else:
                         prev_path = prev_rev = None
                 else:
@@ -294,13 +293,12 @@ class AbstractDiffModule(Component):
                                               old=diff.new_rev)
             req.hdf['diff.reverse_href'] = reverse_href
             if restricted:              # 'diff between 2 revisions' mode
-                title = 'Diff r%s:%s for %s' % (diff.old_rev, diff.new_rev,
-                                                diff.new_path)
+                title = 'Diff r%s:%s for %s' \
+                        % (diff.old_rev, diff.new_rev, diff.new_path)
             else:                       # 'arbitrary diff' mode
-                title = 'Diff from %s @ %s to %s @ %s' % (diff.old_path,
-                                                          diff.old_rev,
-                                                          diff.new_path,
-                                                          diff.new_rev)
+                title = 'Diff from %s@%s to %s@%s' \
+                        % (diff.old_path, diff.old_rev,
+                           diff.new_path, diff.new_rev)
         req.hdf['title'] = title
 
         def _change_info(old_node, new_node, change):
