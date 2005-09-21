@@ -12,14 +12,14 @@
 <div id="content" class="wiki">
 
  <?cs def:anchor(obj) ?>
-  <a href="<?cs var:obj.href ?>"><em><?cs var:obj.shortname ?></em></a><?cs 
+  <a href="<?cs var:obj.href ?>"><em><?cs var:obj.displayname ?></em></a><?cs 
  /def ?>
 
  <?cs set:n_backlinks = len(xref.backlinks) ?>
  <?cs set:n_relations_in = len(xref.relations.in) ?>
  <?cs set:n_relations_out = len(xref.relations.out) ?>
 
- <h1>Cross-references for <a href="<?cs var:xref.me.href ?>"><?cs var:xref.me.fqname ?></a></h1>
+ <h1>Cross-references for <a href="<?cs var:xref.me.href ?>"><?cs var:xref.me.displayname ?></a></h1>
 
  <h2 id='backlinks'>Backlinks (<?cs var:n_backlinks ?>)</h2>
   <dl><?cs 

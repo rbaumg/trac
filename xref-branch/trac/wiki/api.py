@@ -291,10 +291,7 @@ class WikiSystem(Component):
 
     def _wiki_factory(self, id):
         from trac.wiki.model import WikiPage
-        src = WikiPage(self.env, None) # no _fetch
-        src.id = id
-        src.name = id
-        return src
+        return WikiPage(self.env).setid(id)
 
 
 WIKI_START = r"!?(?<!/)\b"

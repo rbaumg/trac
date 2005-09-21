@@ -44,15 +44,19 @@ class TracObject:
     `type` and `id`-entity:
      * manage the relationships to other Trac Objects
      * handle custom fields (future)
+    Therefore, the `factory` method produces objects that are not
+    fully loaded, as this would introduces an extra cost which is not
+    usually worth it.
 
-    Note: `type` __must__ be a static class member.
+    But the methods at the sub-class level usually require that the
+    Trac Object is fully loaded. Therefore, if the object was obtained
+    by the `factory` method, the `reload()` method must be called first.
 
-    The methods at the sub-class level usually require that the
-    Trac Object has been fully loaded.
-
-    Lastly, when a Trac Object is directly created using the sub-class
-    constructor, the `id` ''might'' not be set (e.g. while creating a new
-    object). In that case, most of the TracObject methods won't produce a
+    When a Trac Object is directly created using the sub-class
+    constructor, the `id` is usually set, and the object is the loaded.
+    However,  in some cases, the id ''might'' not be set
+    (e.g. while creating a new object).
+    In that case, most of the TracObject methods won't produce a
     meaningful result.
     """
 
@@ -60,9 +64,18 @@ class TracObject:
         return TracObjectSystem(env).object_factory(type, id)
     factory = classmethod(_factory)
 
-    def __init__(self, env, id):
+    def __init__(self, env, id=None):
         self.env = env
         self.id = id
+
+    def setid(self, id):
+        """Identity change. Usually reimplemented."""
+        self.id = id
+        return self
+
+    def reload(self):
+        """Load additional object data. Usually reimplemented"""
+        pass
 
     # -- Generic methods
 
@@ -72,7 +85,11 @@ class TracObject:
 
     def shortname(self):
         """Return the shorthand Trac Wiki Link for that object"""
-        return self.fqname()
+        return escape(self.id)
+
+    def displayname(self):
+        """Return an explicit designation of the object"""
+        return escape(self.id)
 
     def htmlclass(self):
         """Return the relevant HTML class attribute for that object"""
@@ -260,7 +277,7 @@ class ITracObjectManager(Interface):
         """Generator that yield a type and the corresponding factory method
 
         A factory method is a method which takes an `id` argument
-        and returns an (unloaded) instance of the appropriate
+        and returns an '''unloaded''' instance of the appropriate
         subclass of TracObject which has this `id`.
         """
 
@@ -291,7 +308,8 @@ class TracObjectSystem(Component):
         for mgr in self.object_managers:
             for source, facet, time, author, wikitext in mgr.rebuild_xrefs(db):
                 source.delete_links(db, facet=facet)
-                xf.parse(source, facet, time, author, wikitext)
+                if wikitext:
+                    xf.parse(source, facet, time, author, wikitext)
         db.commit()
 
     def _get_object_factories(self):

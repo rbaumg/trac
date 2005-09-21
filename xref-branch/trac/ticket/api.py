@@ -185,7 +185,6 @@ class TicketSystem(Component):
         yield ('ticket', self._ticket_factory)
 
     def rebuild_xrefs(self, db):
-        from trac.ticket.model import Ticket
         cursor = db.cursor()
         cursor.execute("SELECT id,description,time,reporter FROM ticket")
         for id,description,time,reporter in cursor:
@@ -210,9 +209,7 @@ class TicketSystem(Component):
 
     def _ticket_factory(self, id):
         from trac.ticket.model import Ticket
-        src = Ticket(self.env, None)
-        src.id = id
-        return src
+        return Ticket(self.env).setid(id)
 
     # ISearchProvider methods
 

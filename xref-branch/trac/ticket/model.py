@@ -43,9 +43,12 @@ class Ticket(TracObject):
 
     # TracObject methods
 
+    def reload(self):
+        self._fetch_ticket(self.id)
+    
     def shortname(self): return '#%s' % self.id
-    def htmlclass(self): return 'newticket'
-    # FIXME (should depend on the status, but this would imply a fetch)
+    def htmlclass(self): return 'newticket' # FIXME reload() to get the status?
+    def displayname(self): return 'Ticket #%s' % self.id
 
     def get_facet(self, facet, db=None):
         if facet == 'description':

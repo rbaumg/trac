@@ -191,6 +191,7 @@ class XRefModule(Component):
             return {'type': type,
                     'id': escape(id), 
                     'fqname': obj.fqname(),
+                    'displayname': obj.displayname(),
                     'shortname': obj.shortname(),
                     'htmlclass': obj.htmlclass(),
                     'href': obj.href(),
@@ -263,7 +264,8 @@ class BacklinksMacro(Component):
                 first = False
             target = TracObject.factory(self.env, target_type, target_id)
             buf.write('<a class="%s" href="%s">%s</a>' \
-                          % (target.htmlclass(), target.href(), target.shortname()))
+                          % (target.htmlclass(), target.href(),
+                             target.shortname()))
         return buf.getvalue()
 
 

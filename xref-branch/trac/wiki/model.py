@@ -44,8 +44,12 @@ class WikiPage(TracObject):
 
     # TracObject methods
 
-    def shortname(self):
-        return escape(self.name) # FIXME: only if name matches pagename rules...
+    def setid(self, id):
+        self.name = id
+        return TracObject.setid(self, id)
+
+    def reload(self):
+        self._fetch(self.name)
 
     def get_facet(self, facet, db=None):
         if facet == 'content':
