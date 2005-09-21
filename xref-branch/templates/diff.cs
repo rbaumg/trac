@@ -6,6 +6,7 @@
  with:links = chrome.links ?>
   <ul><?cs
    if:diff.chgset ?><?cs
+    call:backlinks("changeset", changeset.revision) ?><?cs
     if:len(links.prev) ?>
      <li class="first<?cs if:!len(links.next) ?> last<?cs /if ?>">
       <a class="prev" href="<?cs var:links.prev.0.href ?>" title="<?cs

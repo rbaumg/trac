@@ -6,16 +6,6 @@ See the wiki page ChristianBoos for more info.
 
 == TODO ==
 
-=== Anydiff Branch ===
-
- * create patch against 0.9b1
- * create ticket for integration in trunk
-
-=== InterTrac Branch ===
- 
- * create patch against 0.9b1
- * create ticket for integration in trunk
-
 === TracCrossReferences Branch ===
  
  * Finish to add the Cross-references navigation link everywhere
@@ -67,6 +57,13 @@ The TicketTypes feature was integrated in the trunk in r1691.
 
  * The link syntax described in #199 will be done
    using an IWikiLinkProvider (depends on InterTrac branch).
+ * create patch against 0.9b1
+ * create ticket for integration in trunk (#2028)
+
+=== InterTrac Branch ===
+ 
+ * create patch against 0.9b1
+ * create ticket for integration in trunk (#2041)
 
 === TracCrossReferences Branch ===
 

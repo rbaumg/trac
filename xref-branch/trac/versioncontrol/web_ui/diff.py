@@ -26,7 +26,7 @@ from urllib import urlencode
 from trac import mimeview, util
 from trac.core import *
 from trac.perm import IPermissionRequestor
-from trac.versioncontrol import Changeset, Node
+from trac.versioncontrol import Changeset, Node, ChangesetObject
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet
@@ -221,6 +221,9 @@ class AbstractDiffModule(Component):
         
         if chgset: # Changeset Mode (possibly restricted on a path)
             path, rev = diff.new_path, diff.new_rev
+
+            db = self.env.get_db_cnx()
+            ChangesetObject(self.env, rev).xref_count_to_hdf(req, db)
 
             # -- getting the deltas from the Changeset.get_changes method
             def get_deltas():

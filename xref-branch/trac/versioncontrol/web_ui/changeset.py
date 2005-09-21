@@ -24,7 +24,7 @@ from trac import mimeview, util
 from trac.core import *
 from trac.Search import ISearchSource, query_to_sql, shorten_result
 from trac.Timeline import ITimelineEventProvider
-from trac.versioncontrol import Changeset, Node
+from trac.versioncontrol import Changeset, Node, ChangesetObject
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web import IRequestHandler
 from trac.web.chrome import INavigationContributor
@@ -103,10 +103,11 @@ class ChangesetModule(AbstractDiffModule):
     def get_wiki_syntax(self):
         yield (r"!?\[\d+\]|(?:\b|!)r\d+\b", (lambda x, y, z:
                self._format_link(x, 'changeset',
-                                 y[0] == 'r' and y[1:] or y[1:-1], y)))
+                                 y[0] == 'r' and y[1:] or y[1:-1], y)),
+               (lambda x, y, z: self._parse_link(x, 'changeset', y, y)))
 
     def get_link_resolvers(self):
-        yield ('changeset', self._format_link)
+        yield ('changeset', self._format_link, self._parse_link)
 
     def _format_link(self, formatter, ns, rev, label):
         cursor = formatter.db.cursor()
@@ -119,6 +120,9 @@ class ChangesetModule(AbstractDiffModule):
         else:
             return '<a class="missing changeset" href="%s" rel="nofollow">%s</a>' \
                    % (formatter.href.changeset(rev), label)
+
+    def _parse_link(self, formatter, ns, target, label):
+        return ChangesetObject(self.env).setid(target)
 
     # ISearchPrivider methods
 

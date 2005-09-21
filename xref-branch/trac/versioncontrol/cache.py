@@ -17,6 +17,7 @@
 from __future__ import generators
 
 from trac.util import TracError
+from trac.object import TracObject
 from trac.versioncontrol import Changeset, Node, Repository, Authorizer
 
 
@@ -62,10 +63,17 @@ class CachedRepository(Repository):
                 current_rev = self.repos.oldest_rev
             while current_rev is not None:
                 changeset = self.repos.get_changeset(current_rev)
+                # -- cache changeset data
                 cursor.execute("INSERT INTO revision (rev,time,author,message) "
                                "VALUES (%s,%s,%s,%s)", (str(current_rev),
                                changeset.date, changeset.author,
                                changeset.message))
+                # -- update xrefs (FIXME: this would require the environment)
+                # chgset_object = ChangesetObject(**env**, current_rev, changeset)
+                # chgset_object.update_links(self.db, 'content',
+                #                            changeset.date, changeset.author,
+                #                            changeset.message)
+                # -- cache node changes
                 for path,kind,action,base_path,base_rev in changeset.get_changes():
                     self.log.debug("Caching node change in [%s]: %s"
                                    % (current_rev, (path, kind, action,
