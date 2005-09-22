@@ -54,7 +54,12 @@ class WikiTestCase(unittest.TestCase):
                 self.href = Href('/')
                 self.abs_href = Href('http://www.example.com/')
                 self.path = ''
+                # -- intertrac support
                 self.siblings = {}
+                self.config.set('intertrac', 'trac.title', "Trac's Trac")
+                self.config.set('intertrac', 'trac.url',
+                                "http://projects.edgewall.com/trac")
+                self.config.set('intertrac', 't', 'trac')
             def component_activated(self, component):
                 component.env = self
                 component.config = self.config

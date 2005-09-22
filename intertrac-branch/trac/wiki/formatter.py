@@ -31,7 +31,8 @@ from trac.core import *
 from trac.mimeview import *
 from trac.wiki.api import WikiSystem, IWikiChangeListener, IWikiMacroProvider
 
-__all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline']
+__all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline',
+           'LINK_SCHEME' ]
 
 #
 # Customization of the Wiki syntax  ***use with care***
@@ -45,7 +46,7 @@ SUBSCRIPT_TOKEN = ",,"
 SUPERSCRIPT_TOKEN = r"\^"
 INLINE_TOKEN = "`"
 
-LINK_SCHEME = r"[\w.+-]+" # as per RFC 2396
+LINK_SCHEME = r"[\w.+-]+?" # as per RFC 2396, non-greedy for InterTrac support
 
 def system_message(msg, text):
     return """<div class="system-message">
@@ -311,10 +312,12 @@ class Formatter(object):
 
     def shorthand_intertrac_helper(self, ns, target, label, fullmatch):
         if fullmatch: # short form
-            alias = fullmatch.group('it_%s' % ns)
-            if alias:
-                intertrac = self.env.config.get('intertrac', alias.upper(), alias)
-                target = '%s:%s' % (ns, target[len(alias):])
+            it_grp = fullmatch.group('it_%s' % ns)
+            if it_grp:
+                alias = it_grp.strip()
+                intertrac = self.env.config.get('intertrac', alias.upper(),
+                                                alias)
+                target = '%s:%s' % (ns, target[len(it_grp):])
                 it = self._make_intertrac_link(intertrac, target, label)
                 return it or label
         return None
