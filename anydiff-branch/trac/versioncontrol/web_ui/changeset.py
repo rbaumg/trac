@@ -68,8 +68,13 @@ class ChangesetModule(AbstractDiffModule):
                                              'changeset_show_files'))
             db = self.env.get_db_cnx()
             repos = self.env.get_repository()
+            authzperm = SubversionAuthorizer(self.env, req.authname)
             rev = repos.youngest_rev
             while rev:
+                if not authzperm.has_permission_for_changeset(rev):
+                    rev = repos.previous_rev(rev)
+                    continue
+
                 chgset = repos.get_changeset(rev)
                 if chgset.date < start:
                     return
@@ -126,10 +131,11 @@ class ChangesetModule(AbstractDiffModule):
                    % (util.escape(util.shorten_line(row[0])),
                       formatter.href.changeset(rev, path), label)
         else:
-            return '<a class="missing changeset" href="%s" rel="nofollow">%s</a>' \
+            return '<a class="missing changeset" href="%s"' \
+                   ' rel="nofollow">%s</a>' \
                    % (formatter.href.changeset(rev, path), label)
 
-    # ISearchPrivider methods
+    # ISearchProvider methods
 
     def get_search_filters(self, req):
         if req.perm.has_permission('CHANGESET_VIEW'):

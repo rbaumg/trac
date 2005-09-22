@@ -28,6 +28,7 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.versioncontrol import Changeset, Node
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
+from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet
 from trac.wiki import wiki_to_html, IWikiSyntaxProvider
@@ -101,8 +102,12 @@ class AbstractDiffModule(Component):
         repos = self.env.get_repository(req.authname)
         path = repos.normalize_path(path)
         rev = repos.normalize_rev(rev)
-        old_path = repos.normalize_path(old_path)
+        if old_path: # Note: normalize_path now returns '/' if given 'None'
+            old_path = repos.normalize_path(old_path)
         
+        authzperm = SubversionAuthorizer(self.env, req.authname)
+        authzperm.assert_permission_for_changeset(rev)
+
         if old_path == path and old and old == new: # revert to Changeset
             rev = old
             old_path = old = new = None
@@ -245,7 +250,7 @@ class AbstractDiffModule(Component):
             title = _changeset_title(rev)
             req.hdf['changeset'] = {
                 'revision': chgset.rev,
-                'time': time.strftime('%c', time.localtime(chgset.date)),
+                'time': util.format_datetime(chgset.date),
                 'author': util.escape(chgset.author or 'anonymous'),
                 'message': wiki_to_html(chgset.message or '--', self.env, req,
                                         escape_newlines=True)
@@ -572,6 +577,10 @@ class AnyDiffModule(Component):
         old_path = repos.normalize_path(old_path)
         old_rev = repos.normalize_rev(old_rev)
 
+        authzperm = SubversionAuthorizer(self.env, req.authname)
+        authzperm.assert_permission_for_changeset(new_rev)
+        authzperm.assert_permission_for_changeset(old_rev)
+        
         # -- prepare rendering
         req.hdf['anydiff'] = {
             'new_path': new_path,

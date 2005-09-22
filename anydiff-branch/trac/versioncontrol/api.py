@@ -15,6 +15,7 @@
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
 from __future__ import generators
+from trac.perm import PermissionError
 
 class Repository(object):
     """
@@ -234,12 +235,13 @@ class Changeset(object):
         raise NotImplementedError
 
 
-class PermissionDenied(Exception):
+class PermissionDenied(PermissionError):
     """
     Exception raised by an authorizer if the user has insufficient permissions
     to view a specific part of the repository.
     """
-    pass
+    def __str__(self):
+        return self.action
 
 
 class Authorizer(object):
@@ -252,6 +254,11 @@ class Authorizer(object):
         if not self.has_permission(path):
             raise PermissionDenied, \
                   'Insufficient permissions to access %s' % path
+
+    def assert_permission_for_changeset(self, rev):
+        if not self.has_permission_for_changeset(rev):
+            raise PermissionDenied, \
+                  'Insufficient permissions to access changeset %s' % rev
 
     def has_permission(self, path):
         return 1

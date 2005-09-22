@@ -65,13 +65,6 @@ class Environment(Component, ComponentManager):
         """
         ComponentManager.__init__(self)
 
-        try: # Use binary I/O on Windows
-            import msvcrt, sys
-            msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
-            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-        except ImportError:
-            pass
-
         self.path = path
         self.__cnx_pool = None
         if create:
@@ -161,6 +154,7 @@ class Environment(Component, ComponentManager):
         # Create the directory structure
         os.mkdir(self.path)
         os.mkdir(self.get_log_dir())
+        os.mkdir(self.get_htdocs_dir())
         os.mkdir(os.path.join(self.path, 'plugins'))
         os.mkdir(os.path.join(self.path, 'wiki-macros'))
 
@@ -201,6 +195,10 @@ class Environment(Component, ComponentManager):
     def get_templates_dir(self):
         """Return absolute path to the templates directory."""
         return os.path.join(self.path, 'templates')
+
+    def get_htdocs_dir(self):
+        """Return absolute path to the htdocs directory."""
+        return os.path.join(self.path, 'htdocs')
 
     def get_log_dir(self):
         """Return absolute path to the log directory."""

@@ -15,12 +15,14 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 from __future__ import generators
+import os
 import re
 import time
 
 from trac import util
 from trac.attachment import attachment_to_hdf, Attachment
 from trac.core import *
+from trac.env import IEnvironmentSetupParticipant
 from trac.Milestone import Milestone
 from trac.Notify import TicketNotifyEmail
 from trac.ticket import Ticket, TicketSystem
@@ -32,7 +34,30 @@ from trac.wiki import wiki_to_html, wiki_to_oneliner
 
 class NewticketModule(Component):
 
-    implements(INavigationContributor, IRequestHandler)
+    implements(IEnvironmentSetupParticipant, INavigationContributor,
+               IRequestHandler)
+
+    # IEnvironmentSetupParticipant methods
+
+    def environment_created(self):
+        """Create the `site_newticket.cs` template file in the environment."""
+        if self.env.path:
+            templates_dir = os.path.join(self.env.path, 'templates')
+            if not os.path.exists(templates_dir):
+                os.mkdir(templates_dir)
+            template_name = os.path.join(templates_dir, 'site_newticket.cs')
+            template_file = file(template_name, 'w')
+            template_file.write("""<?cs
+####################################################################
+# New ticket prelude - Included directly above the new ticket form
+?>
+""")
+
+    def environment_needs_upgrade(self, db):
+        return False
+
+    def upgrade_environment(self, db):
+        pass
 
     # INavigationContributor methods
 
@@ -56,14 +81,14 @@ class NewticketModule(Component):
 
         db = self.env.get_db_cnx()
 
-        if req.method == 'POST' and 'preview' not in req.args.keys():
+        if req.method == 'POST' and not req.args.has_key('preview'):
             self._do_create(req, db)
 
         ticket = Ticket(self.env, db=db)
         ticket.populate(req.args)
         ticket.values.setdefault('reporter', util.get_reporter_id(req))
 
-        if 'description' in ticket.values.keys():
+        if ticket.values.has_key('description'):
             description = wiki_to_html(ticket['description'], self.env, req, db)
             req.hdf['newticket.description_preview'] = description
 
@@ -164,7 +189,7 @@ class TicketModule(Component):
         reporter_id = util.get_reporter_id(req)
 
         if req.method == 'POST':
-            if 'preview' not in req.args.keys():
+            if not req.args.has_key('preview'):
                 self._do_save(req, db, ticket)
             else:
                 # Use user supplied values
@@ -287,7 +312,7 @@ class TicketModule(Component):
             if not req.args.get('summary'):
                 raise TracError('Tickets must contain summary.')
 
-            if 'description' in req.args.keys() or 'reporter' in req.args.keys():
+            if req.args.has_key('description') or req.args.has_key('reporter'):
                 req.perm.assert_permission('TICKET_ADMIN')
 
             ticket.populate(req.args)
@@ -362,10 +387,10 @@ class TicketModule(Component):
         req.hdf['ticket.description.formatted'] = wiki_to_html(ticket['description'],
                                                                self.env, req, db)
 
-        req.hdf['ticket.opened'] = time.strftime('%c', time.localtime(ticket.time_created))
+        req.hdf['ticket.opened'] = util.format_datetime(ticket.time_created)
         req.hdf['ticket.opened_delta'] = util.pretty_timedelta(ticket.time_created)
         if ticket.time_changed != ticket.time_created:
-            req.hdf['ticket.lastmod'] = time.strftime('%c', time.localtime(ticket.time_changed))
+            req.hdf['ticket.lastmod'] = util.format_datetime(ticket.time_changed)
             req.hdf['ticket.lastmod_delta'] = util.pretty_timedelta(ticket.time_changed)
 
         changelog = ticket.get_changelog(db=db)
@@ -375,7 +400,7 @@ class TicketModule(Component):
         for date, author, field, old, new in changelog:
             if date != curr_date or author != curr_author:
                 changes.append({
-                    'date': time.strftime('%c', time.localtime(date)),
+                    'date': util.format_datetime(date),
                     'author': util.escape(author),
                     'fields': {}
                 })
