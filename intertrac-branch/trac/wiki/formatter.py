@@ -32,7 +32,7 @@ from trac.mimeview import *
 from trac.wiki.api import WikiSystem, IWikiChangeListener, IWikiMacroProvider
 
 __all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline',
-           'LINK_SCHEME' ]
+           'INTERTRAC_SCHEME' ]
 
 #
 # Customization of the Wiki syntax  ***use with care***
@@ -46,7 +46,8 @@ SUBSCRIPT_TOKEN = ",,"
 SUPERSCRIPT_TOKEN = r"\^"
 INLINE_TOKEN = "`"
 
-LINK_SCHEME = r"[\w.+-]+?" # as per RFC 2396, non-greedy for InterTrac support
+LINK_SCHEME = r"[\w.+-]+?" # as per RFC 2396
+INTERTRAC_SCHEME = r"[a-zA-Z.+-]+?" # no digits (support for shorthand links)
 
 def system_message(msg, text):
     return """<div class="system-message">

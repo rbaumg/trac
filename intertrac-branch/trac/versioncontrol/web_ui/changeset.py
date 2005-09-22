@@ -29,7 +29,7 @@ from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web import IRequestHandler
 from trac.web.chrome import INavigationContributor
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider, \
-                      LINK_SCHEME
+                      INTERTRAC_SCHEME
 from trac.versioncontrol.web_ui.diff import AbstractDiffModule
 
 class ChangesetModule(AbstractDiffModule):
@@ -103,7 +103,7 @@ class ChangesetModule(AbstractDiffModule):
     
     def get_wiki_syntax(self):
         yield (r"!?\[(?P<it_changeset>%s\s*)?\d+\]|" \
-               % LINK_SCHEME +                          # [1], [T1] or [trac 1]
+               % INTERTRAC_SCHEME +                     # [1], [T1] or [trac 1]
                r"(?:\b|!)r\d+\b(?!:\d)",                # r1 but not r1:2
                lambda x, y, z: self._format_link(x, 'changeset',
                                                  y[0] == 'r' and y[1:]
