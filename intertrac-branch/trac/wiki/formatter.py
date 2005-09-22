@@ -79,7 +79,7 @@ class WikiProcessor(object):
         if not self.processor:
             # Find a matching mimeview renderer
             from trac.mimeview.api import MIME_MAP
-            if self.name in MIME_MAP.keys():
+            if MIME_MAP.has_key(self.name):
                 self.name = MIME_MAP[self.name]
                 self.processor = self._mimeview_processor
             elif self.name in MIME_MAP.values():
@@ -154,9 +154,9 @@ class Formatter(object):
                     r"(?P<stgt>'[^']+'|\"[^\"]+\"|"
                     r"((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))"),
                    (r"(?P<lhref>!?\[(?:(?P<lns>%s):" % LINK_SCHEME +
-                    r"(?P<ltgt>'[^']+'|\"[^\"]+\"|[^\] ]+)"
+                    r"(?P<ltgt>'[^']+'|\"[^\"]+\"|[^\] ]*)"
                     r"|(?P<rel>[/.][^ [\]]*))"
-                    r"(?: (?P<label>.*?))?\])"),
+                    r"(?: (?P<label>'[^']+'|\"[^\"]+\"|[^\]]+))?\])"),
                    (r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)"
                     r"(\]\]|\((?P<macroargs>.*?)\)\]\]))"),
                    r"(?P<heading>^\s*(?P<hdepth>=+)\s.*\s(?P=hdepth)\s*$)",
@@ -260,9 +260,19 @@ class Formatter(object):
     def _lhref_formatter(self, match, fullmatch):
         ns = fullmatch.group('lns')
         target = fullmatch.group('ltgt') 
-        if target and target[0] in "'\"":
+        if target and target[0] in ("'",'"'):
             target = target[1:-1]
-        label = fullmatch.group('label') or target
+        label = fullmatch.group('label')
+        if not label: # e.g. `[http://target]` or `[wiki:target]`
+            if target:
+                if target.startswith('//'): # for `[http://target]`
+                    label = ns+':'+target   # use `http://target`
+                else:                       # for `wiki:target`
+                    label = target          # use only `target`
+            else: # e.g. `[search:]` 
+                label = ns
+        if label and label[0] in ("'",'"'):
+            label = label[1:-1]
         rel = fullmatch.group('rel')
         if rel:
             return self._make_relative_link(rel, label or rel)
@@ -698,17 +708,18 @@ class OutlineFormatter(Formatter):
         Formatter.__init__(self, env, None, absurls, db)
 
     # Override a few formatters to disable some wiki syntax in "outline"-mode
-    def _macro_formatter(self, match, fullmatch): return match
+    def _macro_formatter(self, match, fullmatch):
+        return match
 
-    def format(self, text, out, max_depth=None):
+    def format(self, text, out, max_depth=6, min_depth=1):
         self.outline = []
         class NullOut(object):
             def write(self, data): pass
         Formatter.format(self, text, NullOut())
 
-        curr_depth = 0
-        for depth,link in self.outline:
-            if max_depth is not None and depth > max_depth:
+        curr_depth = min_depth - 1
+        for depth, link in self.outline:
+            if depth < min_depth or depth > max_depth:
                 continue
             if depth < curr_depth:
                 out.write('</li></ol><li>' * (curr_depth - depth))
@@ -730,12 +741,6 @@ class OutlineFormatter(Formatter):
         text = re.sub(r'</?a(?: .*?)?>', '', text) # Strip out link tags
         self.outline.append((depth, '<a href="#%s">%s</a>' % (anchor, text)))
 
-    def handle_code_block(self, line):
-        if line.strip() == '{{{':
-            self.in_code_block += 1
-        elif line.strip() == '}}}':
-            self.in_code_block -= 1
-
 
 def wiki_to_html(wikitext, env, req, db=None, absurls=0, escape_newlines=False):
     out = StringIO()
@@ -747,9 +752,11 @@ def wiki_to_oneliner(wikitext, env, db=None, absurls=0):
     OneLinerFormatter(env, absurls, db).format(wikitext, out)
     return out.getvalue()
 
-def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
+def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None,
+                    min_depth=None):
     out = StringIO()
-    OutlineFormatter(env, absurls, db).format(wikitext, out, max_depth)
+    OutlineFormatter(env, absurls, db).format(wikitext, out, max_depth,
+                                              min_depth)
     return out.getvalue()
 
 

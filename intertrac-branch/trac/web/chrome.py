@@ -113,7 +113,8 @@ class Chrome(Component):
 
         if self.env.path:
             templates_dir = os.path.join(self.env.path, 'templates')
-            os.mkdir(templates_dir)
+            if not os.path.exists(templates_dir):
+                os.mkdir(templates_dir)
             _create_file(os.path.join(templates_dir, 'README'),
                         'This directory contains project-specific custom '
                         'templates and style sheet.\n')
@@ -173,7 +174,8 @@ class Chrome(Component):
 
     def get_htdocs_dirs(self):
         from trac.config import default_dir
-        yield ['common', default_dir('htdocs')]
+        return [('common', default_dir('htdocs')),
+                ('project', self.env.get_htdocs_dir())]
 
     def get_templates_dirs(self):
         return [self.env.get_templates_dir(),
@@ -205,8 +207,11 @@ class Chrome(Component):
         add_stylesheet(req, 'common/css/trac.css')
         icon = self.config.get('project', 'icon')
         if icon:
-            if icon[0] != '/' and icon.find('://') == -1:
-                icon = href.chrome('common', icon)
+            if not icon.startswith('/') and icon.find('://') == -1:
+                if '/' in icon:
+                    icon = href.chrome(icon)
+                else:
+                    icon = href.chrome('common', icon)
             mimetype = mimeview.get_mimetype(icon)
             add_link(req, 'icon', icon, mimetype=mimetype)
             add_link(req, 'shortcut icon', icon, mimetype=mimetype)
@@ -218,7 +223,10 @@ class Chrome(Component):
             logo_src_abs = logo_src.startswith('http://') or \
                            logo_src.startswith('https://')
             if not logo_src.startswith('/') and not logo_src_abs:
-                logo_src = href.chrome('common', logo_src)
+                if '/' in logo_src:
+                    logo_src = href.chrome(logo_src)
+                else:
+                    logo_src = href.chrome('common', logo_src)
             req.hdf['chrome.logo'] = {
                 'link': util.escape(logo_link), 'src': util.escape(logo_src),
                 'src_abs': util.escape(logo_src_abs),

@@ -137,7 +137,8 @@ class Pool(object):
             # Set up callbacks to mark pool as invalid when parents
             # are destroyed
             self._weakref = weakref.ref(self._parent_pool._is_valid,
-                                        lambda x: _mark_weakpool_invalid(weakself));
+                                        lambda x: \
+                                        _mark_weakpool_invalid(weakself));
 
         # mark pool as valid
         self._is_valid = lambda: 1
@@ -181,14 +182,16 @@ class SubversionRepository(Repository):
             path = os.path.split(path)[0]
         self.path = repos.svn_repos_find_root_path(path, self.pool())
         if self.path is None:
-            raise TracError, "%s does not appear to be a Subversion repository." % (path, )
+            raise TracError, \
+                  "%s does not appear to be a Subversion repository." % (path, )
         if self.path != path:
             self.scope = path[len(self.path):]
             if not self.scope[-1] == '/':
                 self.scope += '/'
         else:
             self.scope = '/'
-        self.log.debug("Opening subversion file-system at %s with scope %s" % (self.path, self.scope))
+        self.log.debug("Opening subversion file-system at %s with scope %s" \
+                       % (self.path, self.scope))
 
         self.repos = repos.svn_repos_open(self.path, self.pool())
         self.fs_ptr = repos.svn_repos_fs(self.repos)
@@ -210,7 +213,7 @@ class SubversionRepository(Repository):
         return node_type in _kindmap
 
     def normalize_path(self, path):
-        return path == '/' and path or path and path.strip('/') or ''
+        return (not path or path == '/') and '/' or path.strip('/')
 
     def normalize_rev(self, rev):
         try:
@@ -235,7 +238,7 @@ class SubversionRepository(Repository):
                                    self.fs_ptr, self.pool)
 
     def get_node(self, path, rev=None):
-        self.authz.assert_permission(self.scope + path)
+        self.authz.assert_permission(posixpath.join(self.scope, path))
         if path and path[-1] == '/':
             path = path[:-1]
 
@@ -284,11 +287,12 @@ class SubversionRepository(Repository):
         return self.normalize_rev(rev1) < self.normalize_rev(rev2)
 
     def get_youngest_rev_in_cache(self, db):
-        """
-        Get the latest stored revision by sorting the revision strings numerically
+        """Get the latest stored revision by sorting the revision strings
+        numerically
         """
         cursor = db.cursor()
-        cursor.execute("SELECT rev FROM revision ORDER BY -LENGTH(rev), rev DESC LIMIT 1")
+        cursor.execute("SELECT rev FROM revision "
+                       "ORDER BY -LENGTH(rev), rev DESC LIMIT 1")
         row = cursor.fetchone()
         return row and row[0] or None
 
@@ -301,7 +305,8 @@ class SubversionRepository(Repository):
             subpool.clear()
             if self.has_node(path, rev):
                 if expect_deletion:
-                    # it was missing, now it's there again: rev+1 must be a delete
+                    # it was missing, now it's there again:
+                    #  rev+1 must be a delete
                     yield path, rev+1, Changeset.DELETE
                 newer = None # 'newer' is the previously seen history tuple
                 older = None # 'older' is the currently examined history tuple
@@ -310,15 +315,19 @@ class SubversionRepository(Repository):
                     older = (self.normalize_path(p), r, Changeset.ADD)
                     rev = self.previous_rev(r)
                     if newer:
-                        if older[0] == path: # still on the path: 'newer' was an edit
+                        if older[0] == path:
+                            # still on the path: 'newer' was an edit
                             yield newer[0], newer[1], Changeset.EDIT
-                        else: # the path changed: 'newer' was a copy
-                            rev = self.previous_rev(newer[1]) # restart before the copy op
+                        else:
+                            # the path changed: 'newer' was a copy
+                            rev = self.previous_rev(newer[1])
+                            # restart before the copy op
                             yield newer[0], newer[1], Changeset.COPY
                             older = (older[0], older[1], 'unknown')
                             break
                     newer = older
-                if older: # either a real ADD or the source of a COPY
+                if older:
+                    # either a real ADD or the source of a COPY
                     yield older
             else:
                 expect_deletion = True
@@ -400,8 +409,10 @@ class SubversionNode(Node):
         node_type = fs.check_path(self.root, self.scoped_path, self.pool())
         if not node_type in _kindmap:
             raise TracError, "No node at %s in revision %s" % (path, rev)
-        self.created_rev = fs.node_created_rev(self.root, self.scoped_path, self.pool())
-        self.created_path = fs.node_created_path(self.root, self.scoped_path, self.pool())
+        self.created_rev = fs.node_created_rev(self.root, self.scoped_path,
+                                               self.pool())
+        self.created_path = fs.node_created_path(self.root, self.scoped_path,
+                                                 self.pool())
         # Note: 'created_path' differs from 'path' if the last change was a copy,
         #        and furthermore, 'path' might not exist at 'create_rev'.
         #        The only guarantees are:
@@ -439,7 +450,8 @@ class SubversionNode(Node):
             if rev > 0 and path.startswith(self.scope):
                 older = (path[len(self.scope):], rev, Changeset.ADD)
                 if newer:
-                    change = newer[0] == older[0] and Changeset.EDIT or Changeset.COPY
+                    change = newer[0] == older[0] and Changeset.EDIT or \
+                             Changeset.COPY
                     newer = (newer[0], newer[1], change)
                     yield newer
                 newer = older

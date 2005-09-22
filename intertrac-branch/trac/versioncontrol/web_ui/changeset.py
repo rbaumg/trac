@@ -48,9 +48,12 @@ class ChangesetModule(AbstractDiffModule):
     # (reimplemented) IRequestHandler methods
 
     def match_request(self, req):
-        match = re.match(r'/changeset/([0-9]+)$', req.path_info)
+        match = re.match(r'/changeset/([0-9]+)(/.*)?$', req.path_info)
         if match:
             req.args['rev'] = match.group(1)
+            path = match.group(2)
+            if path:
+                req.args['path'] = path
             return 1
 
     # ITimelineEventProvider methods
@@ -66,8 +69,13 @@ class ChangesetModule(AbstractDiffModule):
                                              'changeset_show_files'))
             db = self.env.get_db_cnx()
             repos = self.env.get_repository()
+            authzperm = SubversionAuthorizer(self.env, req.authname)
             rev = repos.youngest_rev
             while rev:
+                if not authzperm.has_permission_for_changeset(rev):
+                    rev = repos.previous_rev(rev)
+                    continue
+
                 chgset = repos.get_changeset(rev)
                 if chgset.date < start:
                     return
@@ -102,7 +110,7 @@ class ChangesetModule(AbstractDiffModule):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        yield (r"!?\[(?P<it_changeset>%s\s*)?\d+\]|" \
+        yield (r"!?\[(?P<it_changeset>%s\s*)?\d+(?:/[^\]]*)?\]|" \
                % INTERTRAC_SCHEME +                     # [1], [T1] or [trac 1]
                r"(?:\b|!)r\d+\b(?!:\d)",                # r1 but not r1:2
                lambda x, y, z: self._format_link(x, 'changeset',
@@ -112,23 +120,29 @@ class ChangesetModule(AbstractDiffModule):
     def get_link_resolvers(self):
         yield ('changeset', self._format_link)
 
-    def _format_link(self, formatter, ns, rev, label, fullmatch=None):
-        intertrac = formatter.shorthand_intertrac_helper(ns, rev, label,
+    def _format_link(self, formatter, ns, chgset, label, fullmatch=None):
+        intertrac = formatter.shorthand_intertrac_helper(ns, chgset, label,
                                                          fullmatch)
         if intertrac:
             return intertrac
+        sep = chgset.find('/')
+        if sep > 0:
+            rev, path = chgset[:sep], chgset[sep:]
+        else:
+            rev, path = chgset, None
         cursor = formatter.db.cursor()
         cursor.execute('SELECT message FROM revision WHERE rev=%s', (rev,))
         row = cursor.fetchone()
         if row:
             return '<a class="changeset" title="%s" href="%s">%s</a>' \
                    % (util.escape(util.shorten_line(row[0])),
-                      formatter.href.changeset(rev), label)
+                      formatter.href.changeset(rev, path), label)
         else:
-            return '<a class="missing changeset" href="%s" rel="nofollow">%s</a>' \
-                   % (formatter.href.changeset(rev), label)
+            return '<a class="missing changeset" href="%s"' \
+                   ' rel="nofollow">%s</a>' \
+                   % (formatter.href.changeset(rev, path), label)
 
-    # ISearchPrivider methods
+    # ISearchProvider methods
 
     def get_search_filters(self, req):
         if req.perm.has_permission('CHANGESET_VIEW'):
