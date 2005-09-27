@@ -85,6 +85,14 @@ Issue <a class="missing ticket" href="/ticket/1" rel="nofollow">1</a>, CS<a clas
 <a class="source" href="/browser/foo/bar">source foo/bar</a>, <a class="ext-link" href="http://www.edgewall.com/"><span class="icon"></span>edgewall</a>
 </p>
 ==============================
+diff:trunk//branch
+diff:trunk@12//branch@23
+------------------------------
+<p>
+<a class="changeset" title="Diff" href="/diff/branch?old_path=trunk">diff:trunk//branch</a>
+<a class="changeset" title="Diff" href="/diff/branch?new=23&old=12&old_path=trunk">diff:trunk@12//branch@23</a>
+</p>
+==============================
 CamelCase AlabamA ABc AlaBamA FooBar
 ------------------------------
 <p>

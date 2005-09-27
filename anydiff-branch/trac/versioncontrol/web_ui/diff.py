@@ -530,7 +530,7 @@ class DiffModule(AbstractDiffModule):
 
     def _format_link(self, formatter, ns, params, label):
         def pathrev(path):
-            irev = path.find('#')
+            irev = path.find('@')
             if irev > 0:
                 return (path[:irev], path[irev+1:])
             else:
