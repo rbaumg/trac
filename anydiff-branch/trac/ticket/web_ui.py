@@ -119,7 +119,7 @@ class NewticketModule(Component):
                 field['label'] = 'Assign to'
             elif name == 'milestone':
                 # Don't make completed milestones available for selection
-                options = field['options']
+                options = field['options'][:]
                 for option in field['options']:
                     milestone = Milestone(self.env, option, db=db)
                     if milestone.is_completed:
@@ -289,7 +289,8 @@ class TicketModule(Component):
                 if format == 'rss':
                     href = self.env.abs_href.ticket(id)
                     if status != 'new':
-                        message = wiki_to_html(message or '--', self.env, db)
+                        message = wiki_to_html(message or '--', self.env, req,
+                                               db)
                     else:
                         message = util.escape(message)
                 else:
