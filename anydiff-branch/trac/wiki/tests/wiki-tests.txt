@@ -87,10 +87,14 @@ Issue <a class="missing ticket" href="/ticket/1" rel="nofollow">1</a>, CS<a clas
 ==============================
 diff:trunk//branch
 diff:trunk@12//branch@23
+diff:trunk@12:23
+diff:@12:23
 ------------------------------
 <p>
-<a class="changeset" title="Diff" href="/diff/branch?old_path=trunk">diff:trunk//branch</a>
-<a class="changeset" title="Diff" href="/diff/branch?new=23&old=12&old_path=trunk">diff:trunk@12//branch@23</a>
+<a class="changeset" title="Diff from trunk@latest to branch@latest" href="/diff/branch?old_path=trunk">diff:trunk//branch</a>
+<a class="changeset" title="Diff from trunk@12 to branch@23" href="/diff/branch?new=23&old=12&old_path=trunk">diff:trunk@12//branch@23</a>
+<a class="changeset" title="Diff r12:23 for trunk" href="/diff/trunk?new=23&old=12&old_path=trunk">diff:trunk@12:23</a>
+<a class="changeset" title="Diff r12:23 for /" href="/diff/?new=23&old=12&old_path=">diff:@12:23</a>
 </p>
 ==============================
 CamelCase AlabamA ABc AlaBamA FooBar
