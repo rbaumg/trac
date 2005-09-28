@@ -297,13 +297,7 @@ class AbstractDiffModule(Component):
                                               old_path=diff.new_path,
                                               old=diff.new_rev)
             req.hdf['diff.reverse_href'] = reverse_href
-            if restricted:              # 'diff between 2 revisions' mode
-                title = 'Diff r%s:%s for %s' \
-                        % (diff.old_rev, diff.new_rev, diff.new_path)
-            else:                       # 'arbitrary diff' mode
-                title = 'Diff from %s@%s to %s@%s' \
-                        % (diff.old_path, diff.old_rev,
-                           diff.new_path, diff.new_rev)
+            title = self.title_for_diff(diff)
         req.hdf['title'] = title
 
         def _change_info(old_node, new_node, change):
@@ -506,6 +500,17 @@ class AbstractDiffModule(Component):
         
         req.write(buf.getvalue())
 
+    def title_for_diff(self, diff):
+        if diff.new_path == diff.old_path: # ''diff between 2 revisions'' mode
+            return 'Diff r%s:%s for %s' \
+                   % (diff.old_rev or 'latest', diff.new_rev or 'latest',
+                      diff.new_path or '/')
+        else:                              # ''arbitrary diff'' mode
+            return 'Diff from %s@%s to %s@%s' \
+                   % (diff.old_path or '/', diff.old_rev or 'latest',
+                      diff.new_path or '/', diff.new_rev or 'latest')
+
+
 
 class DiffModule(AbstractDiffModule):
 
@@ -530,28 +535,27 @@ class DiffModule(AbstractDiffModule):
 
     def _format_link(self, formatter, ns, params, label):
         def pathrev(path):
-            irev = path.find('#')
-            if irev > 0:
-                return (path[:irev], path[irev+1:])
+            if '@' in path:
+                return path.split('@', 1)
             else:
                 return (path, None)
-        ianydiff = params.find('//')
-        if ianydiff > 0:
-            old_path, old_rev = pathrev(params[:ianydiff])
-            new_path, new_rev = pathrev(params[ianydiff+2:])
+        if '//' in params:
+            p1, p2 = params.split('//', 1)
+            old, new = pathrev(p1), pathrev(p2)
+            diff = DiffArgs(old_path=old[0], old_rev=old[1],
+                            new_path=new[0], new_rev=new[1])
         else: 
             old_path, old_rev = pathrev(params)
-            new_path = old_path
             new_rev = None
-            if old_rev:
-                isep = old_rev.find(':')
-                if isep > 0:
-                    old_rev = old_rev[:isep]
-                    new_rev = old_rev[isep+1:]
-        href = formatter.href.diff(new_path, new=new_rev,
-                                   old_path=old_path, old=old_rev)
+            if old_rev and ':' in old_rev:
+                old_rev, new_rev = old_rev.split(':', 1)
+            diff = DiffArgs(old_path=old_path, old_rev=old_rev,
+                            new_path=old_path, new_rev=new_rev)
+        title = self.title_for_diff(diff)
+        href = formatter.href.diff(diff.new_path, new=diff.new_rev,
+                                   old_path=diff.old_path, old=diff.old_rev)
         return '<a class="changeset" title="%s" href="%s">%s</a>' \
-                   % ('Diff', href, label)
+               % (title, href, label)
 
 
 class AnyDiffModule(Component):
