@@ -118,7 +118,7 @@ class Repository(object):
         """
         return NotImplementedError
 
-    def get_deltas(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
+    def get_changes(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
         """
         Generator that yields change tuples (old_node, new_node, kind, change)
         for each node change between the two arbitrary (path,rev) pairs.

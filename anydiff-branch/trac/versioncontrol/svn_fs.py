@@ -333,7 +333,7 @@ class SubversionRepository(Repository):
                 expect_deletion = True
                 rev = self.previous_rev(rev)
 
-    def get_deltas(self, old_path, old_rev, new_path, new_rev,
+    def get_changes(self, old_path, old_rev, new_path, new_rev,
                    ignore_ancestry=0):
         old_node = new_node = None
         old_rev = self.normalize_rev(old_rev)

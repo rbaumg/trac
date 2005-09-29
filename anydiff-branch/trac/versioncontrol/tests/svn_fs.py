@@ -227,14 +227,14 @@ class SubversionRepositoryTestCase(unittest.TestCase):
         self.assertEqual(expected[2], (got[2], got[3]))
         
     def test_diff_file_different_revs(self):
-        diffs = self.repos.get_deltas('trunk/README.txt', 2, 'trunk/README.txt', 3)
+        diffs = self.repos.get_changes('trunk/README.txt', 2, 'trunk/README.txt', 3)
         self._cmp_diff((('trunk/README.txt', 2),
                         ('trunk/README.txt', 3),
                         (Node.FILE, Changeset.EDIT)), diffs.next())
         self.assertRaises(StopIteration, diffs.next)
 
     def test_diff_file_different_files(self):
-        diffs = self.repos.get_deltas('branches/v1x/README.txt', 12,
+        diffs = self.repos.get_changes('branches/v1x/README.txt', 12,
                                       'branches/v1x/README2.txt', 12)
         self._cmp_diff((('branches/v1x/README.txt', 12),
                         ('branches/v1x/README2.txt', 12),
@@ -242,12 +242,12 @@ class SubversionRepositoryTestCase(unittest.TestCase):
         self.assertRaises(StopIteration, diffs.next)
 
     def test_diff_file_no_change(self):
-        diffs = self.repos.get_deltas('trunk/README.txt', 7,
+        diffs = self.repos.get_changes('trunk/README.txt', 7,
                                       'tags/v1/README.txt', 7)
         self.assertRaises(StopIteration, diffs.next)
  
     def test_diff_dir_different_revs(self):
-        diffs = self.repos.get_deltas('trunk', 4, 'trunk', 8)
+        diffs = self.repos.get_changes('trunk', 4, 'trunk', 8)
         self._cmp_diff((None, ('trunk/dir1/dir2', 8),
                         (Node.DIRECTORY, Changeset.ADD)), diffs.next())
         self._cmp_diff((None, ('trunk/dir1/dir3', 8),
@@ -261,7 +261,7 @@ class SubversionRepositoryTestCase(unittest.TestCase):
         self.assertRaises(StopIteration, diffs.next)
 
     def test_diff_dir_different_dirs(self):
-        diffs = self.repos.get_deltas('trunk', 1, 'branches/v1x', 12)
+        diffs = self.repos.get_changes('trunk', 1, 'branches/v1x', 12)
         self._cmp_diff((None, ('branches/v1x/dir1', 12),
                         (Node.DIRECTORY, Changeset.ADD)), diffs.next())
         self._cmp_diff((None, ('branches/v1x/dir1/dir2', 12),
@@ -275,7 +275,7 @@ class SubversionRepositoryTestCase(unittest.TestCase):
         self.assertRaises(StopIteration, diffs.next)
 
     def test_diff_dir_no_change(self):
-        diffs = self.repos.get_deltas('trunk', 7,
+        diffs = self.repos.get_changes('trunk', 7,
                                       'tags/v1', 7)
         self.assertRaises(StopIteration, diffs.next)
         
