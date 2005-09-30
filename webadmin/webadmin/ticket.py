@@ -92,7 +92,7 @@ class ComponentAdminPage(Component):
                   'is_default': c.name == default,
                   'href': self.env.href.admin(cat, page, c.name)
                  } for c in ticket.Component.select(self.env)]
-            
+
 
         restrict_owner = self.config.get('ticket', 'restrict_owner')
         if restrict_owner in util.TRUE:
@@ -168,7 +168,8 @@ class VersionAdminPage(Component):
 
             default = self.config.get('ticket', 'default_version')
             req.hdf['admin.versions'] = \
-                [{'name': v.name, 'time': util.format_datetime(v.time),
+                [{'name': v.name,
+                  'time': v.time and util.format_datetime(v.time) or '',
                   'is_default': v.name == default,
                   'href': self.env.href.admin(cat, page, v.name)
                  } for v in ticket.Version.select(self.env)]
