@@ -16,6 +16,7 @@
 
 from __future__ import generators
 import re
+import time
 import types
 import urllib
 

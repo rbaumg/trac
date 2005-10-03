@@ -511,5 +511,3 @@ class MilestoneModule(Component):
 
     def _milestone_factory(self, id):
         return Milestone(self.env).setid(id)
-
-    
