@@ -227,8 +227,8 @@ class AbstractDiffModule(Component):
         if chgset: # Changeset Mode (possibly restricted on a path)
             path, rev = diff.new_path, diff.new_rev
 
-            # -- getting the deltas from the Changeset.get_changes method
-            def get_deltas():
+            # -- getting the change summary from the Changeset.get_changes method
+            def get_changes():
                 old_node = new_node = None
                 for npath, kind, change, opath, orev in chgset.get_changes():
                     if restricted and \
@@ -287,8 +287,8 @@ class AbstractDiffModule(Component):
                     add_link(req, 'next', next_href, _changeset_title(next_rev))
 
         else: # Diff Mode
-            # -- getting the deltas from the Repository.get_deltas method
-            def get_deltas():
+            # -- getting the change summary from the Repository.get_changes method
+            def get_changes():
                 for d in repos.get_deltas(**diff):
                     yield d
                     
@@ -381,7 +381,7 @@ class AbstractDiffModule(Component):
                 return []
 
         idx = 0
-        for old_node, new_node, kind, change in get_deltas():
+        for old_node, new_node, kind, change in get_changes():
             if change != Changeset.EDIT:
                 show_entry = True
             else:

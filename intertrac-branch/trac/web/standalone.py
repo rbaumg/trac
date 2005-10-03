@@ -145,7 +145,12 @@ class TracHTTPServer(ThreadingMixIn, HTTPServer):
             while env_path and not os.path.split(env_path)[1]:
                 env_path = os.path.split(env_path)[0]
             project = os.path.split(env_path)[1]
-            self.projects[project] = env_path
+            if self.projects.has_key(project):
+                print >>sys.stderr, 'Warning: Ignoring project "%s" since ' \
+                                    'it conflicts with project "%s"' \
+                                    % (env_path, self.projects[project])
+            else:
+                self.projects[project] = env_path
             env = get_environment(None, self.get_env_opts(project))
             siblings[project] = env
         for p in siblings.values():

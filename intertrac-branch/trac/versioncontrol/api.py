@@ -22,7 +22,8 @@ class Repository(object):
     Base class for a repository provided by a version control system.
     """
 
-    def __init__(self, authz, log):
+    def __init__(self, name, authz, log):
+        self.name = name
         self.authz = authz or Authorizer()
         self.log = log
 
@@ -43,7 +44,11 @@ class Repository(object):
         """
         Tell if there's a node at the specified (path,rev) combination.
         """
-        raise NotImplementedError
+        try:
+            self.get_node()
+            return True
+        except TracError:
+            return False        
     
     def get_node(self, path, rev=None):
         """
@@ -118,7 +123,7 @@ class Repository(object):
         """
         return NotImplementedError
 
-    def get_deltas(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
+    def get_changes(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
         """
         Generator that yields change tuples (old_node, new_node, kind, change)
         for each node change between the two arbitrary (path,rev) pairs.
