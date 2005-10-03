@@ -18,8 +18,9 @@ VERSION = str(trac.__version__)
 URL = trac.__url__
 LICENSE = trac.__license__
 
-if sys.version_info<(2,1):
-    print >>sys.stderr, "You need at least Python 2.1 for %s %s" % (PACKAGE, VERSION)
+if sys.version_info < (2, 3):
+    print >>sys.stderr, 'You need at least Python 2.3 for %s %s' \
+                        % (PACKAGE, VERSION)
     sys.exit(3)
 
 def _p(unix_path):
@@ -95,7 +96,12 @@ class my_install_scripts (install_scripts):
                                                     'trac.cgi'), cgi_dir)
         if copied:
             self.outfiles.append(ofile)
-        
+
+        ofile, copied = self.copy_file(os.path.join(self.build_dir,
+                                                    'trac.fcgi'), cgi_dir)
+        if copied:
+            self.outfiles.append(ofile)
+         
         if os.name == 'posix':
             # Set the executable bits (owner, group, and world) on
             # all the scripts we just installed.
@@ -142,7 +148,7 @@ distutils.command.bdist_wininst.bdist_wininst = my_bdist_wininst
 # parameters for various rpm distributions
 rpm_distros = {
     'suse_options': { 'version_suffix': 'SuSE',
-                      'requires': """python >= 2.1
+                      'requires': """python >= 2.3
                         subversion >= 1.0.0
                         pysqlite >= 0.4.3
                         clearsilver >= 0.9.3
@@ -224,7 +230,8 @@ facilities.
                _p('scripts/trac-postinstall.py'),
                _p('scripts/tracd'),
                _p('scripts/tracdb2env'),
-               _p('cgi-bin/trac.cgi')],
+               _p('cgi-bin/trac.cgi'),
+               _p('cgi-bin/trac.fcgi')],
       cmdclass = {'install': my_install,
                   'install_scripts': my_install_scripts,
                   'install_data': my_install_data})

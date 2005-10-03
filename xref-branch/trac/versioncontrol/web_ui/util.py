@@ -15,15 +15,13 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 
 import re
-import time
 import urllib
 
 from trac import util
+from trac.util import escape, format_datetime, pretty_timedelta, shorten_line
 from trac.wiki import wiki_to_html, wiki_to_oneliner
 
-__all__ = [ 'get_changes', 'get_path_links', 'get_path_rev' ]
-
-rev_re = re.compile(r"([^#]*)#(.+)")
+__all__ = ['get_changes', 'get_path_links', 'get_path_rev_line']
 
 def get_changes(env, repos, revs, full=None, req=None, format=None):
     db = env.get_db_cnx()
@@ -31,7 +29,7 @@ def get_changes(env, repos, revs, full=None, req=None, format=None):
     for rev in revs:
         changeset = repos.get_changeset(rev)
         message = changeset.message
-        shortlog = util.shorten_line(message)        
+        shortlog = shorten_line(message)        
         files = None
         if format == 'changelog':
             files = [change[0] for change in changeset.get_changes()]
@@ -46,8 +44,8 @@ def get_changes(env, repos, revs, full=None, req=None, format=None):
             message = '--'
         changes[rev] = {
             'date_seconds': changeset.date,
-            'date': time.strftime('%x %X', time.localtime(changeset.date)),
-            'age': util.pretty_timedelta(changeset.date),
+            'date': format_datetime(changeset.date),
+            'age': pretty_timedelta(changeset.date),
             'author': changeset.author or 'anonymous',
             'shortlog': shortlog,
             'message': message,
@@ -65,16 +63,20 @@ def get_path_links(href, path, rev):
         path = path + part + '/'
         links.append({
             'name': part or 'root',
-            'href': href.browser(path, rev=rev)
+            'href': escape(href.browser(path, rev=rev))
         })
     return links
 
-def get_path_rev(path):
+rev_re = re.compile(r"([^@#]*)[@#]([^#]+)(?:#L(\d+))?")
+
+def get_path_rev_line(path):
     rev = None
+    line = None
     match = rev_re.search(path)
     if match:
         path = match.group(1)
         rev = match.group(2)
+        if match.group(3):
+            line = int(match.group(3))
     path = urllib.unquote(path)
-    return (path, rev)
-
+    return path, rev, line

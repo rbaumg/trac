@@ -58,7 +58,7 @@ class Milestone(object):
     is_completed = property(fget=lambda self: self.completed != 0)
     is_late = property(fget=lambda self: self.due and self.due < time.time())
 
-    def delete(self, retarget_to=None, db=None):
+    def delete(self, retarget_to=None, author=None, db=None):
         if not db:
             db = self.env.get_db_cnx()
             handle_ta = True
@@ -69,17 +69,15 @@ class Milestone(object):
         self.env.log.info('Deleting milestone %s' % self.name)
         cursor.execute("DELETE FROM milestone WHERE name=%s", (self.name,))
 
-        if retarget_to:
-            self.env.log.info('Retargeting milestone field of all tickets '
-                              'associated with milestone "%s" to milestone "%s"'
-                              % (self.name, retarget_to))
-            cursor.execute("UPDATE ticket SET milestone=%s WHERE milestone=%s",
-                           (retarget_to, self.name))
-        else:
-            self.env.log.info('Resetting milestone field of all tickets '
-                              'associated with milestone %s' % self.name)
-            cursor.execute("UPDATE ticket SET milestone=NULL "
-                           "WHERE milestone=%s", (self.name,))
+        # Retarget/reset tickets associated with this milestone
+        now = time.time()
+        cursor.execute("SELECT id FROM ticket WHERE milestone=%s", (self.name,))
+        tkt_ids = [int(row[0]) for row in cursor]
+        for tkt_id in tkt_ids:
+            ticket = Ticket(self.env, tkt_id, db)
+            ticket['milestone'] = retarget_to
+            ticket.save_changes(author, 'Milestone %s deleted' % self.name,
+                                now, db=db)
 
         if handle_ta:
             db.commit()
@@ -206,42 +204,26 @@ def milestone_to_hdf(env, db, req, milestone):
         hdf['description'] = wiki_to_html(milestone.description, env, req, db)
     if milestone.due:
         hdf['due'] = milestone.due
-        hdf['due_date'] = time.strftime('%x', time.localtime(milestone.due))
+        hdf['due_date'] = format_date(milestone.due)
         hdf['due_delta'] = pretty_timedelta(milestone.due)
         hdf['late'] = milestone.is_late
     if milestone.completed:
         hdf['completed'] = milestone.completed
-        hdf['completed_date'] = time.strftime('%x %X',
-                                              time.localtime(milestone.completed))
+        hdf['completed_date'] = format_datetime(milestone.completed)
         hdf['completed_delta'] = pretty_timedelta(milestone.completed)
     return hdf
 
 def _get_groups(env, db, by='component'):
     for field in TicketSystem(env).get_ticket_fields():
         if field['name'] == by:
-            if 'options' in field.keys():
+            if field.has_key('options'):
                 return field['options']
             else:
                 cursor = db.cursor()
                 cursor.execute("SELECT DISTINCT %s FROM ticket ORDER BY %s"
                                % (by, by))
                 return [row[0] for row in cursor]
-
-def _parse_date(datestr):
-    seconds = None
-    datestr = datestr.strip()
-    for format in ['%x %X', '%x, %X', '%X %x', '%X, %x', '%x', '%c',
-                   '%b %d, %Y']:
-        try:
-            date = time.strptime(datestr, format)
-            seconds = time.mktime(date)
-            break
-        except ValueError:
-            continue
-    if seconds == None:
-        raise TracError('%s is not a known date format.' % datestr,
-                        'Invalid Date Format')
-    return seconds
+    return []
 
 
 class MilestoneModule(Component):
@@ -310,7 +292,7 @@ class MilestoneModule(Component):
         action = req.args.get('action', 'view')
 
         if req.method == 'POST':
-            if 'cancel' in req.args.keys():
+            if req.args.has_key('cancel'):
                 if milestone.exists:
                     req.redirect(self.env.href.milestone(milestone.name))
                 else:
@@ -337,7 +319,7 @@ class MilestoneModule(Component):
         retarget_to = None
         if req.args.has_key('retarget'):
             retarget_to = req.args.get('target')
-        milestone.delete(retarget_to)
+        milestone.delete(retarget_to, req.authname)
         db.commit()
         req.redirect(self.env.href.roadmap())
 
@@ -347,16 +329,22 @@ class MilestoneModule(Component):
         else:
             req.perm.assert_permission('MILESTONE_CREATE')
 
-        if not 'name' in req.args.keys():
+        if not req.args.has_key('name'):
             raise TracError('You must provide a name for the milestone.',
                             'Required Field Missing')
         milestone.name = req.args.get('name')
 
         due = req.args.get('duedate', '')
-        milestone.due = due and _parse_date(due) or 0
-        if 'completed' in req.args.keys():
+        try:
+            milestone.due = due and parse_date(due) or 0
+        except ValueError, e:
+            raise TracError(e, 'Invalid Date Format')
+        if req.args.has_key('completed'):
             completed = req.args.get('completeddate', '')
-            milestone.completed = completed and _parse_date(completed) or 0
+            try:
+                milestone.completed = completed and parse_date(completed) or 0
+            except ValueError, e:
+                raise TracError(e, 'Invalid Date Format')
             if milestone.completed > time.time():
                 raise TracError('Completion date may not be in the future',
                                 'Invalid Completion Date')
@@ -397,8 +385,7 @@ class MilestoneModule(Component):
         req.hdf['milestone'] = milestone_to_hdf(self.env, db, req, milestone)
         req.hdf['milestone.date_hint'] = get_date_format_hint()
         req.hdf['milestone.datetime_hint'] = get_datetime_format_hint()
-        req.hdf['milestone.datetime_now'] = time.strftime('%x %X',
-                                                          time.localtime(time.time()))
+        req.hdf['milestone.datetime_now'] = format_datetime()
 
     def _render_view(self, req, db, milestone):
         req.hdf['title'] = 'Milestone %s' % milestone.name
@@ -431,8 +418,8 @@ class MilestoneModule(Component):
         tickets = get_tickets_for_milestone(self.env, db, milestone.name, by)
         stats = calc_ticket_stats(tickets)
         req.hdf['milestone.stats'] = stats
-        queries = get_query_links(self.env, milestone.name)
-        req.hdf['milestone.queries'] = queries
+        for key, value in get_query_links(self.env, milestone.name).items():
+            req.hdf['milestone.queries.' + key] = escape(value)
 
         groups = _get_groups(self.env, db, by)
         group_no = 0
@@ -451,16 +438,17 @@ class MilestoneModule(Component):
             req.hdf['%s.percent_total' % prefix] = percent_total * 100
             stats = calc_ticket_stats(group_tickets)
             req.hdf[prefix] = stats
-            queries = get_query_links(self.env, milestone.name, by, group)
-            req.hdf['%s.queries' % prefix] = queries
+            for key, value in get_query_links(self.env, milestone.name,
+                                              by, group).items():
+                req.hdf['%s.queries.%s' % (prefix, key)] = escape(value)
             group_no += 1
         req.hdf['milestone.stats.max_percent_total'] = max_percent_total * 100
 
     # IWikiSyntaxProvider methods
-    
+
     def get_wiki_syntax(self):
         return []
-    
+
     def get_link_resolvers(self):
         yield ('milestone', self._format_link)
 

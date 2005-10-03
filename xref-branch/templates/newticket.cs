@@ -1,5 +1,5 @@
-<?cs include "header.cs" ?>
-<?cs include "macros.cs" ?>
+<?cs include:"header.cs" ?>
+<?cs include:"macros.cs" ?>
 <script type="text/javascript">
 addEvent(window, 'load', function() { document.getElementById('summary').focus()}); 
 </script>
@@ -7,8 +7,8 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
 <div id="ctxtnav" class="nav"></div>
 
 <div id="content" class="ticket">
-
 <h1>Create New Ticket</h1>
+<?cs include:"site_newticket.cs" ?>
 <form id="newticket" method="post" action="<?cs
   var:trac.href.newticket ?>#preview">
  <div class="field">
@@ -87,7 +87,9 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
          var:option ?></label> <?cs set:optidx = optidx + 1 ?><?cs
        /each ?><?cs
       /if ?></td><?cs
-     if:idx % 2 || fullrow ?></tr><tr><?cs 
+     if:idx % 2 || fullrow ?><?cs
+      if:idx < num_fields - 1 ?></tr><tr><?cs
+      /if ?><?cs 
      elif:idx == num_fields - 1 ?><th class="col2"></th><td></td><?cs
      /if ?><?cs set:idx = idx + #fullrow + 1 ?><?cs
     /if ?><?cs
@@ -99,7 +101,7 @@ addEvent(window, 'load', function() { document.getElementById('summary').focus()
    var:chrome.href ?>/common/js/wikitoolbar.js"></script>
 
  <div class="buttons">
-  <input type="submit" name="preview" value="Preview" />&nbsp;
+  <input type="submit" name="preview" value="Preview" accesskey="r" />&nbsp;
   <input type="submit" value="Submit ticket" />
  </div>
 </form>

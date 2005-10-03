@@ -3,8 +3,8 @@
 
 <div id="ctxtnav" class="nav">
  <h2>Ticket Navigation</h2><?cs
- with:links = chrome.links ?>
-  <ul><?cs
+ with:links = chrome.links ?><?cs
+  if:len(links.prev) || len(links.up) || len(links.next) ?><ul><?cs
    call:backlinks("ticket", ticket.id) ?><?cs
    if:len(links.prev) ?>
     <li class="first<?cs if:!len(links.up) && !len(links.next) ?> last<?cs /if ?>">
@@ -24,8 +24,8 @@
      <a href="<?cs var:links.next.0.href ?>" title="<?cs
        var:links.next.0.title ?>">Next Ticket</a> &rarr;
     </li><?cs
-   /if ?>
-  </ul><?cs
+   /if ?></ul><?cs
+  /if ?><?cs
  /with ?>
 </div>
 
@@ -124,7 +124,6 @@
 
 <?cs if:trac.acl.TICKET_CHGPROP || trac.acl.TICKET_APPEND ?>
 <form action="<?cs var:ticket.href ?>#preview" method="post">
- <input type="hidden" name="ts" value="<?cs var:ticket.ts ?>"/>
  <hr />
  <h3><a name="edit" onfocus="document.getElementById('comment').focus()">Add/Change #<?cs
    var:ticket.id ?> (<?cs var:ticket.summary ?>)</a></h3>
@@ -153,7 +152,7 @@
   <table><tr>
    <th><label for="summary">Summary:</label></th>
    <td class="fullrow" colspan="3"><input type="text" id="summary" name="summary" value="<?cs
-     var:ticket.summary ?>" size="70" />
+     var:ticket.summary ?>" size="70" /></td>
    </tr><?cs
    if:len(ticket.fields.type.options) ?>
    <tr>
@@ -219,7 +218,9 @@
          var:option ?></label> <?cs set:optidx = optidx + 1 ?><?cs
         /each ?><?cs
       /if ?></td><?cs
-     if:idx % 2 || fullrow ?></tr><tr><?cs 
+     if:idx % 2 || fullrow ?><?cs
+      if:idx < num_fields - 1 ?></tr><tr><?cs
+      /if ?><?cs 
      elif:idx == num_fields - 1 ?><th class="col2"></th><td></td><?cs
      /if ?><?cs set:idx = idx + #fullrow + 1 ?><?cs
     /if ?><?cs
@@ -293,7 +294,8 @@
    var:chrome.href ?>/common/js/wikitoolbar.js"></script>
 
  <div class="buttons">
-  <input type="submit" name="preview" value="Preview" />&nbsp;
+  <input type="hidden" name="ts" value="<?cs var:ticket.ts ?>" />
+  <input type="submit" name="preview" value="Preview" accesskey="r" />&nbsp;
   <input type="submit" value="Submit changes" />
  </div>
 </form>

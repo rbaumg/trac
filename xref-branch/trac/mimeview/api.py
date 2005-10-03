@@ -25,7 +25,7 @@ except ImportError:
     from StringIO import StringIO
 
 from trac.core import *
-from trac.util import enum, escape
+from trac.util import enum, escape, to_utf8
 
 __all__ = ['get_charset', 'get_mimetype', 'is_binary', 'detect_unicode',
            'Mimeview']
@@ -59,7 +59,8 @@ MIME_MAP = {
     'java':'text/x-java',
     'js':'text/x-javascript',
     'ksh':'text/x-ksh',
-    'm':'text/x-objc',
+    'lua':'text/x-lua',
+    'm':'text/x-objc', 'mm':'text/x-objc',
     'm4':'text/x-m4',
     'make':'text/x-makefile', 'mk':'text/x-makefile', 'Makefile':'text/x-makefile',
     'mail':'text/x-mail',
@@ -83,8 +84,7 @@ MIME_MAP = {
     'tcl':'text/x-tcl',
     'tex':'text/x-tex',
     'txtl': 'text/x-textile', 'textile': 'text/x-textile',
-    'vba':'text/x-vba',
-    'bas':'text/x-vba',
+    'vb':'text/x-vba', 'vba':'text/x-vba', 'bas':'text/x-vba',
     'v':'text/x-verilog', 'verilog':'text/x-verilog',
     'vhd':'text/x-vhdl',
     'vrml':'model/vrml',
@@ -120,10 +120,7 @@ def is_binary(str):
     """Detect binary content by checking the first thousand bytes for zeroes."""
     if detect_unicode(str):
         return False
-    for i in range(0, min(len(str), 1000)):
-        if str[i] == '\0':
-            return True
-    return False
+    return '\0' in str[:1000]
 
 def detect_unicode(data):
     """Detect different unicode charsets by looking for BOMs (Byte Order
@@ -142,6 +139,10 @@ class IHTMLPreviewRenderer(Interface):
     """Extension point interface for components that add HTML renderers of
     specific content types to the `Mimeview` component.
     """
+
+    # implementing classes should set this property to True if they
+    # support text content where Trac should expand tabs into spaces
+    expand_tabs = False
 
     def get_quality_ratio(mimetype):
         """Return the level of support this renderer provides for the content of
@@ -207,18 +208,29 @@ class Mimeview(Component):
             mimetype = get_mimetype(filename)
         mimetype = mimetype.split(';')[0].strip() # split off charset
 
+        expanded_content = None
+
         candidates = []
         for renderer in self.renderers:
             qr = renderer.get_quality_ratio(mimetype)
             if qr > 0:
-                candidates.append((qr, renderer))
+                expand_tabs = getattr(renderer, 'expand_tabs', False)
+                if expand_tabs and expanded_content is None:
+                    tab_width = int(self.config.get('mimeviewer', 'tab_width'))
+                    expanded_content = content.expandtabs(tab_width)
+
+                if expand_tabs:
+                    candidates.append((qr, renderer, expanded_content))
+                else:
+                    candidates.append((qr, renderer, content))
         candidates.sort(lambda x,y: cmp(y[0], x[0]))
 
-        for qr, renderer in candidates:
+        for qr, renderer, content in candidates:
             try:
                 self.log.debug('Trying to render HTML preview using %s'
                                % renderer.__class__.__name__)
                 result = renderer.render(req, mimetype, content, filename, rev)
+
                 if not result:
                     continue
                 elif isinstance(result, (str, unicode)):
@@ -227,10 +239,9 @@ class Mimeview(Component):
                     return self._annotate(result, annotations)
                 else:
                     buf = StringIO()
-                    buf.write('<div class="code-block"><pre>')
-                    tab_width = int(self.config.get('mimeviewer', 'tab_width'))
+                    buf.write('<div class="code"><pre>')
                     for line in result:
-                        buf.write(line.expandtabs(tab_width) + '\n')
+                        buf.write(line + '\n')
                     buf.write('</pre></div>')
                     return buf.getvalue()
             except Exception, e:
@@ -239,7 +250,7 @@ class Mimeview(Component):
 
     def _annotate(self, lines, annotations):
         buf = StringIO()
-        buf.write('<table class="code-block listing"><thead><tr>')
+        buf.write('<table class="code"><thead><tr>')
         annotators = []
         for annotator in self.annotators:
             atype, alabel, adesc = annotator.get_annotation_type()
@@ -257,17 +268,35 @@ class Mimeview(Component):
                 div, mod = divmod(len(m), 2)
                 return div * '&nbsp; ' + mod * '&nbsp;'
             return (match.group('tag') or '') + '&nbsp;'
-        tab_width = int(self.config.get('mimeviewer', 'tab_width'))
 
         for num, line in enum(_html_splitlines(lines)):
             cells = []
             for annotator in annotators:
                 cells.append(annotator.annotate_line(num + 1, line))
-            cells.append('<td>%s</td>\n'
-                         % space_re.sub(htmlify, line.expandtabs(tab_width)))
+            cells.append('<td>%s</td>\n' % space_re.sub(htmlify, line))
             buf.write('<tr>' + '\n'.join(cells) + '</tr>')
         buf.write('</tbody></table>')
         return buf.getvalue()
+
+    def max_preview_size(self):
+        return int(self.config.get('mimeviewer', 'max_preview_size', '262144'))
+
+    def preview_charset(self, content):
+        return detect_unicode(content) or self.config.get('trac',
+                                                          'default_charset')
+
+    def preview_to_hdf(self, req, mimetype, charset, content, filename,
+                       detail=None, annotations=None):
+        if not is_binary(content):
+            content = to_utf8(content, charset or self.preview_charset(content))
+        max_preview_size = self.max_preview_size()            
+        if len(content) >= max_preview_size:
+            return {'max_file_size_reached': True,
+                    'max_file_size': max_preview_size,
+                    'preview': ' '}
+        else:
+            return {'preview': self.render(req, mimetype, content,
+                                           filename, detail, annotations)}
 
 
 def _html_splitlines(lines):
@@ -311,7 +340,7 @@ class LineNumberAnnotator(Component):
         return 'lineno', 'Line', 'Line numbers'
 
     def annotate_line(self, number, content):
-        return '<th id="l%s"><a href="#l%s">%s</a></th>' % (number, number,
+        return '<th id="L%s"><a href="#L%s">%s</a></th>' % (number, number,
                                                             number)
 
 
@@ -321,10 +350,18 @@ class PlainTextRenderer(Component):
     """
     implements(IHTMLPreviewRenderer)
 
+    expand_tabs = True
+
+    TREAT_AS_BINARY = [
+        'application/pdf',
+        'application/postscript',
+        'application/rtf'
+    ]
+
     def get_quality_ratio(self, mimetype):
-        if mimetype.startswith('text/'):
-            return 1
-        return 0
+        if mimetype in self.TREAT_AS_BINARY:
+            return 0
+        return 1
 
     def render(self, req, mimetype, content, filename=None, rev=None):
         if is_binary(content):

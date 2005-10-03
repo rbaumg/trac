@@ -3,7 +3,7 @@
 
 <div id="ctxtnav" class="nav">
  <ul>
-  <li class="first"><a href="<?cs var:browser.restricted_changeset_href ?>">
+  <li class="first"><a href="<?cs var:browser.restr_changeset_href ?>">
    Last Change</a></li>
   <li class="last"><a href="<?cs var:browser.log_href ?>">
    Revision Log</a></li>
@@ -36,11 +36,11 @@
     </tr>
    </thead>
    <tbody>
-    <?cs if:len(links.up) != "/" ?>
+    <?cs if:len(chrome.links.up) ?>
      <tr class="even">
-      <td class="name" colspan="4">
+      <td class="name" colspan="5">
        <a class="parent" title="Parent Directory" href="<?cs
-         var:links.up.0.href ?>">../</a>
+         var:chrome.links.up.0.href ?>">../</a>
       </td>
      </tr>
     <?cs /if ?>

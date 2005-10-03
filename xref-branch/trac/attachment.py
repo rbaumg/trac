@@ -55,7 +55,7 @@ class Attachment(object):
         cursor.execute("SELECT filename,description,size,time,author,ipnr "
                        "FROM attachment WHERE type=%s AND id=%s "
                        "AND filename=%s ORDER BY time",
-                       (self.parent.type, self.parent.id, filename))
+                       (self.parent.type, str(self.parent.id), filename))
         row = cursor.fetchone()
         cursor.close()
         if not row:
@@ -164,7 +164,7 @@ class Attachment(object):
         cursor = db.cursor()
         cursor.execute("SELECT filename,description,size,time,author,ipnr "
                        "FROM attachment WHERE type=%s AND id=%s ORDER BY time",
-                       (parent.type, parent.id))
+                       (parent.type, str(parent.id)))
         for filename,description,size,time,author,ipnr in cursor:
             attachment = Attachment(parent)
             attachment.filename = filename
@@ -182,9 +182,8 @@ class Attachment(object):
         try:
             fd = open(self.path, 'rb')
         except IOError:
-            raise TracError('Attachment %s not found', self.filename)
+            raise TracError('Attachment %s not found' % self.filename)
         return fd
-
 
     def to_hdf(self, req, db=None):
         from trac.wiki import wiki_to_oneliner
@@ -196,7 +195,7 @@ class Attachment(object):
             'author': util.escape(self.author),
             'ipnr': self.ipnr,
             'size': util.pretty_size(self.size),
-            'time': time.strftime('%c', time.localtime(self.time)),
+            'time': util.format_datetime(self.time),
             'href': self.href()
         }
         return hdf
@@ -288,7 +287,7 @@ class AttachmentModule(Component):
         perm_map = {'ticket': 'TICKET_APPEND', 'wiki': 'WIKI_MODIFY'}
         req.perm.assert_permission(perm_map[attachment.parent.type])
 
-        if 'cancel' in req.args.keys():
+        if req.args.has_key('cancel'):
             req.redirect(attachment.parent.href())
 
         upload = req.args['attachment']
@@ -322,8 +321,7 @@ class AttachmentModule(Component):
                 old_attachment = Attachment(attachment.parent, filename)
                 if not (old_attachment.author and req.authname \
                         and old_attachment.author == req.authname):
-                    perm_map = {'ticket': perm.TICKET_ADMIN,
-                                'wiki': perm.WIKI_DELETE}
+                    perm_map = {'ticket': 'TICKET_ADMIN', 'wiki': 'WIKI_DELETE'}
                     req.perm.assert_permission(perm_map[old_attachment.parent.type])
                 old_attachment.delete()
             except TracError:
@@ -338,7 +336,7 @@ class AttachmentModule(Component):
         perm_map = {'ticket': 'TICKET_ADMIN', 'wiki': 'WIKI_DELETE'}
         req.perm.assert_permission(perm_map[attachment.parent.type])
 
-        if 'cancel' in req.args.keys():
+        if req.args.has_key('cancel'):
             req.redirect(attachment.href())
 
         attachment.delete()
@@ -412,32 +410,25 @@ class AttachmentModule(Component):
                        % (attachment.filename, mimetype))
         fd = attachment.open()
         try:
-            max_preview_size = int(self.config.get('mimeviewer',
-                                                   'max_preview_size',
-                                                   '262144'))
+            mimeview = Mimeview(self.env)
+
+            max_preview_size = mimeview.max_preview_size()
             data = fd.read(max_preview_size)
-            max_size_reached = len(data) == max_preview_size
-            charset = detect_unicode(data) or self.config.get('trac',
-                                                              'default_charset')
             
             if fmt in ('raw', 'txt'):
                 # Send raw file
+                charset = mimeview.preview_charset(data)
                 req.send_file(attachment.path, mimetype + ';charset=' + charset)
                 return
             
             if not is_binary(data):
-                data = util.to_utf8(data, charset)
                 add_link(req, 'alternate', attachment.href(format='txt'),
                          'Plain Text', mimetype)
-            if max_size_reached:
-                req.hdf['attachment.max_file_size_reached'] = 1
-                req.hdf['attachment.max_file_size'] = max_preview_size
-                vdata = ''
-            else:
-                mimeview = Mimeview(self.env)
-                vdata = mimeview.render(req, mimetype, data,
-                                        attachment.filename)
-            req.hdf['attachment.preview'] = vdata
+
+            hdf = mimeview.preview_to_hdf(req, mimetype, None, data,
+                                          attachment.filename, None,
+                                          annotations=['lineno'])
+            req.hdf['attachment'] = hdf
         finally:
             fd.close()
 

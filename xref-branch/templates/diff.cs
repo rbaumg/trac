@@ -73,6 +73,7 @@
  <div><?cs 
   if:!diff.chgset ?>
    <input type="hidden" name="old_path" value="<?cs var:diff.old_path ?>" />
+   <input type="hidden" name="path" value="<?cs var:diff.new_path ?>" />
    <input type="hidden" name="old" value="<?cs var:diff.old_rev ?>" />
    <input type="hidden" name="new" value="<?cs var:diff.new_rev ?>" /><?cs
   /if ?>
@@ -221,7 +222,7 @@
        var:item.rev.old ?></a></th>
       <th colspan="2"><a href="<?cs
        var:item.browser_href.new ?>" title="Show new rev. <?cs
-       var:item.rev.old ?> of <?cs var:item.path.new ?>">Revision <?cs
+       var:item.rev.new ?> of <?cs var:item.path.new ?>">Revision <?cs
        var:item.rev.new ?></a></th>
       </tr>
      </thead><?cs

@@ -15,21 +15,22 @@
 __copyright__ = 'Copyright (c) 2003-2005 Edgewall Software'
 
 from __future__ import generators
-import os
-import os.path
-import sys
-import time
 import cmd
+import getpass
+import os
 import shlex
 import shutil
 import StringIO
+import sys
+import time
 import traceback
 import urllib
 
 import trac
-from trac import perm, util
+from trac import perm, util, db_default
 from trac.config import default_dir
 from trac.env import Environment
+from trac.config import Configuration
 from trac.Milestone import Milestone
 from trac.perm import PermissionSystem
 from trac.ticket.model import *
@@ -61,18 +62,26 @@ class TracAdmin(cmd.Cmd):
 
     def __init__(self, envdir=None):
         cmd.Cmd.__init__(self)
-        self.interactive = 0
+        self.interactive = False
         if envdir:
             self.env_set(os.path.abspath(envdir))
-
-    def docmd(self, cmd='help'):
-        self.onecmd(cmd)
 
     def emptyline(self):
         pass
 
+    def onecmd(self, line):
+        try:
+            rv = cmd.Cmd.onecmd(self, line) or 0
+        except SystemExit:
+            raise
+        except Exception, e:
+            print>>sys.stderr, 'Command failed: %s' % e
+            rv = 2
+        if not self.interactive:
+            return rv
+
     def run(self):
-        self.interactive = 1
+        self.interactive = True
         print 'Welcome to trac-admin %(ver)s\n'                \
               'Interactive Trac adminstration console.\n'       \
               '%(copy)s\n\n'                                    \
@@ -146,22 +155,11 @@ class TracAdmin(cmd.Cmd):
         if hasattr(shlex, 'split'):
             toks = shlex.split(argstr)
         else:
-            def my_strip(s, c):
-                """string::strip in python2.1 doesn't support arguments"""
-                i = j = 0
-                for i in range(len(s)):
-                    if not s[i] in c:
-                        break
-                for j in range(len(s), 0, -1):
-                    if not s[j-1] in c:
-                        break
-                return s[i:j]
-        
             lexer = shlex.shlex(StringIO.StringIO(argstr))
             lexer.wordchars = lexer.wordchars + ".,_/"
             toks = []
-            while 1:
-                token = my_strip(lexer.get_token(), '"\'')
+            while True:
+                token = lexer.get_token().strip('"\'')
                 if not token:
                     break
                 toks.append(token)
@@ -263,7 +261,7 @@ class TracAdmin(cmd.Cmd):
             except ValueError:
                 pass
         if seconds == None:
-            print >> sys.stderr, 'Unknown time format'
+            print>>sys.stderr, 'Unknown time format %s' % t
         return seconds
 
     def _format_date(self, s):
@@ -304,7 +302,7 @@ class TracAdmin(cmd.Cmd):
                 print
                 print "Usage: trac-admin </path/to/projenv> [command [subcommand] [option ...]]\n"
                 print "Invoking trac-admin without command starts "\
-                       "interactive mode."
+                      "interactive mode."
             self.print_doc (docs)
 
     
@@ -352,28 +350,25 @@ class TracAdmin(cmd.Cmd):
 
     def do_component(self, line):
         arg = self.arg_tokenize(line)
-        try:
-            if arg[0]  == 'list':
-                self._do_component_list()
-            elif arg[0] == 'add' and len(arg)==3:
-                name = arg[1]
-                owner = arg[2]
-                self._do_component_add(name, owner)
-            elif arg[0] == 'rename' and len(arg)==3:
-                name = arg[1]
-                newname = arg[2]
-                self._do_component_rename(name, newname)
-            elif arg[0] == 'remove'  and len(arg)==2:
-                name = arg[1]
-                self._do_component_remove(name)
-            elif arg[0] == 'chown' and len(arg)==3:
-                name = arg[1]
-                owner = arg[2]
-                self._do_component_set_owner(name, owner)
-            else:    
-                self.do_help ('component')
-        except Exception, e:
-            print 'Component %s failed:' % arg[0], e
+        if arg[0]  == 'list':
+            self._do_component_list()
+        elif arg[0] == 'add' and len(arg)==3:
+            name = arg[1]
+            owner = arg[2]
+            self._do_component_add(name, owner)
+        elif arg[0] == 'rename' and len(arg)==3:
+            name = arg[1]
+            newname = arg[2]
+            self._do_component_rename(name, newname)
+        elif arg[0] == 'remove'  and len(arg)==2:
+            name = arg[1]
+            self._do_component_remove(name)
+        elif arg[0] == 'chown' and len(arg)==3:
+            name = arg[1]
+            owner = arg[2]
+            self._do_component_set_owner(name, owner)
+        else:    
+            self.do_help ('component')
 
     def _do_component_list(self):
         data = []
@@ -423,24 +418,21 @@ class TracAdmin(cmd.Cmd):
 
     def do_permission(self, line):
         arg = self.arg_tokenize(line)
-        try:
-            if arg[0]  == 'list':
-                user = None
-                if len(arg) > 1:
-                    user = arg[1]
-                self._do_permission_list(user)
-            elif arg[0] == 'add' and len(arg) >= 3:
+        if arg[0]  == 'list':
+            user = None
+            if len(arg) > 1:
                 user = arg[1]
-                for action in arg[2:]:
-                    self._do_permission_add(user, action)
-            elif arg[0] == 'remove'  and len(arg) >= 3:
-                user = arg[1]
-                for action in arg[2:]:
-                    self._do_permission_remove(user, action)
-            else:
-                self.do_help('permission')
-        except Exception, e:
-            print 'Permission %s failed:' % arg[0], e
+            self._do_permission_list(user)
+        elif arg[0] == 'add' and len(arg) >= 3:
+            user = arg[1]
+            for action in arg[2:]:
+                self._do_permission_add(user, action)
+        elif arg[0] == 'remove'  and len(arg) >= 3:
+            user = arg[1]
+            for action in arg[2:]:
+                self._do_permission_remove(user, action)
+        else:
+            self.do_help('permission')
 
     def _do_permission_list(self, user=None):
         if user:
@@ -524,13 +516,15 @@ class TracAdmin(cmd.Cmd):
         dt = default_dir('templates')
         prompt = 'Templates directory [%s]> ' % dt
         returnvals.append(raw_input(prompt).strip()  or dt)
+        print
         return returnvals
 
     def do_initenv(self, line):
         if self.env_check():
             print "Initenv for '%s' failed." % self.envname
             print "Does an environment already exist?"
-            return
+            return 2
+
         arg = self.arg_tokenize(line)
         project_name = None
         db_str = None
@@ -541,13 +535,14 @@ class TracAdmin(cmd.Cmd):
             project_name, db_str, repository_dir, templates_dir = returnvals
         elif len(arg) != 4:
             print 'Wrong number of arguments to initenv: %d' % len(arg)
-            return
+            return 2
         else:
             project_name, db_str, repository_dir, templates_dir = arg[:4]
 
         if not os.access(os.path.join(templates_dir, 'header.cs'), os.F_OK):
             print templates_dir, "doesn't look like a Trac templates directory"
-            return
+            return 2
+
         try:
             print 'Creating and Initializing Project'
             self.env_create(db_str)
@@ -571,7 +566,7 @@ class TracAdmin(cmd.Cmd):
                     continue
                 src = os.path.join(default_dir('macros'), f)
                 dst = os.path.join(self.__env.path, 'wiki-macros', f)
-                print " %s => %s" % (src, f)
+                print "  %s => %s" % (src, f)
                 shutil.copy2(src, dst)
 
             # Add a few default wiki pages
@@ -588,55 +583,50 @@ class TracAdmin(cmd.Cmd):
         except Exception, e:
             print 'Failed to initialize environment.', e
             traceback.print_exc()
-            sys.exit(2)
+            return 2
 
+        print """
+---------------------------------------------------------------------
+Project environment for '%(project_name)s' created.
 
-        print "---------------------------------------------------------------------"
-        print
-        print 'Project database for \'%s\' created.' % project_name
-        print
-        print ' Customize settings for your project using the command:'
-        print
-        print '   trac-admin %s' % self.envname
-        print
-        print ' Don\'t forget, you also need to copy (or symlink) "trac/cgi-bin/trac.cgi"'
-        print ' to you web server\'s /cgi-bin/ directory, and then configure the server.'
-        print
-        print ' If you\'re using Apache, this config example snippet might be helpful:'
-        print
-        print '    Alias /trac "/wherever/you/installed/trac/htdocs/"'
-        print '    <Location "/cgi-bin/trac.cgi">'
-        print '        SetEnv TRAC_ENV "%s"' % self.envname
-        print '    </Location>'
-        print
-        print '    # You need something like this to authenticate users'
-        print '    <Location "/cgi-bin/trac.cgi/login">'
-        print '        AuthType Basic'
-        print '        AuthName "%s"' % project_name
-        print '        AuthUserFile /somewhere/trac.htpasswd'
-        print '        Require valid-user'
-        print '    </Location>'
-        print
+You may now configure the environment by editing the file:
 
-        print ' The latest documentation can also always be found on the project website:'
-        print ' http://projects.edgewall.com/trac/'
-        print
-        print 'Congratulations!'
-        print
-        
+  %(config_path)s
+
+If you'd like to take this new project environment for a test drive,
+try running the Trac standalone web server `tracd`:
+
+  tracd --port 8000 %(project_path)s
+
+Then point your browser to http://localhost:8000/%(project_dir)s.
+There you can also browse the documentation for your installed
+version of Trac, including information on further setup (such as
+deploying Trac to a real web server).
+
+The latest documentation can also always be found on the project
+website:
+
+  http://projects.edgewall.com/trac/
+
+Congratulations!
+""" % dict(project_name=project_name, project_path=self.envname,
+           project_dir=os.path.basename(self.envname),
+           config_path=os.path.join(self.envname, 'conf', 'trac.ini'))
+
     _help_resync = [('resync', 'Re-synchronize trac with the repository')]
 
     ## Resync
     def do_resync(self, line):
-        print 'resyncing...'
-        cnx = self.db_open() # We need to call this function to open the env, really stupid
-        self.db_update("DELETE FROM revision")
-        self.db_update("DELETE FROM node_change")
-
+        print 'Resyncing repository history...'
+        cnx = self.db_open()
+        cursor = cnx.cursor()
+        cursor.execute("DELETE FROM revision")
+        cursor.execute("DELETE FROM node_change")
         repos = self.__env.get_repository()
+        cursor.execute("INSERT OR REPLACE INTO system (name,value) "
+                       "VALUES ('repository_dir',%s)", (repos.name,))
         repos.sync()
-            
-        print 'done.'
+        print 'Done.'
 
     _help_xref = [('xref',
                    'Rebuild the cross-reference information'
@@ -688,33 +678,30 @@ class TracAdmin(cmd.Cmd):
 
     def do_wiki(self, line):
         arg = self.arg_tokenize(line)
-        try:
-            if arg[0]  == 'list':
-                self._do_wiki_list()
-            elif arg[0] == 'remove'  and len(arg)==2:
-                name = arg[1]
-                self._do_wiki_remove(name)
-            elif arg[0] == 'import' and len(arg) == 3:
-                title = arg[1]
-                file = arg[2]
-                self._do_wiki_import(file, title)
-            elif arg[0] == 'export'  and len(arg) in [2,3]:
-                page = arg[1]
-                file = (len(arg) == 3 and arg[2]) or None
-                self._do_wiki_export(page, file)
-            elif arg[0] == 'dump' and len(arg) in [1,2]:
-                dir = (len(arg) == 2 and arg[1]) or ''
-                self._do_wiki_dump(dir)
-            elif arg[0] == 'load' and len(arg) in [1,2]:
-                dir = (len(arg) == 2 and arg[1]) or ''
-                self._do_wiki_load(dir)
-            elif arg[0] == 'upgrade' and len(arg) == 1:
-                self._do_wiki_load(default_dir('wiki'),
-                                   ignore=['WikiStart', 'checkwiki.py'])
-            else:    
-                self.do_help ('wiki')
-        except Exception, e:
-            print 'Wiki %s failed:' % arg[0], e
+        if arg[0]  == 'list':
+            self._do_wiki_list()
+        elif arg[0] == 'remove'  and len(arg)==2:
+            name = arg[1]
+            self._do_wiki_remove(name)
+        elif arg[0] == 'import' and len(arg) == 3:
+            title = arg[1]
+            file = arg[2]
+            self._do_wiki_import(file, title)
+        elif arg[0] == 'export'  and len(arg) in [2,3]:
+            page = arg[1]
+            file = (len(arg) == 3 and arg[2]) or None
+            self._do_wiki_export(page, file)
+        elif arg[0] == 'dump' and len(arg) in [1,2]:
+            dir = (len(arg) == 2 and arg[1]) or ''
+            self._do_wiki_dump(dir)
+        elif arg[0] == 'load' and len(arg) in [1,2]:
+            dir = (len(arg) == 2 and arg[1]) or ''
+            self._do_wiki_load(dir)
+        elif arg[0] == 'upgrade' and len(arg) == 1:
+            self._do_wiki_load(default_dir('wiki'),
+                               ignore=['WikiStart', 'checkwiki.py'])
+        else:    
+            self.do_help ('wiki')
 
     def _do_wiki_list(self):
         rows = self.db_query("SELECT name,max(version),time "
@@ -728,8 +715,8 @@ class TracAdmin(cmd.Cmd):
 
     def _do_wiki_import(self, filename, title, cursor=None):
         if not os.path.isfile(filename):
-            print "%s is not a file" % filename
-            return
+            raise Exception, '%s is not a file' % filename
+
         f = open(filename,'r')
         data = util.to_utf8(f.read())
 
@@ -845,23 +832,20 @@ class TracAdmin(cmd.Cmd):
 
     def _do_enum(self, type, line):
         arg = self.arg_tokenize(line)
-        try:
-            if arg[0]  == 'list':
-                self._do_enum_list(type)
-            elif arg[0] == 'add' and len(arg)==2:
-                name = arg[1]
-                self._do_enum_add(type, name)
-            elif arg[0] == 'change'  and len(arg)==3:
-                name = arg[1]
-                newname = arg[2]
-                self._do_enum_change(type, name, newname)
-            elif arg[0] == 'remove'  and len(arg)==2:
-                name = arg[1]
-                self._do_enum_remove(type, name)
-            else:    
-                self.do_help (type)
-        except Exception, e:
-            print 'Command %s failed:' % arg[0], e
+        if arg[0]  == 'list':
+            self._do_enum_list(type)
+        elif arg[0] == 'add' and len(arg)==2:
+            name = arg[1]
+            self._do_enum_add(type, name)
+        elif arg[0] == 'change'  and len(arg)==3:
+            name = arg[1]
+            newname = arg[2]
+            self._do_enum_change(type, name, newname)
+        elif arg[0] == 'remove'  and len(arg)==2:
+            name = arg[1]
+            self._do_enum_remove(type, name)
+        else:    
+            self.do_help (type)
 
     def _do_enum_list(self, type):
         enum_cls = self._enum_map[type]
@@ -869,11 +853,14 @@ class TracAdmin(cmd.Cmd):
                            [(e.name,) for e in enum_cls.select(self.env_open())])
 
     def _do_enum_add(self, type, name):
+        cnx = self.db_open()
         sql = ("INSERT INTO enum(value,type,name) "
-               " SELECT 1+COALESCE(max(value),0),'%(type)s','%(name)s'"
+               " SELECT 1+COALESCE(max(%(cast)s),0),'%(type)s','%(name)s'"
                "   FROM enum WHERE type='%(type)s'" 
-               % {'type':type, 'name':name})
-        self.db_update(sql)
+               % {'type':type, 'name':name, 'cast': cnx.cast('value', 'int')})
+        cursor = cnx.cursor()
+        self.db_update(sql, cursor)
+        cnx.commit()
 
     def _do_enum_change(self, type, name, newname):
         enum_cls = self._enum_map[type]
@@ -909,25 +896,22 @@ class TracAdmin(cmd.Cmd):
 
     def do_milestone(self, line):
         arg = self.arg_tokenize(line)
-        try:
-            if arg[0]  == 'list':
-                self._do_milestone_list()
-            elif arg[0] == 'add' and len(arg) in [2,3]:
-                self._do_milestone_add(arg[1])
-                if len(arg) == 3:
-                    self._do_milestone_set_due(arg[1], arg[2])
-            elif arg[0] == 'rename' and len(arg) == 3:
-                self._do_milestone_rename(arg[1], arg[2])
-            elif arg[0] == 'remove' and len(arg) == 2:
-                self._do_milestone_remove(arg[1])
-            elif arg[0] == 'due' and len(arg) == 3:
+        if arg[0]  == 'list':
+            self._do_milestone_list()
+        elif arg[0] == 'add' and len(arg) in [2,3]:
+            self._do_milestone_add(arg[1])
+            if len(arg) == 3:
                 self._do_milestone_set_due(arg[1], arg[2])
-            elif arg[0] == 'completed' and len(arg) == 3:
-                self._do_milestone_set_completed(arg[1], arg[2])
-            else:
-                self.do_help('milestone')
-        except Exception, e:
-            print 'Command %s failed:' % arg[0], e
+        elif arg[0] == 'rename' and len(arg) == 3:
+            self._do_milestone_rename(arg[1], arg[2])
+        elif arg[0] == 'remove' and len(arg) == 2:
+            self._do_milestone_remove(arg[1])
+        elif arg[0] == 'due' and len(arg) == 3:
+            self._do_milestone_set_due(arg[1], arg[2])
+        elif arg[0] == 'completed' and len(arg) == 3:
+            self._do_milestone_set_completed(arg[1], arg[2])
+        else:
+            self.do_help('milestone')
 
     def _do_milestone_list(self):
         data = []
@@ -949,7 +933,7 @@ class TracAdmin(cmd.Cmd):
 
     def _do_milestone_remove(self, name):
         milestone = Milestone(self.env_open(), name)
-        milestone.delete()
+        milestone.delete(author=getpass.getuser())
 
     def _do_milestone_set_due(self, name, t):
         milestone = Milestone(self.env_open(), name)
@@ -980,23 +964,20 @@ class TracAdmin(cmd.Cmd):
 
     def do_version(self, line):
         arg = self.arg_tokenize(line)
-        try:
-            if arg[0]  == 'list':
-                self._do_version_list()
-            elif arg[0] == 'add' and len(arg) in [2,3]:
-                self._do_version_add(arg[1])
-                if len(arg) == 3:
-                    self._do_version_time(arg[1], arg[2])
-            elif arg[0] == 'rename' and len(arg) == 3:
-                self._do_version_rename(arg[1], arg[2])
-            elif arg[0] == 'time' and len(arg) == 3:
+        if arg[0]  == 'list':
+            self._do_version_list()
+        elif arg[0] == 'add' and len(arg) in [2,3]:
+            self._do_version_add(arg[1])
+            if len(arg) == 3:
                 self._do_version_time(arg[1], arg[2])
-            elif arg[0] == 'remove' and len(arg) == 2:
-                self._do_version_remove(arg[1])
-            else:
-                self.do_help('version')
-        except Exception, e:
-            print 'Command %s failed:' % arg[0], e
+        elif arg[0] == 'rename' and len(arg) == 3:
+            self._do_version_rename(arg[1], arg[2])
+        elif arg[0] == 'time' and len(arg) == 3:
+            self._do_version_time(arg[1], arg[2])
+        elif arg[0] == 'remove' and len(arg) == 2:
+            self._do_version_remove(arg[1])
+        else:
+            self.do_help('version')
 
     def _do_version_list(self):
         data = []
@@ -1030,15 +1011,25 @@ class TracAdmin(cmd.Cmd):
         if arg[0] in ['-b', '--no-backup']:
             do_backup = False
         self.db_open()
+        self._update_sample_config()
+
+        if not self.__env.needs_upgrade():
+            print "Database is up to date, no upgrade necessary."
+            return
+
+        self.__env.upgrade(backup=do_backup)
+        print 'Upgrade done.'
+
+    def _update_sample_config(self):
+        filename = os.path.join(self.__env.path, 'conf', 'trac.ini.sample')
         try:
-            if not self.__env.needs_upgrade():
-                print "Database is up to date, no upgrade necessary."
-                return
-            self.__env.upgrade(backup=do_backup)
-            print 'Upgrade done.'
-        except Exception, e:
-            print "Upgrade failed:", e
-            traceback.print_exc()
+            file(filename, 'w').close() # Create the config file
+            config = Configuration(filename)
+            for section, name, value in db_default.default_config:
+                config.set(section, name, value)
+            config.save()
+        except IOError, e:
+            print "Warning: couldn't write sample configuration file (%s)" % e
 
     _help_hotcopy = [('hotcopy <backupdir>',
                       'Make a hot backup copy of an environment')]
@@ -1049,40 +1040,38 @@ class TracAdmin(cmd.Cmd):
         else:
             self.do_help('hotcopy')
             return
+
+        # Bogus statement to lock the database while copying files
         cnx = self.db_open()
-        # Lock the database while copying files
-        cnx.db.execute("BEGIN")
-        print 'Hotcopying %s to %s ...' % (self.__env.path, dest),
+        cursor = cnx.cursor()
+        cursor.execute("UPDATE system SET name=NULL WHERE name IS NULL")
+
         try:
+            print 'Hotcopying %s to %s ...' % (self.__env.path, dest),
             shutil.copytree(self.__env.path, dest, symlinks=1)
-            print 'OK'
-        except Exception, err:
-            print err
-        # Unlock database
-        cnx.db.execute("ROLLBACK")
+        finally:
+            # Unlock database
+            cnx.rollback()
 
-## ---------------------------------------------------------------------------
+        print 'Hotcopy done.'
 
-##
-## Main
-##
 
-def run(*args):
-    args = list(args)
-    tracadm = TracAdmin()
-    if len (args) > 0:
+def run(args):
+    """Main entry point."""
+    admin = TracAdmin()
+    if len(args) > 0:
         if args[0] in ('-h', '--help', 'help'):
-            tracadm.docmd("help")
+            return admin.onecmd("help")
         elif args[0] in ('-v','--version','about'):
-            tracadm.docmd("about")
+            return admin.onecmd("about")
         else:
-            tracadm.env_set(os.path.abspath(args[0]))
-            if len (args) > 1:
+            admin.env_set(os.path.abspath(args[0]))
+            if len(args) > 1:
                 s_args = ' '.join(["'%s'" % c for c in args[2:]])
                 command = args[1] + ' ' +s_args
-                tracadm.docmd(command)
+                return admin.onecmd(command)
             else:
-                while 1:
-                    tracadm.run()
+                while True:
+                    admin.run()
     else:
-        tracadm.docmd ("help")
+        return admin.onecmd("help")

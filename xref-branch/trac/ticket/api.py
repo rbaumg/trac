@@ -20,7 +20,7 @@ from trac import util
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.object import ITracObjectManager
-from trac.wiki import IWikiSyntaxProvider
+from trac.wiki import IWikiSyntaxProvider, INTERTRAC_SCHEME
 from trac.Search import ISearchSource, query_to_sql, shorten_result
 
 
@@ -151,7 +151,7 @@ class TicketSystem(Component):
                 ('ticket', self._format_link, self._parse_link)]
 
     def get_wiki_syntax(self):
-        yield (r"!?#(?P<it_ticket>[a-zA-Z_-]{0,3})\d+",
+        yield (r"!?#(?P<it_ticket>%s)?\d+" % INTERTRAC_SCHEME,
                lambda x, y, z: self._format_link(x, 'ticket', y[1:], y, z),
                lambda x, y, z: self._parse_link(x, 'ticket', y[1:], y, z))
 

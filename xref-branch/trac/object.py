@@ -122,11 +122,11 @@ class TracObject:
         return out.getvalue()
 
     def wiki_to_outline(self, facet, wikitext,
-                        db=None, absurls=0, max_depth=None):
+                        db=None, absurls=0, max_depth=None, min_depth=None):
         from trac.wiki.formatter import OutlineFormatter
         out = StringIO()
         OutlineFormatter(self.env, absurls, db).format(self, facet, wikitext,
-                                                       out, max_depth)
+                                                       out, max_depth, min_depth)
         return out.getvalue()
 
     # -- -- Cross-references related methods

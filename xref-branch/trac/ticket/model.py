@@ -124,9 +124,9 @@ class Ticket(TracObject):
 
     def __setitem__(self, name, value):
         """Log ticket modifications so the table ticket_change can be updated"""
-        if name in self.values.keys() and self.values[name] == value:
+        if self.values.has_key(name) and self.values[name] == value:
             return
-        if name not in self._old.keys(): # Changed field
+        if not self._old.has_key(name): # Changed field
             self._old[name] = self.values.get(name)
         elif self._old[name] == value: # Change of field reverted
             del self._old[name]
@@ -141,7 +141,7 @@ class Ticket(TracObject):
         # We have to do an extra trick to catch unchecked checkboxes
         for name in [name for name in values.keys() if name[9:] in field_names
                      and name.startswith('checkbox_')]:
-            if name[9:] not in values.keys():
+            if not values.has_key(name[9:]):
                 self[name[9:]] = '0'
 
     def insert(self, when=0, db=None):
@@ -172,7 +172,7 @@ class Ticket(TracObject):
 
         # Insert ticket record
         std_fields = [f['name'] for f in self.fields if not f.get('custom')
-                      and f['name'] in self.values.keys()]
+                      and self.values.has_key(f['name'])]
         cursor.execute("INSERT INTO ticket (%s,time,changetime) VALUES (%s)"
                        % (','.join(std_fields),
                           ','.join(['%s'] * (len(std_fields) + 2))),
@@ -182,7 +182,7 @@ class Ticket(TracObject):
 
         # Insert custom fields
         custom_fields = [f['name'] for f in self.fields if f.get('custom')
-                         and f['name'] in self.values.keys()]
+                         and self.values.has_key(f['name'])]
         if custom_fields:
             cursor.executemany("INSERT INTO ticket_custom (ticket,name,value) "
                                "VALUES (%s,%s,%s)", [(tkt_id, name, self[name])
@@ -218,12 +218,12 @@ class Ticket(TracObject):
         if not when:
             when = int(time.time())
 
-        if 'component' in self.values.keys():
+        if self.values.has_key('component'):
             # If the component is changed on a 'new' ticket then owner field
             # is updated accordingly. (#623).
             if self.values.get('status') == 'new' \
-                    and 'component' in self._old.keys() \
-                    and 'owner' not in self._old.keys():
+                    and self._old.has_key('component') \
+                    and not self._old.has_key('owner'):
                 try:
                     old_comp = Component(self.env, self._old['component'], db)
                     if old_comp.owner == self.values.get('owner'):
@@ -294,7 +294,7 @@ class Ticket(TracObject):
                            "SELECT time,author,'comment',null,description "
                            "FROM attachment WHERE id=%s AND time=%s "
                            "ORDER BY time",
-                           (self.id, when, self.id, when, self.id, when))
+                           (self.id, when, str(self.id), when, self.id, when))
         else:
             cursor.execute("SELECT time,author,field,oldvalue,newvalue "
                            "FROM ticket_change WHERE ticket=%s "
@@ -304,7 +304,7 @@ class Ticket(TracObject):
                            "UNION "
                            "SELECT time,author,'comment',null,description "
                            "FROM attachment WHERE id=%s "
-                           "ORDER BY time", (self.id,  self.id, self.id))
+                           "ORDER BY time", (self.id,  str(self.id), self.id))
         log = []
         for t, author, field, oldvalue, newvalue in cursor:
             log.append((int(t), author, field, oldvalue or '', newvalue or ''))
@@ -363,9 +363,9 @@ class AbstractEnum(object):
         self.env.log.debug("Creating new %s '%s'" % (self.type, self.name))
         value = self.value
         if not value:
-            cursor.execute("SELECT COALESCE(MAX(value),0) FROM enum "
-                           "WHERE type=%s", (self.type,))
-            value = int(cursor.fetchone()[0]) + 1
+            cursor.execute(("SELECT COALESCE(MAX(%s),0) FROM enum "
+                            "WHERE type=%%s") % db.cast('value', 'int'), (self.type,))
+            value = str(int(cursor.fetchone()[0]) + 1)
         cursor.execute("INSERT INTO enum (type,name,value) VALUES (%s,%s,%s)",
                        (self.type, self.name, value))
 

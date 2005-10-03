@@ -32,6 +32,9 @@
    if:wiki.only_version ?>
     This is the only version the page, so the page will be removed
     completely!<?cs
+   /if ?><?cs
+   if:?wiki.version ?>
+    <input type="hidden" name="version" value="<?cs var:wiki.version ?>" /><?cs
    /if ?>
    This is an irreversible operation.</p>
    <div class="buttons">
@@ -256,11 +259,11 @@
     </fieldset>
     <div class="buttons"><?cs
      if wiki.action == "collision" ?>
-     <input type="submit" name="preview" value="Preview" disabled="" />&nbsp;
-     <input type="submit" name="save" value="Submit changes" disabled="" />&nbsp;
+      <input type="submit" name="preview" value="Preview" disabled="disabled" />&nbsp;
+      <input type="submit" name="save" value="Submit changes" disabled="disabled" />&nbsp;
      <?cs else ?>
-     <input type="submit" name="preview" value="Preview" />&nbsp;
-     <input type="submit" name="save" value="Submit changes" />&nbsp;
+      <input type="submit" name="preview" value="Preview" accesskey="r" />&nbsp;
+      <input type="submit" name="save" value="Submit changes" />&nbsp;
      <?cs /if ?>
      <input type="submit" name="cancel" value="Cancel" />
     </div>
@@ -290,7 +293,8 @@
     if:trac.acl.WIKI_MODIFY ?>
      <form method="get" action="<?cs var:wiki.current_href ?>"><div>
       <input type="hidden" name="action" value="edit" />
-      <input type="submit" value="<?cs if:wiki.exists ?>Edit<?cs else ?>Create<?cs /if ?> this page" />
+      <input type="submit" value="<?cs if:wiki.exists ?>Edit<?cs
+        else ?>Create<?cs /if ?> this page" accesskey="e" />
      </div></form><?cs
      if:wiki.exists ?>
       <form method="get" action="<?cs var:wiki.attach_href ?>"><div>

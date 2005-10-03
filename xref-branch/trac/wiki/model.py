@@ -98,19 +98,17 @@ class WikiPage(TracObject):
             # Delete a wiki page completely
             cursor.execute("DELETE FROM wiki WHERE name=%s", (self.name,))
             self.env.log.info('Deleted page %s' % self.name)
-            page_deleted = True
         else:
             # Delete only a specific page version
             cursor.execute("DELETE FROM wiki WHERE name=%s and version=%s",
                            (self.name, version))
             self.env.log.info('Deleted version %d of page %s'
                               % (version, self.name))
-            cursor.execute("SELECT COUNT(*) FROM wiki WHERE name=%s",
-                           (self.name,))
-            if cursor.fetchone()[0] == 0:
-                page_deleted = True
 
-        if page_deleted:
+        if version is None or version == self.version:
+            self._fetch(self.name, None, db)
+
+        if not self.exists:
             self.delete_links(db)
             from trac.attachment import Attachment
             # Delete orphaned attachments
@@ -123,7 +121,6 @@ class WikiPage(TracObject):
 
         if handle_ta:
             db.commit()
-        self.version = 0
 
     def save(self, author, comment, remote_addr, t=None, db=None):
         if not db:

@@ -10,7 +10,13 @@ import os.path
 import shutil
 import tempfile
 import unittest
+import time
 
+
+def sleep_for_timestamps():
+    granularity = 0.02
+    time.sleep(granularity)
+    
 
 class AttachmentTestCase(unittest.TestCase):
 
@@ -64,6 +70,7 @@ class AttachmentTestCase(unittest.TestCase):
     def test_insert(self):
         attachment = Attachment(TracObject.factory(self.env, 'ticket', '42'))
         attachment.insert('foo.txt', tempfile.TemporaryFile(), 0)
+        sleep_for_timestamps()
         attachment = Attachment(TracObject.factory(self.env, 'ticket', '42'))
         attachment.insert('bar.jpg', tempfile.TemporaryFile(), 0)
 

@@ -28,6 +28,7 @@ from trac.wiki import IWikiSyntaxProvider
 from trac.versioncontrol import Changeset
 from trac.versioncontrol.web_ui.util import *
 
+LOG_LIMIT = 100
 
 class LogModule(Component):
 
@@ -53,7 +54,7 @@ class LogModule(Component):
         import re
         match = re.match(r'/log(?:(/.*)|$)', req.path_info)
         if match:
-            req.args['path'] = match.group(1)
+            req.args['path'] = match.group(1) or '/'
             return 1
 
     def process_request(self, req):
@@ -65,7 +66,7 @@ class LogModule(Component):
         format = req.args.get('format')
         stop_rev = req.args.get('stop_rev')
         verbose = req.args.get('verbose')
-        limit = int(req.args.get('limit') or 100)
+        limit = LOG_LIMIT
         old = req.args.get('old')
         new = req.args.get('new')
 
@@ -185,7 +186,7 @@ class LogModule(Component):
                 author_email = ''
                 if '@' in author:
                     author_email = author
-                elif author in email_map.keys():
+                elif email_map.has_key(author):
                     author_email = email_map[author]
                 cs['author'] = author_email
                 cs['date'] = util.http_date(cs['date_seconds'])
@@ -215,16 +216,19 @@ class LogModule(Component):
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
-        return []
+        yield (r"!?\[\d+:\d+\]|(?:\b|!)r\d+:\d+\b",
+               lambda x, y, z: self._format_link(x, 'log',
+                                                 '#'+(y[0] == 'r' and y[1:]
+                                                      or y[1:-1]), y))
 
     def get_link_resolvers(self):
         yield ('log', self._format_link)
 
     def _format_link(self, formatter, ns, path, label):
-        path, rev = get_path_rev(path)
+        path, rev, line = get_path_rev_line(path)
         stop_rev = None
         if rev and ':' in rev:
-            stop_rev, rev = rev.split(':',1)
+            stop_rev, rev = rev.split(':', 1)
         label = urllib.unquote(label)
         return '<a class="source" href="%s">%s</a>' \
                % (formatter.href.log(path, rev=rev, stop_rev=stop_rev), label)

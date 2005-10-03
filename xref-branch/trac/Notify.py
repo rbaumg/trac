@@ -21,7 +21,6 @@ from trac.web.clearsilver import HDFWrapper
 from trac.web.main import populate_hdf
 
 import md5
-import sys
 import time
 import smtplib
 
@@ -42,10 +41,6 @@ class Notify:
         populate_hdf(self.hdf, env)
 
     def notify(self, resid):
-        if sys.version_info[0] == 2 and (sys.version_info[1] < 2 or
-                                         sys.version_info[1] == 2 and
-                                         sys.version_info[2] < 2):
-            raise TracError, "Email notifications require Python >= 2.2.2"
         rcpts = self.get_recipients(resid)
         self.begin_send()
         for to in rcpts:
@@ -220,7 +215,7 @@ class TicketNotifyEmail(NotifyEmail):
         t = self.modtime or tkt.time_changed
         width = [0, 0, 0, 0]
         for i, f in enum([f['name'] for f in fields]):
-            if not f in tkt.values.keys():
+            if not tkt.values.has_key(f):
                 continue
             fval = tkt[f]
             if fval.find('\n') > -1:
@@ -324,7 +319,7 @@ class TicketNotifyEmail(NotifyEmail):
     def send(self, rcpt):
         hdrs = {}
         hdrs['Message-ID'] = self.get_message_id(rcpt, self.modtime)
-        hdrs['X-Trac-Ticket-ID'] = self.ticket.id
+        hdrs['X-Trac-Ticket-ID'] = str(self.ticket.id)
         hdrs['X-Trac-Ticket-URL'] = self.ticket['link']
         if not self.newticket:
             hdrs['In-Reply-To'] = self.get_message_id(rcpt)

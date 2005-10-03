@@ -18,7 +18,6 @@ from __future__ import generators
 import imp
 import inspect
 import os.path
-import time
 import shutil
 import re
 
@@ -28,7 +27,7 @@ except ImportError:
     from StringIO import StringIO
 
 from trac.core import *
-from trac.util import escape
+from trac.util import escape, format_date
 from trac.env import IEnvironmentSetupParticipant
 from trac.object import TracObject
 from trac.wiki.api import IWikiMacroProvider, WikiSystem
@@ -119,18 +118,18 @@ class RecentChangesMacro(Component):
         cursor.execute(sql)
 
         buf = StringIO()
-        prevtime = None
+        prevdate = None
 
-        for name,t in cursor:
-            t = time.strftime('%x', time.localtime(t))
-            if t != prevtime:
-                if prevtime:
+        for name, time in cursor:
+            date = format_date(time)
+            if date != prevdate:
+                if prevdate:
                     buf.write('</ul>')
-                buf.write('<h3>%s</h3><ul>' % t)
-                prevtime = t
+                buf.write('<h3>%s</h3><ul>' % date)
+                prevdate = date
             buf.write('<li><a href="%s">%s</a></li>\n'
                       % (escape(self.env.href.wiki(name)), escape(name)))
-        if prevtime:
+        if prevdate:
             buf.write('</ul>')
 
         return buf.getvalue()
@@ -141,14 +140,21 @@ class PageOutlineMacro(Component):
     Displays a structural outline of the current wiki page, each item in the
     outline being a link to the corresponding heading.
 
-    This macro accepts three optional parameters: The first must be a number
-    between 1 and 6 that specifies the maximum depth of the outline (the default
-    is 6). The second can be used to specify a custom title (the default is no
-    title). The third parameter selects the style of the outline. This can be
-    either '''inline''' or '''pullout''' (default is '''pullout''').
-    The '''inline''' style renders the outline as normal part of the content,
-    while '''pullout''' causes the outline to be rendered in a box
-    that is by default floated to the right side of the other content.
+    This macro accepts three optional parameters:
+    
+     * The first is a number or range that allows configuring the minimum and
+       maximum level of headings that should be included in the outline. For
+       example, specifying "1" here will result in only the top-level headings
+       being included in the outline. Specifying "2-3" will make the outline
+       include all headings of level 2 and 3, as a nested list. The default is
+       to include all heading levels.
+     * The second parameter can be used to specify a custom title (the default
+       is no title).
+     * The third parameter selects the style of the outline. This can be
+       either `inline` or `pullout` (the latter being the default). The `inline`
+       style renders the outline as normal part of the content, while `pullout`
+       causes the outline to be rendered in a box that is by default floated to
+       the right side of the other content.
     """
     implements(IWikiMacroProvider)
 
@@ -159,13 +165,17 @@ class PageOutlineMacro(Component):
         return inspect.getdoc(PageOutlineMacro)
 
     def render_macro(self, req, source, facet, name, content):
-        max_depth = 6
+        min_depth, max_depth = 1, 6
         title = None
         inline = 0
         if content:
             argv = [arg.strip() for arg in content.split(',')]
             if len(argv) > 0:
-                max_depth = int(argv[0])
+                depth = argv[0]
+                if depth.find('-') >= 0:
+                    min_depth, max_depth = [int(d) for d in depth.split('-', 1)]
+                else:
+                    min_depth, max_depth = int(depth), int(depth)
                 if len(argv) > 1:
                     title = argv[1].strip()
                     if len(argv) > 2:
@@ -179,7 +189,7 @@ class PageOutlineMacro(Component):
         if title:
             buf.write('<h4>%s</h4>' % escape(title))
         buf.write(source.wiki_to_outline(facet, source.get_facet(facet),
-                                         db=db, max_depth=max_depth))
+                                         db=db, max_depth=max_depth, min_depth=min_depth))
         if not inline:
             buf.write('</div>')
         return buf.getvalue()
@@ -187,40 +197,42 @@ class PageOutlineMacro(Component):
 
 class ImageMacro(Component):
     """
-    Display an image into the wiki page.
-
-    The first argument is the file specification.
-
-    The file specification may refer attachments:
-     * {{{module:id:file}}}, with module being either '''wiki''' or '''ticket''',
-       to refer to the attachment named ''file'' in the module:id object
-     * {{{id:file}}} same as above, but id is either a ticket shorthand or
-       a Wiki page name.
-     * {{{file}}} to refer to a local attachment named 'file'
-       (but then, this works only from within a wiki page or a ticket).
-
-    Also, the file specification may refer to repository files,
-    using the {{{source:file}}} syntax (or the usual aliases for '''source''',
-    like '''repos''' or '''browser''').
-
-    Rest of optional arguments are attribute/style string of IMG element.
+    Embed an image in wiki-formatted text.
+    
+    The first argument is the file specification. The file specification may
+    reference attachments or files in three ways:
+     * `module:id:file`, where module can be either '''wiki''' or '''ticket''',
+       to refer to the attachment named ''file'' of the specified wiki page or
+       ticket.
+     * `id:file`: same as above, but id is either a ticket shorthand or a Wiki
+       page name.
+     * `file` to refer to a local attachment named 'file'. This only works from
+       within that wiki page or a ticket.
+    
+    Also, the file specification may refer to repository files, using the
+    `source:file` syntax.
+    
+    The remaining arguments are optional and allow configuring the attributes
+    and style of the rendered `<img>` element:
      * digits and unit are interpreted as the size (ex. 120, 25%)
        for the image
-     * '''right''', '''left''', '''top''' or '''bottom'''
-       are interpreted as the alignment for the image
-     * {{{key=value}}} style are interpreted as HTML attributes for the image
-     * {{{key:value}}} style are interpreted as CSS style indications for the image
-
+     * `right`, `left`, `top` or `bottom` are interpreted as the alignment for
+       the image
+     * `nolink` means without link to image source.
+     * `key=value` style are interpreted as HTML attributes for the image
+     * `key:value` style are interpreted as CSS style indications for the image
+    
     Examples:
     {{{
         [[Image(photo.jpg)]]                           # simplest
         [[Image(photo.jpg, 120px)]]                    # with size
         [[Image(photo.jpg, right)]]                    # aligned by keyword
+        [[Image(photo.jpg, nolink)]]                   # without link to source
         [[Image(photo.jpg, align=right)]]              # aligned by attribute
         [[Image(photo.jpg, float:right)]]              # aligned by style
         [[Image(photo.jpg, float:right, border:solid 5px green)]] # 2 style specs
     }}}
-
+    
     You can use image from other page, other ticket or other module.
     {{{
         [[Image(OtherPage:foo.bmp)]]    # if current module is wiki
@@ -228,9 +240,11 @@ class ImageMacro(Component):
         [[Image(#3:baz.bmp)]]           # if in a ticket, point to #3
         [[Image(ticket:36:boo.jpg)]]
         [[Image(source:/images/bee.jpg)]] # straight from the repository!
+        [[Image(htdocs:foo/bar.png)]]   # image file in project htdocs dir.
     }}}
-
-    ''Adapted from the Image.py macro created by Shun-ichi Goto <gotoh@taiyo.co.jp>''
+    
+    ''Adapted from the Image.py macro created by Shun-ichi Goto
+    <gotoh@taiyo.co.jp>''
     """
     implements(IWikiMacroProvider)
 
@@ -256,6 +270,7 @@ class ImageMacro(Component):
         quoted_re = re.compile("^(?:&#34;|')(.*)(?:&#34;|')$")
         attr = {}
         style = {}
+        nolink = False
         for arg in args[1:]:
             arg = arg.strip()
             if size_re.search(arg):
@@ -265,6 +280,9 @@ class ImageMacro(Component):
             if align_re.search(arg):
                 # 'align' keyword
                 attr['align'] = arg
+                continue
+            if arg == 'nolink':
+                nolink = True
                 continue
             match = keyval_re.search(arg)
             if match:
@@ -289,7 +307,7 @@ class ImageMacro(Component):
                 raise Exception("%s module can't have attachments" % parts[0])
             source = TracObject.factory(self.env, module, id)
         elif len(parts) == 2:
-            from trac.Browser import BrowserModule
+            from trac.versioncontrol.web_ui import BrowserModule
             try:
                 browser_links = [link for link,_ in 
                                  BrowserModule(self.env).get_link_resolvers()]
@@ -300,12 +318,15 @@ class ImageMacro(Component):
                 url = self.env.href.browser(file)
                 raw_url = self.env.href.browser(file, format='raw')
                 desc = filespec
-            else:                           # #ticket:attachment or WikiPage:attachment
+            else: # #ticket:attachment or WikiPage:attachment
                 # FIXME: do something generic about shorthand forms...
                 id, file = parts
                 if id and id[0] == '#':
                     module = 'ticket'
                     id = id[1:]
+                elif id == 'htdocs':
+                    raw_url = url = self.env.href.chrome('site', file)
+                    desc = os.path.basename(file)
                 else:
                     module = 'wiki'
             source = TracObject.factory(self.env, module, id)
@@ -327,8 +348,11 @@ class ImageMacro(Component):
         a_style = 'padding:0; border:none' # style of anchor
         img_attr = ' '.join(['%s="%s"' % x for x in attr.iteritems()])
         img_style = '; '.join(['%s:%s' % x for x in style.iteritems()])
-        return '<a href="%s" style="%s"><img src="%s" %s style="%s" /></a>' \
-               % (url, a_style, raw_url, img_attr, img_style)
+        result = '<img src="%s" %s style="%s" />' \
+                 % (raw_url, img_attr, img_style)
+        if not nolink:
+            result = '<a href="%s" style="%s">%s</a>' % (url, a_style, result)
+        return result
 
 
 class MacroListMacro(Component):
@@ -353,6 +377,8 @@ class MacroListMacro(Component):
         wiki = WikiSystem(self.env)
         for macro_provider in wiki.macro_providers:
             for macro_name in macro_provider.get_macros():
+                if content and macro_name != content:
+                    continue
                 buf.write("<dt><code>[[%s]]</code></dt>" % escape(macro_name))
                 description = macro_provider.get_macro_description(macro_name)
                 if description:

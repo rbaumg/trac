@@ -31,7 +31,8 @@ from trac.core import *
 from trac.mimeview import *
 from trac.wiki.api import WikiSystem, IWikiChangeListener, IWikiMacroProvider
 
-__all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline']
+__all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline',
+           'INTERTRAC_SCHEME' ]
 
 #
 # Customization of the Wiki syntax  ***use with care***
@@ -45,7 +46,8 @@ SUBSCRIPT_TOKEN = ",,"
 SUPERSCRIPT_TOKEN = r"\^"
 INLINE_TOKEN = "`"
 
-LINK_SCHEME = r"[\w.+-]+" # as per RFC 2396
+LINK_SCHEME = r"[\w.+-]+?" # as per RFC 2396
+INTERTRAC_SCHEME = r"[a-zA-Z.+-]+?" # no digits (support for shorthand links)
 
 def system_message(msg, text):
     return """<div class="system-message">
@@ -77,7 +79,7 @@ class WikiProcessor(object):
         if not self.processor:
             # Find a matching mimeview renderer
             from trac.mimeview.api import MIME_MAP
-            if self.name in MIME_MAP.keys():
+            if MIME_MAP.has_key(self.name):
                 self.name = MIME_MAP[self.name]
                 self.processor = self._mimeview_processor
             elif self.name in MIME_MAP.values():
@@ -154,9 +156,9 @@ class Formatter(object):
                     r"(?P<stgt>'[^']+'|\"[^\"]+\"|"
                     r"((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))"),
                    (r"(?P<lhref>!?\[(?:(?P<lns>%s):" % LINK_SCHEME +
-                    r"(?P<ltgt>'[^']+'|\"[^\"]+\"|[^\] ]+)"
+                    r"(?P<ltgt>'[^']+'|\"[^\"]+\"|[^\] ]*)"
                     r"|(?P<rel>[/.][^ [\]]*))"
-                    r"(?: (?P<label>.*?))?\])"),
+                    r"(?: (?P<label>'[^']+'|\"[^\"]+\"|[^\]]+))?\])"),
                    (r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)"
                     r"(\]\]|\((?P<macroargs>.*?)\)\]\]))"),
                    r"(?P<heading>^\s*(?P<hdepth>=+)\s.*\s(?P=hdepth)\s*$)",
@@ -252,9 +254,19 @@ class Formatter(object):
     def _lhref_formatter(self, match, fullmatch):
         ns = fullmatch.group('lns')
         target = fullmatch.group('ltgt') 
-        if target and target[0] in "'\"":
+        if target and target[0] in ("'",'"'):
             target = target[1:-1]
-        label = fullmatch.group('label') or target
+        label = fullmatch.group('label')
+        if not label: # e.g. `[http://target]` or `[wiki:target]`
+            if target:
+                if target.startswith('//'): # for `[http://target]`
+                    label = ns+':'+target   # use `http://target`
+                else:                       # for `wiki:target`
+                    label = target          # use only `target`
+            else: # e.g. `[search:]` 
+                label = ns
+        if label and label[0] in ("'",'"'):
+            label = label[1:-1]
         rel = fullmatch.group('rel')
         if rel:
             return self._make_relative_link(rel, label or rel)
@@ -306,10 +318,12 @@ class Formatter(object):
 
     def shorthand_intertrac_helper(self, ns, target, label, fullmatch):
         if fullmatch: # short form
-            alias = fullmatch.group('it_%s' % ns)
-            if alias:
-                intertrac = self.env.config.get('intertrac', alias.upper(), alias)
-                target = '%s:%s' % (ns, target[len(alias):])
+            it_grp = fullmatch.group('it_%s' % ns)
+            if it_grp:
+                alias = it_grp.strip()
+                intertrac = self.env.config.get('intertrac', alias.upper(),
+                                                alias)
+                target = '%s:%s' % (ns, target[len(it_grp):])
                 it = self._make_intertrac_link(intertrac, target, label)
                 return it or label
         return None
@@ -327,8 +341,8 @@ class Formatter(object):
         if Formatter.img_re.search(url) and self.flavor != 'oneliner':
             return '<img src="%s" alt="%s" />' % (url, title or text)
         if not url.startswith(self._local):
-            return '<a class="ext-link" href="%s"%s>%s</a>' \
-                   % (url, title_attr, text)
+            return '<a class="ext-link" href="%s"%s><span class="icon">' \
+                   '</span>%s</a>' % (url, title_attr, text)
         else:
             return '<a href="%s"%s>%s</a>' % (url, title_attr, text)
 
@@ -350,7 +364,8 @@ class Formatter(object):
         if match[0] == '!':
             return match[1:]
         else:
-            return self.simple_tag_handler('<span class="underline">', '</span>')
+            return self.simple_tag_handler('<span class="underline">',
+                                           '</span>')
 
     def _strike_formatter(self, match, fullmatch):
         if match[0] == '!':
@@ -699,17 +714,23 @@ class OutlineFormatter(Formatter):
         Formatter.__init__(self, env, None, absurls, db)
 
     # Override a few formatters to disable some wiki syntax in "outline"-mode
-    def _macro_formatter(self, match, fullmatch): return match
+    def _macro_formatter(self, match, fullmatch):
+        return match
 
-    def format(self, source, facet, text, out, max_depth=None):
+    def format(self, source, facet, text, out, max_depth=6, min_depth=1):
         self.outline = []
         class NullOut(object):
             def write(self, data): pass
         Formatter.format(self, source, facet, text, NullOut())
 
-        curr_depth = 0
-        for depth,link in self.outline:
-            if max_depth is not None and depth > max_depth:
+        if min_depth > max_depth:
+            min_depth, max_depth = max_depth, min_depth
+        max_depth = min(6, max_depth)
+        min_depth = max(1, min_depth)
+
+        curr_depth = min_depth - 1
+        for depth, link in self.outline:
+            if depth < min_depth or depth > max_depth:
                 continue
             if depth < curr_depth:
                 out.write('</li></ol><li>' * (curr_depth - depth))
@@ -731,12 +752,6 @@ class OutlineFormatter(Formatter):
         text = re.sub(r'</?a(?: .*?)?>', '', text) # Strip out link tags
         self.outline.append((depth, '<a href="#%s">%s</a>' % (anchor, text)))
 
-    def handle_code_block(self, line):
-        if line.strip() == '{{{':
-            self.in_code_block += 1
-        elif line.strip() == '}}}':
-            self.in_code_block -= 1
-
 
 def wiki_to_html(wikitext, env, req, db=None, absurls=0, escape_newlines=False):
     out = StringIO()
@@ -749,14 +764,15 @@ def wiki_to_oneliner(wikitext, env, db=None, absurls=0):
     OneLinerFormatter(env, absurls, db).format(None, '', wikitext, out)
     return out.getvalue()
 
-def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
+def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None,
+                    min_depth=None):
     out = StringIO()
-    OutlineFormatter(env, absurls, db).format(None, ''. wikitext,
-                                              out, max_depth)
+    OutlineFormatter(env, absurls, db).format(None, '', wikitext,
+                                              out, max_depth, min_depth)
     return out.getvalue()
 
 
-# InterWiki support
+# -- InterWiki support
 
 class InterWikiMap(Component):
 
@@ -783,11 +799,11 @@ class InterWikiMap(Component):
         def setarg(match):
             num = int(match.group()[1:])
             return 0 < num <= len(args) and args[num-1] or ''
-        url2 = re.sub(InterWikiMap._argspec_re, setarg, url)
-        if url2 == url: 
+        url_with_args = re.sub(InterWikiMap._argspec_re, setarg, url)
+        if url_with_args == url: 
             return url + target, title
         else:
-            return url2, title
+            return url_with_args, title
 
     # IWikiChangeListener methods
 
@@ -837,10 +853,15 @@ class InterWikiMap(Component):
         keys = self._interwiki_map.keys()
         keys.sort()
         buf = StringIO()
-        buf.write('<dl>')
+        buf.write('<table><tr><th>Prefix</th><td>Site</td></tr>\n')
         for k in keys:
             prefix, url, title = self._interwiki_map[k]
-            buf.write('<dt><a href="%s">%s</a></dt>'
-                      '<dd>%s</dd>' % (url, prefix, title))
-        buf.write('</dl>')
+            shortened_url = url and url[:-1]
+            description = title == prefix and shortened_url or title
+            buf.write('<tr>\n' +
+                      ('<td><a href="%sRecentChanges">%s</a></td>'
+                       '<td><a href="%s">%s</a></td>\n') \
+                      % (url, prefix, shortened_url, description) +
+                      '</tr>\n')
+        buf.write('</table>\n')
         return buf.getvalue()

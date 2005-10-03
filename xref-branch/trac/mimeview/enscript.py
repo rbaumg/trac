@@ -47,6 +47,7 @@ types = {
     'text/x-java':              'java',
     'text/x-javascript':        'javascript',
     'text/x-ksh':               'ksh',
+    'text/x-lua':               'lua',
     'text/x-m4':                'm4',
     'text/x-makefile':          'makefile',
     'text/x-mail':              'mail',
@@ -95,8 +96,10 @@ class EnscriptRenderer(Component):
 
     implements(IHTMLPreviewRenderer)
 
+    expand_tabs = True
+
     def get_quality_ratio(self, mimetype):
-        if mimetype in types.keys():
+        if mimetype in types:
             return 2
         return 0
 
@@ -119,5 +122,4 @@ class EnscriptRenderer(Component):
         end = i > 0 and i or len(odata)
 
         odata = EnscriptDeuglifier().format(odata[beg:end])
-        for line in odata.splitlines():
-            yield line
+        return odata.splitlines()

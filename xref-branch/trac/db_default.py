@@ -95,7 +95,7 @@ schema = [
         Column('time', type='int'),
         Column('author'),
         Column('message')],
-    Table('node_change', key=('rev', 'path'))[
+    Table('node_change', key=('rev', 'path', 'change'))[
         Column('rev'),
         Column('path'),
         Column('kind', size=1),
@@ -409,7 +409,7 @@ default_config = \
   ('project', 'name', 'My Project'),
   ('project', 'descr', 'My example project'),
   ('project', 'url', 'http://example.com/'),
-  ('project', 'icon', 'trac.ico'),
+  ('project', 'icon', 'common/trac.ico'),
   ('project', 'footer',
    ' Visit the Trac open source project at<br />'
    '<a href="http://trac.edgewall.com/">http://trac.edgewall.com/</a>'),
@@ -420,7 +420,7 @@ default_config = \
   ('ticket', 'default_component', 'component1'),
   ('ticket', 'restrict_owner', 'false'),
   ('header_logo', 'link', 'http://trac.edgewall.com/'),
-  ('header_logo', 'src', 'trac_banner.png'),
+  ('header_logo', 'src', 'common/trac_banner.png'),
   ('header_logo', 'alt', 'Trac'),
   ('header_logo', 'width', '236'),
   ('header_logo', 'height', '73'),

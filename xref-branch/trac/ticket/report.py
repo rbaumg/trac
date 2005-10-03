@@ -16,7 +16,6 @@
 
 from __future__ import generators
 import re
-import time
 import types
 import urllib
 
@@ -25,17 +24,12 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.wiki import wiki_to_html, IWikiSyntaxProvider
+from trac.wiki import wiki_to_html, IWikiSyntaxProvider, INTERTRAC_SCHEME
 
 
 dynvars_re = re.compile('\$([A-Z]+)')
 dynvars_disallowed_var_chars_re = re.compile('[^A-Z0-9_]')
 dynvars_disallowed_value_chars_re = re.compile(r'[^a-zA-Z0-9-_@.,\\]')
-
-try:
-    _StringTypes = [types.StringType, types.UnicodeType]
-except AttributeError:
-    _StringTypes = [types.StringType]
 
 
 class ColumnSorter:
@@ -51,10 +45,10 @@ class ColumnSorter:
 
         # make sure to ignore case in comparisons
         realX = x[self.columnIndex]
-        if type(realX) in _StringTypes:
+        if isinstance(realX, (str, unicode)):
             realX = realX.lower()
         realY = y[self.columnIndex]
-        if type(realY) in _StringTypes:
+        if isinstance(realY, (str, unicode)):
             realY = realY.lower()
 
         result = 0
@@ -129,6 +123,14 @@ class ReportModule(Component):
         if id != -1 or action == 'new':
             add_link(req, 'up', self.env.href.report(), 'Available Reports')
 
+            # Kludge: Reset session vars created by query module so that the
+            # query navigation links on the ticket page don't confuse the user
+            for var in ('query_constraints', 'query_time', 'query_tickets'):
+                if req.session.has_key(var):
+                    del req.session[var]
+
+        # Kludge: only show link to custom query if the query module is actually
+        # enabled
         from trac.ticket.query import QueryModule
         if req.perm.has_permission('TICKET_VIEW') and \
            self.env.is_component_enabled(QueryModule):
@@ -142,7 +144,7 @@ class ReportModule(Component):
     def _do_create(self, req, db):
         req.perm.assert_permission('REPORT_CREATE')
 
-        if 'cancel' in req.args.keys():
+        if req.args.has_key('cancel'):
             req.redirect(self.env.href.report())
 
         title = req.args.get('title', '')
@@ -158,7 +160,7 @@ class ReportModule(Component):
     def _do_delete(self, req, db, id):
         req.perm.assert_permission('REPORT_DELETE')
 
-        if 'cancel' in req.args.keys():
+        if req.args.has_key('cancel'):
             req.redirect(self.env.href.report(id))
 
         cursor = db.cursor()
@@ -172,7 +174,7 @@ class ReportModule(Component):
         """
         req.perm.assert_permission('REPORT_MODIFY')
 
-        if 'cancel' not in req.args.keys():
+        if not req.args.has_key('cancel'):
             title = req.args.get('title', '')
             sql = req.args.get('sql', '')
             description = req.args.get('description', '')
@@ -344,17 +346,15 @@ class ReportModule(Component):
                         value['ticket_href'] = self.env.href.ticket(id_val)
                 elif column == 'description':
                     value['parsed'] = wiki_to_html(cell, self.env, req, db)
-                elif column == 'reporter':
-                    value['reporter'] = cell
-                    value['reporter.rss'] = cell.find('@') and cell or ''
+                elif column == 'reporter' and cell.find('@') != -1:
+                    value['rss'] = util.escape(cell)
                 elif column == 'report':
                     value['report_href'] = self.env.href.report(cell)
                 elif column in ['time', 'date','changetime', 'created', 'modified']:
-                    t = time.localtime(int(cell))
-                    value['date'] = time.strftime('%x', t)
-                    value['time'] = time.strftime('%X', t)
-                    value['datetime'] = time.strftime('%c', t)
-                    value['gmt'] = util.http_date(int(cell))
+                    value['date'] = util.format_date(cell)
+                    value['time'] = util.format_time(cell)
+                    value['datetime'] = util.format_datetime(cell)
+                    value['gmt'] = util.http_date(cell)
                 prefix = 'report.items.%d.%s' % (row_idx, str(column))
                 req.hdf[prefix] = util.escape(str(cell))
                 for key in value.keys():
@@ -487,9 +487,10 @@ class ReportModule(Component):
         if item:
             item = item.child()
             while item:
-                nodename = 'report.items.%s.summary' % item.name()
-                summary = req.hdf.get(nodename, '')
-                req.hdf[nodename] = util.escape(summary)
+                for col in ('summary', 'description.parsed'):
+                    nodename = 'report.items.%s.%s' % (item.name(), col)
+                    value = req.hdf.get(nodename, '')
+                    req.hdf[nodename] = util.escape(value)
                 item = item.next()
 
     def _render_sql(self, req, id, title, description, sql):
@@ -509,8 +510,13 @@ class ReportModule(Component):
         yield ('report', self._format_link)
 
     def get_wiki_syntax(self):
-        yield (r"!?\{\d+\}", lambda x, y, z: self._format_link(x, 'report', y[1:-1], y))
+        yield (r"!?\{(?P<it_report>%s\s*)?\d+\}" % INTERTRAC_SCHEME,
+               lambda x, y, z: self._format_link(x, 'report', y[1:-1], y, z))
 
-    def _format_link(self, formatter, ns, target, label):
+    def _format_link(self, formatter, ns, target, label, fullmatch=None):
+        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
+                                                         fullmatch)
+        if intertrac:
+            return intertrac
         return '<a class="report" href="%s">%s</a>' % (formatter.href.report(target), label)
 

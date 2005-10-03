@@ -28,6 +28,7 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.versioncontrol import Changeset, Node, ChangesetObject
 from trac.versioncontrol.diff import get_diff_options, hdf_diff, unified_diff
+from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet
 from trac.wiki import wiki_to_html, IWikiSyntaxProvider
@@ -101,8 +102,12 @@ class AbstractDiffModule(Component):
         repos = self.env.get_repository(req.authname)
         path = repos.normalize_path(path)
         rev = repos.normalize_rev(rev)
-        old_path = repos.normalize_path(old_path)
+        if old_path: # Note: normalize_path now returns '/' if given 'None'
+            old_path = repos.normalize_path(old_path)
         
+        authzperm = SubversionAuthorizer(self.env, req.authname)
+        authzperm.assert_permission_for_changeset(rev)
+
         if old_path == path and old and old == new: # revert to Changeset
             rev = old
             old_path = old = new = None
@@ -225,8 +230,8 @@ class AbstractDiffModule(Component):
             db = self.env.get_db_cnx()
             ChangesetObject(self.env, rev).xref_count_to_hdf(req, db)
 
-            # -- getting the deltas from the Changeset.get_changes method
-            def get_deltas():
+            # -- getting the change summary from the Changeset.get_changes method
+            def get_changes():
                 old_node = new_node = None
                 for npath, kind, change, opath, orev in chgset.get_changes():
                     if restricted and \
@@ -248,7 +253,7 @@ class AbstractDiffModule(Component):
             title = _changeset_title(rev)
             req.hdf['changeset'] = {
                 'revision': chgset.rev,
-                'time': time.strftime('%c', time.localtime(chgset.date)),
+                'time': util.format_datetime(chgset.date),
                 'author': util.escape(chgset.author or 'anonymous'),
                 'message': wiki_to_html(chgset.message or '--', self.env, req,
                                         escape_newlines=True)
@@ -259,8 +264,7 @@ class AbstractDiffModule(Component):
                     prev = repos.get_node(path, rev).get_previous()
                     if prev:
                         prev_path, prev_rev = prev[:2]
-                        prev_href = self.env.href.changeset(prev_rev,
-                                                            path=prev_path)
+                        prev_href = self.env.href.changeset(prev_rev, prev_path)
                     else:
                         prev_path = prev_rev = None
                 else:
@@ -286,8 +290,8 @@ class AbstractDiffModule(Component):
                     add_link(req, 'next', next_href, _changeset_title(next_rev))
 
         else: # Diff Mode
-            # -- getting the deltas from the Repository.get_deltas method
-            def get_deltas():
+            # -- getting the change summary from the Repository.get_changes method
+            def get_changes():
                 for d in repos.get_deltas(**diff):
                     yield d
                     
@@ -296,14 +300,7 @@ class AbstractDiffModule(Component):
                                               old_path=diff.new_path,
                                               old=diff.new_rev)
             req.hdf['diff.reverse_href'] = reverse_href
-            if restricted:              # 'diff between 2 revisions' mode
-                title = 'Diff r%s:%s for %s' % (diff.old_rev, diff.new_rev,
-                                                diff.new_path)
-            else:                       # 'arbitrary diff' mode
-                title = 'Diff from %s @ %s to %s @ %s' % (diff.old_path,
-                                                          diff.old_rev,
-                                                          diff.new_path,
-                                                          diff.new_rev)
+            title = self.title_for_diff(diff)
         req.hdf['title'] = title
 
         def _change_info(old_node, new_node, change):
@@ -387,7 +384,7 @@ class AbstractDiffModule(Component):
                 return []
 
         idx = 0
-        for old_node, new_node, kind, change in get_deltas():
+        for old_node, new_node, kind, change in get_changes():
             if change != Changeset.EDIT:
                 show_entry = True
             else:
@@ -481,7 +478,6 @@ class AbstractDiffModule(Component):
         req.send_header('Content-Type', 'application/zip')
         req.send_header('Content-Disposition',
                         'filename=%s.zip' % filename)
-        req.end_headers()
 
         try:
             from cStringIO import StringIO
@@ -500,7 +496,23 @@ class AbstractDiffModule(Component):
                 zipinfo.compress_type = ZIP_DEFLATED
                 zipfile.writestr(zipinfo, new_node.get_content().read())
         zipfile.close()
+
+        buf.seek(0, 2) # be sure to be at the end
+        req.send_header("Content-Length", buf.tell())
+        req.end_headers()
+        
         req.write(buf.getvalue())
+
+    def title_for_diff(self, diff):
+        if diff.new_path == diff.old_path: # ''diff between 2 revisions'' mode
+            return 'Diff r%s:%s for %s' \
+                   % (diff.old_rev or 'latest', diff.new_rev or 'latest',
+                      diff.new_path or '/')
+        else:                              # ''arbitrary diff'' mode
+            return 'Diff from %s@%s to %s@%s' \
+                   % (diff.old_path or '/', diff.old_rev or 'latest',
+                      diff.new_path or '/', diff.new_rev or 'latest')
+
 
 
 class DiffModule(AbstractDiffModule):
@@ -526,28 +538,27 @@ class DiffModule(AbstractDiffModule):
 
     def _format_link(self, formatter, ns, params, label):
         def pathrev(path):
-            irev = path.find('#')
-            if irev > 0:
-                return (path[:irev], path[irev+1:])
+            if '@' in path:
+                return path.split('@', 1)
             else:
                 return (path, None)
-        ianydiff = params.find('//')
-        if ianydiff > 0:
-            old_path, old_rev = pathrev(params[:ianydiff])
-            new_path, new_rev = pathrev(params[ianydiff+2:])
+        if '//' in params:
+            p1, p2 = params.split('//', 1)
+            old, new = pathrev(p1), pathrev(p2)
+            diff = DiffArgs(old_path=old[0], old_rev=old[1],
+                            new_path=new[0], new_rev=new[1])
         else: 
             old_path, old_rev = pathrev(params)
-            new_path = old_path
             new_rev = None
-            if old_rev:
-                isep = old_rev.find(':')
-                if isep > 0:
-                    old_rev = old_rev[:isep]
-                    new_rev = old_rev[isep+1:]
-        href = formatter.href.diff(new_path, new=new_rev,
-                                   old_path=old_path, old=old_rev)
+            if old_rev and ':' in old_rev:
+                old_rev, new_rev = old_rev.split(':', 1)
+            diff = DiffArgs(old_path=old_path, old_rev=old_rev,
+                            new_path=old_path, new_rev=new_rev)
+        title = self.title_for_diff(diff)
+        href = formatter.href.diff(diff.new_path, new=diff.new_rev,
+                                   old_path=diff.old_path, old=diff.old_rev)
         return '<a class="changeset" title="%s" href="%s">%s</a>' \
-                   % ('Diff', href, label)
+               % (title, href, label)
 
 
 class AnyDiffModule(Component):
@@ -573,6 +584,10 @@ class AnyDiffModule(Component):
         old_path = repos.normalize_path(old_path)
         old_rev = repos.normalize_rev(old_rev)
 
+        authzperm = SubversionAuthorizer(self.env, req.authname)
+        authzperm.assert_permission_for_changeset(new_rev)
+        authzperm.assert_permission_for_changeset(old_rev)
+        
         # -- prepare rendering
         req.hdf['anydiff'] = {
             'new_path': new_path,

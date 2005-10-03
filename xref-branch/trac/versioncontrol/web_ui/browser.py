@@ -16,14 +16,13 @@
 
 from __future__ import generators
 import re
-import time
 import urllib
 
 from trac import util
 from trac.core import *
 from trac.mimeview import get_mimetype, is_binary, detect_unicode, Mimeview
 from trac.perm import IPermissionRequestor
-from trac.web import IRequestHandler
+from trac.web import IRequestHandler, RequestDone
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 from trac.versioncontrol.web_ui.util import *
@@ -94,19 +93,24 @@ class BrowserModule(Component):
         hidden_properties = [p.strip() for p
                              in self.config.get('browser', 'hide_properties',
                                                 'svk:merge').split(',')]
+
         req.hdf['title'] = path
-        req.hdf['browser'] = {
+        browser_hdf = {
             'path': path,
             'revision': rev,
             'props': dict([(util.escape(name), util.escape(value))
                            for name, value in node.get_properties().items()
-                           if not name in hidden_properties]),
+                           if not name in hidden_properties])
+            }
+        browser_hrefs = {
             'href': self.env.href.browser(path,rev=rev),
-            'restricted_changeset_href': self.env.href.changeset(node.rev,
-                                                                 path=path),
+            'restr_changeset_href': self.env.href.changeset(node.rev, path),
             'anydiff_href': self.env.href.anydiff(),
             'log_href': self.env.href.log(path)
-        }
+            }
+        browser_hdf.update(dict([(key, util.escape(href)) for key, href in
+                                 browser_hrefs.items()]))
+        req.hdf['browser'] = browser_hdf
 
         path_links = get_path_links(self.env.href, path, rev)
         if len(path_links) > 1:
@@ -143,8 +147,9 @@ class BrowserModule(Component):
                 'size': util.pretty_size(entry.content_length),
                 'rev': entry.rev,
                 'permission': 1, # FIXME
-                'log_href': self.env.href.log(entry.path, rev=rev),
-                'browser_href': self.env.href.browser(entry.path, rev=rev)
+                'log_href': util.escape(self.env.href.log(entry.path, rev=rev)),
+                'browser_href': util.escape(self.env.href.browser(entry.path,
+                                                                  rev=rev))
             })
         changes = get_changes(self.env, repos, [i['rev'] for i in info])
 
@@ -179,12 +184,12 @@ class BrowserModule(Component):
         changeset = repos.get_changeset(node.rev)  
         req.hdf['file'] = {  
             'rev': node.rev,  
-            'changeset_href': self.env.href.changeset(node.rev),  
-            'date': time.strftime('%x %X', time.localtime(changeset.date)),  
-            'age': util.pretty_timedelta(changeset.date),  
-            'author': changeset.author or 'anonymous',  
-            'message': wiki_to_html(changeset.message or '--', self.env, req,  
-                                    escape_newlines=True)  
+            'changeset_href': util.escape(self.env.href.changeset(node.rev)),
+            'date': util.format_datetime(changeset.date),
+            'age': util.pretty_timedelta(changeset.date),
+            'author': changeset.author or 'anonymous',
+            'message': wiki_to_html(changeset.message or '--', self.env, req,
+                                    escape_newlines=True)
         } 
         mime_type = node.content_type
         if not mime_type or mime_type == 'application/octet-stream':
@@ -211,40 +216,27 @@ class BrowserModule(Component):
             while 1:
                 chunk = content.read(CHUNK_SIZE)
                 if not chunk:
-                    break
+                    raise RequestDone
                 req.write(chunk)
-
         else:
             # Generate HTML preview
-            max_preview_size = int(self.config.get('mimeviewer',
-                                                   'max_preview_size',
-                                                   '262144'))
-            content = node.get_content().read(max_preview_size)
-            max_size_reached = len(content) == max_preview_size
-            if not charset:
-                charset = detect_unicode(content) or \
-                          self.config.get('trac', 'default_charset')
+            mimeview = Mimeview(self.env)
+            content = node.get_content().read(mimeview.max_preview_size())
             if not is_binary(content):
-                content = util.to_utf8(content, charset)
                 if mime_type != 'text/plain':
                     plain_href = self.env.href.browser(node.path,
                                                        rev=rev and node.rev,
                                                        format='txt')
                     add_link(req, 'alternate', plain_href, 'Plain Text',
                              'text/plain')
-            if max_size_reached:
-                req.hdf['file.max_file_size_reached'] = 1
-                req.hdf['file.max_file_size'] = max_preview_size
-                preview = ' '
-            else:
-                preview = Mimeview(self.env).render(req, mime_type, content,
-                                                    node.name, node.rev,
-                                                    annotations=['lineno'])
-            req.hdf['file.preview'] = preview
+            req.hdf['file'] = mimeview.preview_to_hdf(req, mime_type, charset,
+                                                      content,
+                                                      node.name, node.rev,
+                                                      annotations=['lineno'])
 
             raw_href = self.env.href.browser(node.path, rev=rev and node.rev,
                                              format='raw')
-            req.hdf['file.raw_href'] = raw_href
+            req.hdf['file.raw_href'] = util.escape(raw_href)
             add_link(req, 'alternate', raw_href, 'Original Format', mime_type)
 
             add_stylesheet(req, 'common/css/code.css')
@@ -264,8 +256,12 @@ class BrowserModule(Component):
         if formatter.flavor != 'oneliner' and match:
             return '<img src="%s" alt="%s" />' % \
                    (formatter.href.file(path, format='raw'), label)
-        path, rev = get_path_rev(path)
+        path, rev, line = get_path_rev_line(path)
+        if line is not None:
+            anchor = '#L%d' % line
+        else:
+            anchor = ''
         label = urllib.unquote(label)
-        return '<a class="source" href="%s">%s</a>' \
-               % (formatter.href.browser(path, rev=rev), label)
-
+        return '<a class="source" href="%s%s">%s</a>' \
+               % (util.escape(formatter.href.browser(path, rev=rev)), anchor,
+                  label)

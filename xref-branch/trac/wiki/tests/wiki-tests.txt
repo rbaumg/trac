@@ -33,13 +33,19 @@ Paragraph
 </td></tr><tr><td>Foo</td><td>Bar</td><td>Baz
 </td></tr></table>
 <p>
-<a class="ext-link" href="http://www.edgewall.com/">http://www.edgewall.com/</a>
+<a class="ext-link" href="http://www.edgewall.com/"><span class="icon"></span>http://www.edgewall.com/</a>
 </p>
 ==============================
-#1, [1], r1, {1}
+#1, {1}
+[1], r1
+[1/README.txt]
+#12, [12], r12, {12}
 ------------------------------
 <p>
-<a class="missing ticket" href="/ticket/1" rel="nofollow">#1</a>, <a class="missing changeset" href="/changeset/1" rel="nofollow">[1]</a>, <a class="missing changeset" href="/changeset/1" rel="nofollow">r1</a>, <a class="report" href="/report/1">{1}</a>
+<a class="missing ticket" href="/ticket/1" rel="nofollow">#1</a>, <a class="report" href="/report/1">{1}</a>
+<a class="missing changeset" href="/changeset/1" rel="nofollow">[1]</a>, <a class="missing changeset" href="/changeset/1" rel="nofollow">r1</a>
+<a class="missing changeset" href="/changeset/1/README.txt" rel="nofollow">[1/README.txt]</a>
+<a class="missing ticket" href="/ticket/12" rel="nofollow">#12</a>, <a class="missing changeset" href="/changeset/12" rel="nofollow">[12]</a>, <a class="missing changeset" href="/changeset/12" rel="nofollow">r12</a>, <a class="report" href="/report/12">{12}</a>
 </p>
 ==============================
 !#1, ![1], !r1, !{1}
@@ -48,10 +54,29 @@ Paragraph
 #1, [1], r1, {1}
 </p>
 ==============================
-ticket:1, changeset:1, report:1, source:foo/bar
+[1:2], r1:2, [12:23], r12:23
 ------------------------------
 <p>
-<a class="missing ticket" href="/ticket/1" rel="nofollow">ticket:1</a>, <a class="missing changeset" href="/changeset/1" rel="nofollow">changeset:1</a>, <a class="report" href="/report/1">report:1</a>, <a class="source" href="/browser/foo/bar">source:foo/bar</a>
+<a class="source" href="/log/?rev=2&stop_rev=1">[1:2]</a>, <a class="source" href="/log/?rev=2&stop_rev=1">r1:2</a>, <a class="source" href="/log/?rev=23&stop_rev=12">[12:23]</a>, <a class="source" href="/log/?rev=23&stop_rev=12">r12:23</a>
+</p>
+==============================
+![1:2], !r1:2, ![12:23], !r12:23
+------------------------------
+<p>
+[1:2], r1:2, [12:23], r12:23
+</p>
+==============================
+ticket:1, report:1, source:foo/bar
+changeset:1, changeset:1/README.txt
+
+Issue [ticket:1], CS[changeset:1], Listing [report:1], File [source:foo/bar]
+------------------------------
+<p>
+<a class="missing ticket" href="/ticket/1" rel="nofollow">ticket:1</a>, <a class="report" href="/report/1">report:1</a>, <a class="source" href="/browser/foo/bar">source:foo/bar</a>
+<a class="missing changeset" href="/changeset/1" rel="nofollow">changeset:1</a>, <a class="missing changeset" href="/changeset/1/README.txt" rel="nofollow">changeset:1/README.txt</a>
+</p>
+<p>
+Issue <a class="missing ticket" href="/ticket/1" rel="nofollow">1</a>, CS<a class="missing changeset" href="/changeset/1" rel="nofollow">1</a>, Listing <a class="report" href="/report/1">1</a>, File <a class="source" href="/browser/foo/bar">foo/bar</a>
 </p>
 ==============================
 [ticket:1 ticket 1], [changeset:1 changeset 1], [report:1 report 1], 
@@ -59,7 +84,19 @@ ticket:1, changeset:1, report:1, source:foo/bar
 ------------------------------
 <p>
 <a class="missing ticket" href="/ticket/1" rel="nofollow">ticket 1</a>, <a class="missing changeset" href="/changeset/1" rel="nofollow">changeset 1</a>, <a class="report" href="/report/1">report 1</a>, 
-<a class="source" href="/browser/foo/bar">source foo/bar</a>, <a class="ext-link" href="http://www.edgewall.com/">edgewall</a>
+<a class="source" href="/browser/foo/bar">source foo/bar</a>, <a class="ext-link" href="http://www.edgewall.com/"><span class="icon"></span>edgewall</a>
+</p>
+==============================
+diff:trunk//branch
+diff:trunk@12//branch@23
+diff:trunk@12:23
+diff:@12:23
+------------------------------
+<p>
+<a class="changeset" title="Diff from trunk@latest to branch@latest" href="/diff/branch?old_path=trunk">diff:trunk//branch</a>
+<a class="changeset" title="Diff from trunk@12 to branch@23" href="/diff/branch?new=23&old=12&old_path=trunk">diff:trunk@12//branch@23</a>
+<a class="changeset" title="Diff r12:23 for trunk" href="/diff/trunk?new=23&old=12&old_path=trunk">diff:trunk@12:23</a>
+<a class="changeset" title="Diff r12:23 for /" href="/diff/?new=23&old=12&old_path=">diff:@12:23</a>
 </p>
 ==============================
 CamelCase AlabamA ABc AlaBamA FooBar
@@ -115,7 +152,7 @@ out:
 ''RFCs von ftp://ftp.rfc-editor.org/in-notes/rfcXXXX.txt''
 ------------------------------
 <p>
-<i>RFCs von <a class="ext-link" href="ftp://ftp.rfc-editor.org/in-notes/rfcXXXX.txt">ftp://ftp.rfc-editor.org/in-notes/rfcXXXX.txt</a></i>
+<i>RFCs von <a class="ext-link" href="ftp://ftp.rfc-editor.org/in-notes/rfcXXXX.txt"><span class="icon"></span>ftp://ftp.rfc-editor.org/in-notes/rfcXXXX.txt</a></i>
 </p>
 ==============================
 [wiki:WikiStart Foo] [http://www.edgewall.com/ Edgewall]
@@ -123,15 +160,20 @@ out:
 wiki:Foo%20Bar wiki:Foo%20Bar#baz
 
 [wiki:Foo%20Bar Foo Bar] [wiki:Foo%20Bar#baz Foo Bar]
+
+[wiki:Argv "*argv[] versus **argv"]
 ------------------------------
 <p>
-<a class="missing wiki" href="/wiki/WikiStart" rel="nofollow">Foo?</a> <a class="ext-link" href="http://www.edgewall.com/">Edgewall</a>
+<a class="missing wiki" href="/wiki/WikiStart" rel="nofollow">Foo?</a> <a class="ext-link" href="http://www.edgewall.com/"><span class="icon"></span>Edgewall</a>
 </p>
 <p>
 <a class="missing wiki" href="/wiki/Foo%20Bar" rel="nofollow">wiki:Foo Bar?</a> <a class="missing wiki" href="/wiki/Foo%20Bar#baz" rel="nofollow">wiki:Foo Bar#baz?</a>
 </p>
 <p>
 <a class="missing wiki" href="/wiki/Foo%20Bar" rel="nofollow">Foo Bar?</a> <a class="missing wiki" href="/wiki/Foo%20Bar#baz" rel="nofollow">Foo Bar?</a>
+</p>
+<p>
+<a class="missing wiki" href="/wiki/Argv" rel="nofollow">*argv[] versus **argv?</a>
 </p>
 ==============================
 foo (FooBar)
@@ -198,50 +240,55 @@ SandBox SandBox, SandBox; SandBox: SandBox. SandBox? SandBox! (SandBox) {SandBox
 </p>
 ==============================
 source:/foo/bar
-
 source:/foo/bar#42
-
 source:/foo/bar#head
-
+source:/foo/bar@42
+source:/foo/bar@head
 source:/foo%20bar/baz%2Bquux
-
 source:/foo%2520bar/baz%252Bquux#42
-
 source:#42
+source:@42
+source:/foo/bar@42#L20
+source:/foo/bar@head#L20
 ------------------------------
 <p>
 <a class="source" href="/browser/foo/bar">source:/foo/bar</a>
-</p>
-<p>
 <a class="source" href="/browser/foo/bar?rev=42">source:/foo/bar#42</a>
-</p>
-<p>
 <a class="source" href="/browser/foo/bar?rev=head">source:/foo/bar#head</a>
-</p>
-<p>
+<a class="source" href="/browser/foo/bar?rev=42">source:/foo/bar@42</a>
+<a class="source" href="/browser/foo/bar?rev=head">source:/foo/bar@head</a>
 <a class="source" href="/browser/foo%20bar/baz%2Bquux">source:/foo bar/baz+quux</a>
-</p>
-<p>
 <a class="source" href="/browser/foo%2520bar/baz%252Bquux?rev=42">source:/foo%20bar/baz%2Bquux#42</a>
-</p>
-<p>
 <a class="source" href="/browser/?rev=42">source:#42</a>
+<a class="source" href="/browser/?rev=42">source:@42</a>
+<a class="source" href="/browser/foo/bar?rev=42#L20">source:/foo/bar@42#L20</a>
+<a class="source" href="/browser/foo/bar?rev=head#L20">source:/foo/bar@head#L20</a>
 </p>
 ==============================
 query:?order=priority
 
+query:?order=priority&owner=me
+
 query:status=new|reopened
 
 query:milestone!=
+
+query:milestone=1.0|2.0&owner=me
 ------------------------------
 <p>
 <a class="query" href="/query?order=priority">query:?order=priority</a>
+</p>
+<p>
+<a class="query" href="/query?order=priority&amp;owner=me">query:?order=priority&amp;owner=me</a>
 </p>
 <p>
 <a class="query" href="/query?status=new&amp;status=reopened&amp;order=priority">query:status=new|reopened</a>
 </p>
 <p>
 <a class="query" href="/query?milestone=%21&amp;order=priority">query:milestone!=</a>
+</p>
+<p>
+<a class="query" href="/query?milestone=1.0&amp;milestone=2.0&amp;owner=me&amp;order=priority">query:milestone=1.0|2.0&amp;owner=me</a>
 </p>
 ==============================
 {{{
@@ -444,11 +491,15 @@ milestone:foo
 search:foo
 search:"foo bar"
 [search:bar Bar]
+[search:bar]
+[search:]
 ------------------------------
 <p>
 <a class="search" href="/search?q=foo">search:foo</a>
 <a class="search" href="/search?q=foo+bar">search:"foo bar"</a>
 <a class="search" href="/search?q=bar">Bar</a>
+<a class="search" href="/search?q=bar">bar</a>
+<a class="search" href="/search?q=">search</a>
 </p>
 ==============================
 search:?q=foo&wiki=on
@@ -456,9 +507,9 @@ search:"?q=foo bar&wiki=on"
 [search:?q=bar&ticket=on Bar in Tickets]
 ------------------------------
 <p>
-<a class="search" href="/search?q=foo&wiki=on">search:?q=foo&amp;wiki=on</a>
-<a class="search" href="/search?q=foo+bar&wiki=on">search:"?q=foo bar&amp;wiki=on"</a>
-<a class="search" href="/search?q=bar&ticket=on">Bar in Tickets</a>
+<a class="search" href="/search?q=foo&amp;wiki=on">search:?q=foo&amp;wiki=on</a>
+<a class="search" href="/search?q=foo+bar&amp;wiki=on">search:"?q=foo bar&amp;wiki=on"</a>
+<a class="search" href="/search?q=bar&amp;ticket=on">Bar in Tickets</a>
 </p>
 ==============================
 '''Note:'''
@@ -521,10 +572,10 @@ rfc-2396.compatible://link
 [rfc-2396.compatible://link RFC 2396]
 ------------------------------
 <p>
-<a class="ext-link" href="svn+ssh://secureserver.org">svn+ssh://secureserver.org</a>
-<a class="ext-link" href="svn+ssh://secureserver.org">SVN link</a>
-<a class="ext-link" href="rfc-2396.compatible://link">rfc-2396.compatible://link</a>
-<a class="ext-link" href="rfc-2396.compatible://link">RFC 2396</a>
+<a class="ext-link" href="svn+ssh://secureserver.org"><span class="icon"></span>svn+ssh://secureserver.org</a>
+<a class="ext-link" href="svn+ssh://secureserver.org"><span class="icon"></span>SVN link</a>
+<a class="ext-link" href="rfc-2396.compatible://link"><span class="icon"></span>rfc-2396.compatible://link</a>
+<a class="ext-link" href="rfc-2396.compatible://link"><span class="icon"></span>RFC 2396</a>
 </p>
 ==============================
 = ça marche! =
@@ -574,3 +625,79 @@ anotherWikiPageName
 <tr><td> a 
 </td></tr><tr><td> b 
 </td></tr></table>
+==============================
+t:wiki:InterTrac
+trac:wiki:InterTrac
+[t:wiki:InterTrac intertrac]
+[trac:wiki:InterTrac intertrac]
+------------------------------
+<p>
+<a class="ext-link" href="http://projects.edgewall.com/trac/wiki/InterTrac" title="wiki:InterTrac in Trac's Trac"><span class="icon"></span>t:wiki:InterTrac</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/wiki/InterTrac" title="wiki:InterTrac in Trac's Trac"><span class="icon"></span>trac:wiki:InterTrac</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/wiki/InterTrac" title="wiki:InterTrac in Trac's Trac"><span class="icon"></span>intertrac</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/wiki/InterTrac" title="wiki:InterTrac in Trac's Trac"><span class="icon"></span>intertrac</a>
+</p>
+==============================
+trac:ticket:2041
+[trac:ticket:2041 Trac #2041]
+#T2041
+#trac2041
+------------------------------
+<p>
+<a class="ext-link" href="http://projects.edgewall.com/trac/ticket/2041" title="ticket:2041 in Trac's Trac"><span class="icon"></span>trac:ticket:2041</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/ticket/2041" title="ticket:2041 in Trac's Trac"><span class="icon"></span>Trac #2041</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/ticket/2041" title="ticket:2041 in Trac's Trac"><span class="icon"></span>#T2041</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/ticket/2041" title="ticket:2041 in Trac's Trac"><span class="icon"></span>#trac2041</a>
+</p>
+==============================
+trac:changeset:2081
+[trac:changeset:2081 Trac r2081]
+[T2081]
+[trac2081]
+[trac 2081]
+------------------------------
+<p>
+<a class="ext-link" href="http://projects.edgewall.com/trac/changeset/2081" title="changeset:2081 in Trac's Trac"><span class="icon"></span>trac:changeset:2081</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/changeset/2081" title="changeset:2081 in Trac's Trac"><span class="icon"></span>Trac r2081</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/changeset/2081" title="changeset:2081 in Trac's Trac"><span class="icon"></span>[T2081]</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/changeset/2081" title="changeset:2081 in Trac's Trac"><span class="icon"></span>[trac2081]</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/changeset/2081" title="changeset:2081 in Trac's Trac"><span class="icon"></span>[trac 2081]</a>
+</p>
+==============================
+trac:report:1
+[trac:report:1 Trac r1]
+{T1}
+{trac1}
+{trac 1}
+------------------------------
+<p>
+<a class="ext-link" href="http://projects.edgewall.com/trac/report/1" title="report:1 in Trac's Trac"><span class="icon"></span>trac:report:1</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/report/1" title="report:1 in Trac's Trac"><span class="icon"></span>Trac r1</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/report/1" title="report:1 in Trac's Trac"><span class="icon"></span>{T1}</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/report/1" title="report:1 in Trac's Trac"><span class="icon"></span>{trac1}</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/report/1" title="report:1 in Trac's Trac"><span class="icon"></span>{trac 1}</a>
+</p>
+==============================
+t:InterTrac
+trac:InterTrac
+[t:InterTrac intertrac]
+[trac:InterTrac intertrac]
+T:r2081
+trac:[2081]
+T:#2041
+trac:#2041
+T:{1}
+trac:{1}
+------------------------------
+<p>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=InterTrac" title="InterTrac in Trac's Trac"><span class="icon"></span>t:InterTrac</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=InterTrac" title="InterTrac in Trac's Trac"><span class="icon"></span>trac:InterTrac</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=InterTrac" title="InterTrac in Trac's Trac"><span class="icon"></span>intertrac</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=InterTrac" title="InterTrac in Trac's Trac"><span class="icon"></span>intertrac</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=r2081" title="r2081 in Trac's Trac"><span class="icon"></span>T:r2081</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=%5B2081%5D" title="[2081] in Trac's Trac"><span class="icon"></span>trac:[2081]</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=%232041" title="#2041 in Trac's Trac"><span class="icon"></span>T:#2041</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=%232041" title="#2041 in Trac's Trac"><span class="icon"></span>trac:#2041</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=%7B1%7D" title="{1} in Trac's Trac"><span class="icon"></span>T:{1}</a>
+<a class="ext-link" href="http://projects.edgewall.com/trac/search?q=%7B1%7D" title="{1} in Trac's Trac"><span class="icon"></span>trac:{1}</a>
+</p>

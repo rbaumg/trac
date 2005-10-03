@@ -22,7 +22,8 @@ import time
 
 from trac.core import *
 from trac.perm import IPermissionRequestor
-from trac.util import enum, escape, http_date, shorten_line
+from trac.util import enum, escape, format_date, format_time, http_date, \
+                      shorten_line
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
@@ -97,11 +98,10 @@ class TimelineModule(Component):
 
         fromdate = time.mktime((t[0], t[1], t[2], 23, 59, 59, t[6], t[7], t[8]))
         try:
-            daysback = max(0, int(req.args.get('daysback', '') \
-                                  or req.session.get('timeline.daysback', '')))
+            daysback = max(0, int(req.args.get('daysback', '')))
         except ValueError:
             daysback = int(self.config.get('timeline', 'default_daysback'))
-        req.hdf['timeline.from'] = time.strftime('%x', time.localtime(fromdate))
+        req.hdf['timeline.from'] = format_date(fromdate)
         req.hdf['timeline.daysback'] = daysback
 
         available_filters = []
@@ -120,13 +120,12 @@ class TimelineModule(Component):
 
         # save the results of submitting the timeline form to the session
         if req.args.has_key('update'):
-            for f in available_filters:
-                key = 'timeline.filter.%s' % f[0]
-                if req.args.has_key(f[0]):
+            for filter in available_filters:
+                key = 'timeline.filter.%s' % filter[0]
+                if req.args.has_key(filter[0]):
                     req.session[key] = '1'
                 elif req.session.has_key(key):
                     del req.session[key]
-            req.session['timeline.daysback'] = daysback
 
         stop = fromdate
         start = stop - (daysback + 1) * 86400
@@ -149,11 +148,11 @@ class TimelineModule(Component):
 
         idx = 0
         for kind, href, title, date, author, message in events:
-            t = time.localtime(date)
             event = {'kind': kind, 'title': title, 'href': escape(href),
                      'author': escape(author or 'anonymous'),
-                     'date': time.strftime('%x', t),
-                     'time': time.strftime('%H:%M', t), 'message': message}
+                     'date': format_date(date),
+                     'time': format_time(date, '%H:%M'),
+                     'message': message}
 
             if format == 'rss':
                 # Strip/escape HTML markup

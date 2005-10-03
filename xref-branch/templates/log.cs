@@ -32,7 +32,7 @@
    <label>and back to <input type="text" id="stop_rev" name="stop_rev" value="<?cs
     var:log.stop_rev ?>" size="5" /></label>
    <br />
-   <div class="choice" ?>
+   <div class="choice">
     <fieldset>
      <legend>Mode:</legend>
      <label for="stop_on_copy">
@@ -117,16 +117,18 @@
           if:idx == #0 ?> checked="checked" <?cs /if ?> /></td>
      <td class="change" style="padding-left:<?cs var:indent ?>em">
       <a title="View log starting at this revision" href="<?cs var:item.log_href ?>">
-       <div class="<?cs var:item.change ?>"></div>
+       <span class="<?cs var:item.change ?>"></span>
        <span class="comment">(<?cs var:item.change ?>)</span>
       </a>
      </td>
      <td class="date"><?cs var:log.changes[item.rev].date ?></td>
      <td class="rev">
-      <a href="<?cs var:item.browser_href ?>"><?cs var:item.rev ?></a>
+      <a href="<?cs var:item.browser_href ?>" 
+         title="Browse at revision <?cs var:item.rev ?>">@<?cs var:item.rev ?></a>
      </td>
      <td class="chgset">
-      <a href="<?cs var:item.changeset_href ?>"><?cs var:item.rev ?></a>
+      <a href="<?cs var:item.changeset_href ?>"
+         title="View changeset [<?cs var:item.rev ?>]">[<?cs var:item.rev ?>]</a>
      </td>
      <td class="author"><?cs var:log.changes[item.rev].author ?></td>
      <td class="summary"><?cs var:log.changes[item.rev].message ?></td>
@@ -136,7 +138,7 @@
   </tbody>
  </table>
  <div class="buttons"><input type="submit" value="View changes" 
-      title="Diff from Old Revision to New Revision (select them below)" />
+      title="Diff from Old Revision to New Revision (select them above)" />
  </div>
  </form><?cs
  if:len(links.prev) || len(links.next) ?><div id="paging" class="nav"><ul><?cs

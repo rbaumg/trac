@@ -141,7 +141,7 @@ class WikiSystem(Component):
     def has_page(self, pagename):
         """Whether a page with the specified name exists."""
         self._update_index()
-        return pagename in self._index.keys()
+        return self._index.has_key(pagename)
 
     def _get_rules(self):
         self._prepare_rules()
@@ -218,7 +218,7 @@ class WikiSystem(Component):
     def wiki_page_added(self, page):
         if not self.has_page(page.name):
             self.log.debug('Adding page %s to index' % page.name)
-            self._pages[page.name] = True
+            self._index[page.name] = True
 
     def wiki_page_changed(self, page, version, t, comment, author, ipnr):
         pass
@@ -226,25 +226,31 @@ class WikiSystem(Component):
     def wiki_page_deleted(self, page):
         if self.has_page(page.name):
             self.log.debug('Removing page %s from index' % page.name)
-            del self._pages[page.name]
+            del self._index[page.name]
 
     # IWikiSyntaxProvider methods
     
     def get_wiki_syntax(self):
         ignore_missing = self.config.get('wiki', 'ignore_missing_pages')
         ignore_missing = ignore_missing in TRUE
-        only_one = True
-        for wikipagenames in self.wikipagenames_providers:
-            if not only_one:
-                self.log.warning('More than one IWikiPageNameSyntaxProvider '
-                                 'implementation available: %s' %
-                                 wikipagenames.__class__.__name__)
-            else:
-                yield (wikipagenames.get_wiki_page_names_syntax(),
+        providers = []
+        for p in self.wikipagenames_providers:
+            if not providers:
+                yield (p.get_wiki_page_names_syntax(),
                        lambda x, y, z: self._format_link(x, 'wiki', y, y,
                                                          ignore_missing),
                        lambda x, y, z: self._parse_link(x, 'wiki', y, y))
-                only_one = False
+            pc = p.__class__
+            providers.append('# %s\n%s.%s = yes' % (pc.__doc__.split('\n')[0],
+                                                    pc.__module__, pc.__name__)
+                                                    )
+        if len(providers) > 1:
+            self.log.warning('More than one IWikiPageNameSyntaxProvider '
+                             'implementation available:\n'
+                             'You should set one of the following to "no" '
+                             'in your trac.ini:\n\n'
+                             '[disabled_components]\n' +
+                             '\n'.join(providers) +'\n')
 
     def get_link_resolvers(self):
         yield ('wiki', self._format_fancy_link, self._parse_link)
@@ -300,9 +306,7 @@ WIKI_END = r"(?=\Z|\s|[.,;:!?\)}\]])"
 WIKI_INTERWIKI = r"(?!:\S)"
 
 class StandardWikiPageNames(Component):
-    """
-    Standard Trac WikiPageNames rule
-    """
+    """Standard Trac WikiPageNames rule"""
 
     implements(IWikiPageNameSyntaxProvider)
 
@@ -315,8 +319,7 @@ class StandardWikiPageNames(Component):
                 WIKI_INTERWIKI)             # InterWiki support
     
 class FlexibleWikiPageNames(Component):
-    """
-    Standard Trac WikiPageNames rule, with digits
+    """Standard Trac WikiPageNames rule, plus digits
     and consecutive upper-case characters allowed.
 
     More precisely, WikiPageNames are:
@@ -336,8 +339,7 @@ class FlexibleWikiPageNames(Component):
                 WIKI_TARGET + WIKI_END + WIKI_INTERWIKI)
 
 class SubWikiPageNames(Component):
-    """
-    SubWiki-like rules.
+    """SubWiki-like rules for WikiPageNames.
     
     See http://www.webdav.org/wiki/projects/TextFormattingRules
 
