@@ -22,6 +22,7 @@ import urllib
 from trac import util
 from trac.core import *
 from trac.perm import IPermissionRequestor
+from trac.object import TracObject, ITracObjectManager
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.wiki import wiki_to_html, IWikiSyntaxProvider, INTERTRAC_SCHEME
@@ -60,10 +61,34 @@ class ColumnSorter:
         return result
 
 
+class Report(TracObject):
+    type = 'report'
+
+    def __init__(self, env, report=None):
+        TracObject.__init__(self, env, report)
+
+    # TracObject methods
+
+    def shortname(self): return '{%s}' % self.id
+    def htmlclass(self): return 'report' # FIXME
+    def displayname(self): return 'Report {%s}' % self.id
+
+    def get_facet(self, facet, db=None):
+        if facet == 'description':
+            if not db:
+                db = self.env.get_db_cnx()
+            cursor = db.cursor()
+            cursor.execute("SELECT description FROM report WHERE id=%s ",
+                           (self.id,))
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+
+
 class ReportModule(Component):
 
     implements(INavigationContributor, IPermissionRequestor, IRequestHandler,
-               IWikiSyntaxProvider)
+               IWikiSyntaxProvider, ITracObjectManager)
 
     # INavigationContributor methods
 
@@ -100,6 +125,7 @@ class ReportModule(Component):
         action = req.args.get('action', 'list')
 
         db = self.env.get_db_cnx()
+        self._report_factory(id).xref_count_to_hdf(req, db)
 
         if req.method == 'POST':
             if action == 'new':
@@ -150,10 +176,14 @@ class ReportModule(Component):
         title = req.args.get('title', '')
         sql = req.args.get('sql', '')
         description = req.args.get('description', '')
+        now = int(time.time())
+        author = req.authname
         cursor = db.cursor()
         cursor.execute("INSERT INTO report (title,sql,description) "
                        "VALUES (%s,%s,%s)", (title, sql, description))
         id = db.get_last_id(cursor, 'report')
+        self._report_factory(id).update_links(db, 'description', now, author,
+                                              description)
         db.commit()
         req.redirect(self.env.href.report(id))
 
@@ -165,6 +195,8 @@ class ReportModule(Component):
 
         cursor = db.cursor()
         cursor.execute("DELETE FROM report WHERE id=%s", (id,))
+        self._report_factory(id).delete_links(db, 'description', '', '',
+                                              description)
         db.commit()
         req.redirect(self.env.href.report())
 
@@ -178,9 +210,13 @@ class ReportModule(Component):
             title = req.args.get('title', '')
             sql = req.args.get('sql', '')
             description = req.args.get('description', '')
+            now = int(time.time())
+            author = req.authname
             cursor = db.cursor()
             cursor.execute("UPDATE report SET title=%s,sql=%s,description=%s "
                            "WHERE id=%s", (title, sql, description, id))
+            self._report_factory(id).update_links(db, 'description', now, author,
+                                                  description)
             db.commit()
         req.redirect(self.env.href.report(id))
 
@@ -507,11 +543,12 @@ class ReportModule(Component):
     # IWikiSyntaxProvider methods
     
     def get_link_resolvers(self):
-        yield ('report', self._format_link)
+        yield ('report', self._format_link, self._parse_link)
 
     def get_wiki_syntax(self):
         yield (r"!?\{(?P<it_report>%s\s*)?\d+\}" % INTERTRAC_SCHEME,
-               lambda x, y, z: self._format_link(x, 'report', y[1:-1], y, z))
+               lambda x, y, z: self._format_link(x, 'report', y[1:-1], y, z),
+               lambda x, y, z: self._parse_link(x, 'report', y[1:-1], y, z))
 
     def _format_link(self, formatter, ns, target, label, fullmatch=None):
         intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
@@ -519,4 +556,26 @@ class ReportModule(Component):
         if intertrac:
             return intertrac
         return '<a class="report" href="%s">%s</a>' % (formatter.href.report(target), label)
+
+    def _parse_link(self, formatter, ns, target, label, fullmatch=None):
+        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
+                                                         fullmatch)
+        if not intertrac:
+            return self._report_factory(target)
+
+    # ITracObjectManager methods
+
+    def get_object_types(self):
+        yield ('report', self._report_factory)
+
+    def rebuild_xrefs(self, db):
+        now = int(time.time())
+        cursor = db.cursor()
+        cursor.execute("SELECT id,description,author FROM report")
+        for id,description,author in cursor:
+            src = self._report_factory(id)
+            yield (src, 'description', now, author, description)
+
+    def _report_factory(self, id):
+        return Report(self.env).setid(id)
 

@@ -3,7 +3,9 @@
 
 <div id="ctxtnav" class="nav">
  <h2>Report Navigation</h2>
- <ul><li class="first"><?cs
+ <ul><?cs
+  call:backlinks("report", report.id) ?>
+  <li class="first"><?cs
    if:chrome.links.up.0.href ?><a href="<?cs
     var:chrome.links.up.0.href ?>">Available Reports</a><?cs
    else ?>Available Reports<?cs

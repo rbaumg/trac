@@ -19,6 +19,7 @@ import time
 
 from trac.core import *
 from trac.perm import IPermissionRequestor
+from trac.object import TracObject, ITracObjectManager
 from trac.ticket import Ticket, TicketSystem
 from trac.Timeline import ITimelineEventProvider
 from trac.util import *
@@ -27,10 +28,12 @@ from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 
 
-class Milestone(object):
+class Milestone(TracObject):
 
+    type = 'milestone'
+    
     def __init__(self, env, name=None, db=None):
-        self.env = env
+        TracObject.__init__(self, env, name)
         if name:
             self._fetch(name, db)
             self._old_name = name
@@ -38,6 +41,31 @@ class Milestone(object):
             self.name = self._old_name = None
             self.due = self.completed = 0
             self.description = ''
+
+    # TracObject methods
+
+    def setid(self, id):
+        self.name = id
+        return TracObject.setid(self, id)
+
+    def reload(self):
+        self._fetch(id)
+
+    def htmlclass(self): return 'milestone'
+    def displayname(self): return 'Milestone %s' % escape(self.id)
+
+    def get_facet(self, facet, db=None):
+        if facet == 'description':
+            if not db:
+                db = self.env.get_db_cnx()
+            cursor = db.cursor()
+            cursor.execute("SELECT description FROM milestone WHERE id=%s ",
+                           (self.id,))
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+
+    # Own methods
 
     def _fetch(self, name, db=None):
         if not db:
@@ -79,6 +107,7 @@ class Milestone(object):
             ticket.save_changes(author, 'Milestone %s deleted' % self.name,
                                 now, db=db)
 
+        self.delete_links(db)
         if handle_ta:
             db.commit()
 
@@ -95,6 +124,9 @@ class Milestone(object):
         cursor.execute("INSERT INTO milestone (name,due,completed,description) "
                        "VALUES (%s,%s,%s,%s)",
                        (self.name, self.due, self.completed, self.description))
+ 
+        now = int(time.time())
+        self.update_links(db, 'description', now, '', self.description)
 
         if handle_ta:
             db.commit()
@@ -119,6 +151,9 @@ class Milestone(object):
                        (self.name, self._old_name))
         # FIXME: Insert change into the change history of the tickets
         self._old_name = self.name
+
+        now = int(time.time())
+        self.update_links(db, 'description', now, '', self.description)
 
         if handle_ta:
             db.commit()
@@ -229,7 +264,7 @@ def _get_groups(env, db, by='component'):
 class MilestoneModule(Component):
 
     implements(INavigationContributor, IPermissionRequestor, IRequestHandler,
-               ITimelineEventProvider, IWikiSyntaxProvider)
+               ITimelineEventProvider, IWikiSyntaxProvider, ITracObjectManager)
 
     # INavigationContributor methods
 
@@ -290,6 +325,8 @@ class MilestoneModule(Component):
         db = self.env.get_db_cnx()
         milestone = Milestone(self.env, req.args.get('id'), db)
         action = req.args.get('action', 'view')
+
+        milestone.xref_count_to_hdf(req, db)
 
         if req.method == 'POST':
             if req.args.has_key('cancel'):
@@ -450,8 +487,29 @@ class MilestoneModule(Component):
         return []
 
     def get_link_resolvers(self):
-        yield ('milestone', self._format_link)
+        yield ('milestone', self._format_link, self._parse_link)
 
     def _format_link(self, formatter, ns, name, label):
         return '<a class="milestone" href="%s">%s</a>' \
                % (formatter.href.milestone(name), label)
+
+    def _parse_link(self, formatter, ns, name, label):
+        return self._milestone_factory(name)
+
+    # ITracObjectManager methods
+
+    def get_object_types(self):
+        yield ('milestone', self._milestone_factory)
+
+    def rebuild_xrefs(self, db):
+        now = int(time.time())
+        cursor = db.cursor()
+        cursor.execute("SELECT name,description FROM milestone")
+        for name,description in cursor:
+            src = self._milestone_factory(name)
+            yield (src, 'description', now, '', description)
+
+    def _milestone_factory(self, id):
+        return Milestone(self.env).setid(id)
+
+    

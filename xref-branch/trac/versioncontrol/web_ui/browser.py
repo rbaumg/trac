@@ -25,6 +25,7 @@ from trac.perm import IPermissionRequestor
 from trac.web import IRequestHandler, RequestDone
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
+from trac.versioncontrol import SourceObject
 from trac.versioncontrol.web_ui.util import *
 
 IMG_RE = re.compile(r"\.(gif|jpg|jpeg|png)(\?.*)?$", re.IGNORECASE)
@@ -89,6 +90,9 @@ class BrowserModule(Component):
         repos = self.env.get_repository(req.authname)
         node = repos.get_node(path, rev)
         rev = repos.normalize_rev(rev)
+
+        db = self.env.get_db_cnx()
+        SourceObject(self.env, path, node).xref_count_to_hdf(req, db)
 
         hidden_properties = [p.strip() for p
                              in self.config.get('browser', 'hide_properties',
@@ -247,9 +251,9 @@ class BrowserModule(Component):
         return []
 
     def get_link_resolvers(self):
-        return [('repos', self._format_link),
-                ('source', self._format_link),
-                ('browser', self._format_link)]
+        return [('repos', self._format_link, self._parse_link),
+                ('source', self._format_link, self._parse_link),
+                ('browser', self._format_link, self._parse_link)]
 
     def _format_link(self, formatter, ns, path, label):
         match = IMG_RE.search(path)
@@ -265,3 +269,6 @@ class BrowserModule(Component):
         return '<a class="source" href="%s%s">%s</a>' \
                % (util.escape(formatter.href.browser(path, rev=rev)), anchor,
                   label)
+
+    def _parse_link(self, formatter, ns, path, label):
+        return SourceObject(self.env).setid(path)

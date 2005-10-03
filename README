@@ -8,9 +8,6 @@ See the wiki page ChristianBoos for more info.
 
 === TracCrossReferences Branch ===
  
- * Finish to add the Cross-references navigation link everywhere
- * Finish to add the management of cross-references on Changeset, 
-   Report and Milestone
  * Redo the update of cross-references after a facet change
    in a slightly smarter way:
    only change author/time of cross-references if __those__ 
@@ -67,6 +64,9 @@ The TicketTypes feature was integrated in the trunk in r1691.
 
 === TracCrossReferences Branch ===
 
+ * Finish to add the Cross-references navigation link everywhere
+ * Finish to add the management of cross-references on Changeset, 
+   Report and Milestone
  * phase out old version
    (see log:branches/cboos-dev/patches/xref-branch#1659)
  * copied from the latest InterTrac branch

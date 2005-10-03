@@ -3,9 +3,9 @@
 
 <div id="ctxtnav" class="nav">
  <h2>Ticket Navigation</h2><?cs
- with:links = chrome.links ?><?cs
-  if:len(links.prev) || len(links.up) || len(links.next) ?><ul><?cs
-   call:backlinks("ticket", ticket.id) ?><?cs
+ with:links = chrome.links ?><ul><?cs
+  call:backlinks("ticket", ticket.id) ?><?cs
+  if:len(links.prev) || len(links.up) || len(links.next) ?><?cs
    if:len(links.prev) ?>
     <li class="first<?cs if:!len(links.up) && !len(links.next) ?> last<?cs /if ?>">
      &larr; <a href="<?cs var:links.prev.0.href ?>" title="<?cs

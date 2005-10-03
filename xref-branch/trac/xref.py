@@ -207,6 +207,7 @@ class XRefModule(Component):
         req.hdf['xref.me'] = {
             'fqname': me.fqname(),
             'shortname': me.shortname(),
+            'displayname': me.displayname(),
             'htmlclass': me.htmlclass(),
             'href': me.href(),
             }

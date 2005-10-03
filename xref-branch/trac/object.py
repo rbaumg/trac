@@ -183,9 +183,9 @@ class TracObject:
         """
         Create a cross-reference from this object to the given `target` object.
         """
-        print ("(+) %s:%s --[%s]--> %s:%s" % (self.type, self.id, relation,
-                                              target.type, target.id) +
-               " (in %s at %s by %s %s)" % (facet, time, author, context))
+        #print ("(+) %s:%s --[%s]--> %s:%s" % (self.type, self.id, relation,
+        #                                      target.type, target.id) +
+        #       " (in %s at %s by %s %s)" % (facet, time, author, context))
         cursor = db.cursor()
         cursor.execute("INSERT INTO xref VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                        (self.type, self.id, facet, context, time, author,
@@ -212,7 +212,7 @@ class TracObject:
                        " WHERE source_type=%s AND source_id=%s"
                        + relation_clause + facet_clause,
                        tuple)
-        print "(-) -- %s:%s --[%s]--> *:*" % (self.type, self.id, relation)
+        #print "(-) -- %s:%s --[%s]--> *:*" % (self.type, self.id, relation)
     
     ## -- Helper methods
 

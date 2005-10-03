@@ -56,6 +56,12 @@ class ChangesetModule(AbstractDiffModule):
                 req.args['path'] = path
             return 1
 
+    def _render_html(self, req, repos, chgset, restricted, diff, diff_options):
+        db = self.env.get_db_cnx()
+        ChangesetObject(self.env, rev).xref_count_to_hdf(req, db)
+        AbstractDiffModule._render_html(self, req, repos, chgset, restricted,
+                                        diff, diff_options)
+
     # ITimelineEventProvider methods
 
     def get_timeline_filters(self, req):
@@ -116,7 +122,9 @@ class ChangesetModule(AbstractDiffModule):
                (lambda x, y, z: self._format_link(x, 'changeset',
                                                   y[0] == 'r' and y[1:]
                                                   or y[1:-1], y, z)),
-               (lambda x, y, z: self._parse_link(x, 'changeset', y, y)))
+               (lambda x, y, z: self._parse_link(x, 'changeset',
+                                                 y[0] == 'r' and y[1:]
+                                                 or y[1:-1], y, z)))
 
     def get_link_resolvers(self):
         yield ('changeset', self._format_link, self._parse_link)
@@ -143,8 +151,11 @@ class ChangesetModule(AbstractDiffModule):
                    ' rel="nofollow">%s</a>' \
                    % (formatter.href.changeset(rev, path), label)
 
-    def _parse_link(self, formatter, ns, target, label):
-        return ChangesetObject(self.env).setid(target)
+    def _parse_link(self, formatter, ns, target, label, fullmatch=None):
+        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
+                                                         fullmatch)
+        if not intertrac:
+            return ChangesetObject(self.env).setid(target)
 
     # ISearchProvider methods
 

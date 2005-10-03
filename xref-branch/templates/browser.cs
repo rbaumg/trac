@@ -2,7 +2,8 @@
 <?cs include "macros.cs"?>
 
 <div id="ctxtnav" class="nav">
- <ul>
+ <ul><?cs
+  call:backlinks("source", browser.path) ?>
   <li class="first"><a href="<?cs var:browser.restr_changeset_href ?>">
    Last Change</a></li>
   <li class="last"><a href="<?cs var:browser.log_href ?>">

@@ -1,7 +1,11 @@
 <?cs include:"header.cs"?>
 <?cs include:"macros.cs"?>
 
-<div id="ctxtnav" class="nav"></div>
+<div id="ctxtnav" class="nav">
+ <ul><?cs
+  call:backlinks("milestone", milestone.name) ?>
+ </ul>
+</div>
 
 <div id="content" class="milestone">
  <?cs if:milestone.mode == "new" ?>

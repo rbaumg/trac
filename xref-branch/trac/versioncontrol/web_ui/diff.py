@@ -227,9 +227,6 @@ class AbstractDiffModule(Component):
         if chgset: # Changeset Mode (possibly restricted on a path)
             path, rev = diff.new_path, diff.new_rev
 
-            db = self.env.get_db_cnx()
-            ChangesetObject(self.env, rev).xref_count_to_hdf(req, db)
-
             # -- getting the change summary from the Changeset.get_changes method
             def get_changes():
                 old_node = new_node = None

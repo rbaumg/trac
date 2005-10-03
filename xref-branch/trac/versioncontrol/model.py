@@ -63,11 +63,13 @@ class SourceObject(TracObject):
         TracObject.__init__(self, env, path)
         self.node = node
         if path:
-            self.setid(path)
-            if not node:
-                self.reload()                
+            if node:
+                self.id = node.path
+            else:
+                self.setid(path)
+                self.reload()
 
-    def setid(self, rev):
+    def setid(self, path):
         self.node = None
         repos = self.env.get_repository()
         return TracObject.setid(self, repos.normalize_path(path))
