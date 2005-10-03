@@ -101,16 +101,12 @@ class XRefParser(Formatter):
 
     # Public API
 
-    def __init__(self, env, db, relation=None):
-        Formatter.__init__(self, env, db=db)
-        self.relation = relation
-
-    def parse(self, source, facet, time, author, wikitext):
-        self.time = time
-        self.author = author
+    def parse(self, source, facet, wikitext):
+        self.xrefs = []
         class NullOut:
             def write(self,*args): pass
         self.format(source, facet, wikitext, NullOut())
+        return self.xrefs
 
     # Reimplemented methods
     
@@ -132,10 +128,7 @@ class XRefParser(Formatter):
                         target = self._lhref_formatter(match, fullmatch)
                     # ignore the rest...
                 if target and issubclass(target.__class__, TracObject):
-                    self.source.create_xref(self.db, self.facet,
-                                            self.time, self.author, target,
-                                            self._extract_context(fullmatch),
-                                            self.relation)
+                    self.xrefs.append((target, self._extract_context(fullmatch)))
 
     def _macro_formatter(self, match, fullmatch):
         pass

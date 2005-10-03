@@ -8,11 +8,6 @@ See the wiki page ChristianBoos for more info.
 
 === TracCrossReferences Branch ===
  
- * Redo the update of cross-references after a facet change
-   in a slightly smarter way:
-   only change author/time of cross-references if __those__ 
-   cross-references have changed inside the facet (decide by using
-   the context)
  * Get #787 done, and also manage cross-references on the attachment
    description facets
  * Implement the `<<...>>` syntax
@@ -64,6 +59,11 @@ The TicketTypes feature was integrated in the trunk in r1691.
 
 === TracCrossReferences Branch ===
 
+ * Redo the update of cross-references after a facet change
+   in a slightly smarter way:
+   only change author/time of cross-references if __those__ 
+   cross-references have changed inside the facet (decide by using
+   the context)
  * Finish to add the Cross-references navigation link everywhere
  * Finish to add the management of cross-references on Changeset, 
    Report and Milestone

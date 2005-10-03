@@ -199,9 +199,25 @@ class TracObject:
         links created.
         """
         from trac.xref import XRefParser
+        if not wikitext:
+            return
+        old_xrefs = {}
+        cursor = db.cursor()
+        cursor.execute("SELECT target_type, target_id, context, relation, "
+                       "       time, author FROM xref "
+                       " WHERE source_type=%s AND source_id=%s AND facet=%s",
+                       (self.type, self.id, facet))
+        for t_type,t_id,context,rel,old_time,old_author in cursor:
+            old_xrefs[(t_type,t_id,context,rel)] = (old_time, old_author)
         self.delete_links(db, facet=facet)
-        XRefParser(self.env, db, relation=relation
-                   ).parse(self, facet, time, author, wikitext)
+        new_xrefs = XRefParser(self.env, db).parse(self, facet, wikitext)
+        for target, context in new_xrefs:
+            key = (target.type, target.id, context, relation)
+            if old_xrefs.has_key(key):
+                t, a = old_xrefs[key]
+            else:
+                t, a = time, author
+            self.create_xref(db, facet, t, a, target, context, relation)
 
     def delete_links(self, db, relation=None, facet=None):
         cursor = db.cursor()
@@ -303,13 +319,9 @@ class TracObjectSystem(Component):
         changesets can be skipped, as this is done by a `resync`
         operation, which is what is advised to do in `trac-admin`.
         """
-        from trac.xref import XRefParser
-        xf = XRefParser(self.env, db)
         for mgr in self.object_managers:
             for source, facet, time, author, wikitext in mgr.rebuild_xrefs(db):
-                source.delete_links(db, facet=facet)
-                if wikitext:
-                    xf.parse(source, facet, time, author, wikitext)
+                source.update_links(db, facet, time, author, wikitext)
         db.commit()
 
     def _get_object_factories(self):
