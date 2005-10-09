@@ -137,9 +137,9 @@ class PluginAdminPage(Component):
             is_enabled = self.env.is_component_enabled(component)
             if is_enabled != (component in enabled):
                 if is_enabled:
-                    self.config.set('components', component, 'true')
+                    self.config.set('components', component, 'enabled')
                 else:
-                    self.config.set('components', component, 'false')
+                    self.config.set('components', component, 'disabled')
                 self.log.info('%sabling component %s',
                               is_enabled and 'Dis' or 'En', component)
                 changes = True
