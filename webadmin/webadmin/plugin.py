@@ -129,24 +129,23 @@ class PluginAdminPage(Component):
         components = req.args.getlist('component')
         enabled = req.args.getlist('enable')
         changes = False
+
+        # FIXME: this needs to be more intelligent and minimize multiple
+        # component names to prefix rules
+
         for component in components:
-            is_enabled = self._is_component_enabled(component)
+            is_enabled = self.env.is_component_enabled(component)
             if is_enabled != (component in enabled):
                 if is_enabled:
-                    self.config.set('disabled_components', component, 'yes')
+                    self.config.set('components', component, 'true')
                 else:
-                    self.config.remove('disabled_components', component)
+                    self.config.set('components', component, 'false')
                 self.log.info('%sabling component %s',
                               is_enabled and 'Dis' or 'En', component)
                 changes = True
+
         if changes:
             self.config.save()
-
-    def _is_component_enabled(self, component_name):
-        for name, value in self.config.options('disabled_components'):
-            if value in util.TRUE and component_name.lower().startswith(name):
-                return False
-        return True
 
     def _render_view(self, req):
         plugins = {}
