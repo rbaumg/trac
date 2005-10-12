@@ -17,10 +17,10 @@
 import re
 
 from trac.core import *
-from trac.util import TracError
 from trac.perm import IPermissionRequestor
 from trac.web import IRequestHandler
-from trac.web.chrome import add_stylesheet, INavigationContributor, ITemplateProvider
+from trac.web.chrome import add_stylesheet, INavigationContributor, \
+                            ITemplateProvider
 from trac.web.href import Href
 
 __all__ = ['IAdminPageProvider']

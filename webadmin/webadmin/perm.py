@@ -17,7 +17,6 @@
 import re
 
 from trac.core import *
-from trac.util import TracError
 from trac.perm import PermissionSystem
 from webadmin.web_ui import IAdminPageProvider
 
