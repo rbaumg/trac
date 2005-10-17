@@ -30,7 +30,9 @@
      <dt class="<?cs var:item.htmlclass ?>"><?cs call:anchor(item) ?></dt><?cs
     /if ?>
     <dd><?cs var:item.context ?> 
-     <em>(by <?cs var:item.author ?>, <?cs var:item.age ?> ago, from the <?cs var:item.facet?>)</em></dd><?cs
+     <span class="xrefcontext">
+      (by <?cs var:item.author ?>, <?cs var:item.age ?> ago, 
+       from the <?cs var:item.facet?>)</span></dd><?cs
    /each ?>
   </dl>
 
@@ -45,7 +47,9 @@
      </a>
     </dt>
     <dd><?cs var:item.context ?>
-     <span style="float:right">(by <?cs var:item.author ?>, <?cs var:item.age ?> ago, from the <?cs var:item.facet?>)</span></dd><?cs
+     <span class="xrefcontext">
+       (by <?cs var:item.author ?>, <?cs var:item.age ?> ago, 
+        from the <?cs var:item.facet?>)</span></dd><?cs
    /each ?>
   </dl>
 
@@ -60,7 +64,9 @@
      </a>
     </dt>
     <dd><?cs var:item.context ?>
-     <em>(by <?cs var:item.author ?>, <?cs var:item.age ?> ago, from the <?cs var:item.facet?>)</em></dd><?cs
+     <span class="xrefcontext">
+      (by <?cs var:item.author ?>, <?cs var:item.age ?> ago, 
+       from the <?cs var:item.facet?>)</span></dd><?cs
    /each ?>
   </dl>
 

@@ -21,6 +21,7 @@ address { font-style: normal }
 img { border: none }
 
 .relation { text-decoration: underline }
+.xrefcontext { float: right; font-style: italic; display: inline }
 .underline { text-decoration: underline }
 ol.loweralpha { list-style-type: lower-alpha }
 ol.upperalpha { list-style-type: upper-alpha }
