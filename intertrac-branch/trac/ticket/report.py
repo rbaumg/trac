@@ -518,5 +518,10 @@ class ReportModule(Component):
                                                          fullmatch)
         if intertrac:
             return intertrac
-        return '<a class="report" href="%s">%s</a>' % (formatter.href.report(target), label)
+        report, args = target, ''
+        if '?' in target:
+            report, args = target.split('?')
+            args = '?' + args
+        return '<a class="report" href="%s">%s</a>' % (
+               formatter.href.report(report) + args, label)
 

@@ -290,7 +290,8 @@ class TracDatabase(object):
         c.execute("DELETE FROM version")
         for vers in v:
             print "  inserting version '%s'" % (vers[key])
-            c.execute("INSERT INTO version (name) VALUES (%s)", (vers[key],))
+            c.execute("INSERT INTO version (name) VALUES (%s)",
+                      (vers[key].encode('utf-8'),))
         self.db().commit()
         
     def setMilestoneList(self, m, key):
@@ -366,6 +367,12 @@ class TracDatabase(object):
 
     def addTicketChange(self, ticket, time, author, field, oldvalue, newvalue):
         c = self.db().cursor()
+
+        if field == "owner":
+            if LOGIN_MAP.has_key(oldvalue):
+                oldvalue = LOGIN_MAP[oldvalue]
+            if LOGIN_MAP.has_key(newvalue):
+                newvalue = LOGIN_MAP[newvalue]
 
         if field == "priority":
             if PRIORITIES_MAP.has_key(oldvalue.lower()):

@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 # 
 # Copyright (C) 2003-2005 Edgewall Software
 # All rights reserved.
@@ -65,6 +65,7 @@ class TracAdmin(cmd.Cmd):
         self.interactive = False
         if envdir:
             self.env_set(os.path.abspath(envdir))
+        self._permsys = None
 
     def emptyline(self):
         pass
@@ -130,7 +131,8 @@ class TracAdmin(cmd.Cmd):
 
     def db_query(self, sql, cursor=None):
         if not cursor:
-            cursor = self.db_open().cursor()
+            cnx = self.db_open()
+            cursor = cnx.cursor()
         cursor.execute(sql)
         for row in cursor:
             yield row
@@ -434,16 +436,21 @@ class TracAdmin(cmd.Cmd):
             self.do_help('permission')
 
     def _do_permission_list(self, user=None):
+        if not self._permsys:
+            self._permsys = PermissionSystem(self.env_open())
         if user:
-            rows = self.db_query("SELECT username, action FROM permission "
-                                 "WHERE username='%s' ORDER BY action" % user)
+            rows = []
+            perms = self._permsys.get_user_permissions(user)
+            for action in perms:
+                if perms[action]:
+                    rows.append((action, user))
         else:
-            rows = self.db_query("SELECT username, action FROM permission "
-                                 "ORDER BY username, action")
+            rows = self._permsys.get_all_permissions()
+        rows.sort()
         self.print_listing(['User', 'Action'], rows)
         print
         print 'Available actions:'
-        actions = PermissionSystem(self.env_open()).get_actions()
+        actions = self._permsys.get_actions()
         actions.sort()
         text = ', '.join(actions)
         print util.wrap(text, initial_indent=' ', subsequent_indent=' ',
@@ -451,23 +458,29 @@ class TracAdmin(cmd.Cmd):
         print
 
     def _do_permission_add(self, user, action):
+        if not self._permsys:
+            self._permsys = PermissionSystem(self.env_open())
         if not action.islower() and not action.isupper():
             print 'Group names must be in lower case and actions in upper case'
             return
-        self.db_update("INSERT INTO permission VALUES('%s', '%s')"
-                       % (user, action))
+        self._permsys.grant_permission(user, action)
 
     def _do_permission_remove(self, user, action):
-        sql = "DELETE FROM permission"
-        clauses = []
-        if action != '*':
-            clauses.append("action='%s'" % action)
-        if user != '*':
-            clauses.append("username='%s'" % user)
-        if clauses:
-            sql += " WHERE " + " AND ".join(clauses)
-        self.db_update(sql)
-
+        if not self._permsys:
+            self._permsys = PermissionSystem(self.env_open())
+        rows = self._permsys.get_all_permissions()
+        if action == '*':
+            for row in rows:
+                if user != '*' and user != row[0]:
+                    continue
+                self._permsys.revoke_permission(row[0], row[1])
+        else:
+            for row in rows:
+                if action != row[1]:
+                    continue
+                if user != '*' and user != row[0]:
+                    continue
+                self._permsys.revoke_permission(row[0], row[1])
 
     ## Initenv
     _help_initenv = [('initenv',
@@ -557,16 +570,6 @@ class TracAdmin(cmd.Cmd):
             print '  project.name'
             config.set('project', 'name', project_name)
             config.save()
-
-            # Add the default wiki macros
-            print ' Installing default wiki macros'
-            for f in os.listdir(default_dir('macros')):
-                if not f.endswith('.py'):
-                    continue
-                src = os.path.join(default_dir('macros'), f)
-                dst = os.path.join(self.__env.path, 'wiki-macros', f)
-                print "  %s => %s" % (src, f)
-                shutil.copy2(src, dst)
 
             # Add a few default wiki pages
             print ' Installing default wiki pages'
@@ -689,7 +692,7 @@ Congratulations!
             self.do_help ('wiki')
 
     def _do_wiki_list(self):
-        rows = self.db_query("SELECT name,max(version),time "
+        rows = self.db_query("SELECT name, max(version), max(time) "
                              "FROM wiki GROUP BY name ORDER BY name")
         self.print_listing(['Title', 'Edits', 'Modified'],
                            [(r[0], r[1], self._format_datetime(r[2])) for r in rows])
