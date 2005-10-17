@@ -139,7 +139,6 @@ class TracHTTPServer(ThreadingMixIn, HTTPServer):
         self.auths = auths
 
         self.projects = {}
-        siblings = {}
         for env_path in env_paths:
             # Remove trailing slashes
             while env_path and not os.path.split(env_path)[1]:
@@ -151,17 +150,13 @@ class TracHTTPServer(ThreadingMixIn, HTTPServer):
                                     % (env_path, self.projects[project])
             else:
                 self.projects[project] = env_path
-            env = get_environment(None, self.get_env_opts(project))
-            siblings[project] = env
-        for p in siblings.values():
-            p.siblings = siblings
 
     def get_env_opts(self, project=None):
         if self.env_parent_dir:
             opts = self.env_parent_dir.items()
         else:
             opts = [('TRAC_ENV', self.projects[project])]
-        return dict(os.environ.items() + opts) # TODO: backport
+        return dict(opts + os.environ.items())
 
     def send_project_index(self, req):
         if self.env_parent_dir:

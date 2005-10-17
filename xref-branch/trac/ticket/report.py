@@ -26,7 +26,7 @@ from trac.perm import IPermissionRequestor
 from trac.object import TracObject, ITracObjectManager
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.wiki import wiki_to_html, IWikiSyntaxProvider, INTERTRAC_SCHEME
+from trac.wiki import wiki_to_html, IWikiSyntaxProvider
 
 
 dynvars_re = re.compile('\$([A-Z]+)')
@@ -547,22 +547,15 @@ class ReportModule(Component):
         yield ('report', self._format_link, self._parse_link)
 
     def get_wiki_syntax(self):
-        yield (r"!?\{(?P<it_report>%s\s*)?\d+\}" % INTERTRAC_SCHEME,
-               lambda x, y, z: self._format_link(x, 'report', y[1:-1], y, z),
-               lambda x, y, z: self._parse_link(x, 'report', y[1:-1], y, z))
+        yield (r"!?\{\d+\}", 
+               lambda x, y, z: self._format_link(x, 'report', y[1:-1], y),
+               lambda x, y, z: self._parse_link(x, 'report', y[1:-1], y))
 
-    def _format_link(self, formatter, ns, target, label, fullmatch=None):
-        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
-                                                         fullmatch)
-        if intertrac:
-            return intertrac
+    def _format_link(self, formatter, ns, target, label):
         return '<a class="report" href="%s">%s</a>' % (formatter.href.report(target), label)
 
     def _parse_link(self, formatter, ns, target, label, fullmatch=None):
-        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
-                                                         fullmatch)
-        if not intertrac:
-            return self._report_factory(target)
+        return self._report_factory(target)
 
     # ITracObjectManager methods
 

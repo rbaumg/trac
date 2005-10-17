@@ -27,12 +27,10 @@ except ImportError:
     from StringIO import StringIO
 
 from trac import util
-from trac.core import *
 from trac.mimeview import *
-from trac.wiki.api import WikiSystem, IWikiChangeListener, IWikiMacroProvider
+from trac.wiki.api import WikiSystem
 
-__all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline',
-           'INTERTRAC_SCHEME' ]
+__all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline']
 
 #
 # Customization of the Wiki syntax  ***use with care***
@@ -46,8 +44,7 @@ SUBSCRIPT_TOKEN = ",,"
 SUPERSCRIPT_TOKEN = r"\^"
 INLINE_TOKEN = "`"
 
-LINK_SCHEME = r"[\w.+-]+?" # as per RFC 2396
-INTERTRAC_SCHEME = r"[a-zA-Z.+-]+?" # no digits (support for shorthand links)
+LINK_SCHEME = r"[\w.+-]+" # as per RFC 2396
 
 def system_message(msg, text):
     return """<div class="system-message">
@@ -277,66 +274,12 @@ class Formatter(object):
 
     def _make_link(self, ns, target, match, label):
         wiki = WikiSystem(self.env)
-        # check first for an alias defined in trac.ini
-        ns = self.env.config.get('intertrac', ns.upper(), ns)
         if ns in wiki.link_resolvers:
             return wiki.link_resolvers[ns](self, ns, target, label)
         elif target.startswith('//') or ns == "mailto":
             return self._make_ext_link(ns+':'+target, label)
         else:
-            intertrac = self._make_intertrac_link(ns, target, label)
-            if intertrac:
-                return intertrac
-            else:
-                interwiki = self._make_interwiki_link(ns, target, label)
-                if interwiki:
-                    return interwiki
-                else:
-                    return match
-
-    def _make_intertrac_link(self, ns, target, label):
-        if self.env.siblings.has_key(ns):
-            sibling = self.env.siblings[ns]
-            if not hasattr(sibling, 'href'):
-                from trac.web.href import Href
-                def xchg_base(base):
-                    return '/'.join(base.split('/')[:-1] + [ns])
-                sibling.href = Href(xchg_base(self.env.href.base))
-                sibling.abs_href = Href(xchg_base(self.env.abs_href.base))
-            ref = wiki_to_oneliner(target, sibling)
-            return ref.replace('>%s' % target, '>%s' % label)
-        url = self.env.config.get('intertrac', ns.upper()+'.url')
-        if url:
-            name = self.env.config.get('intertrac', ns.upper()+'.title',
-                                       'Trac project %s' % ns)
-            sep = target.find(':')
-            if sep != -1:
-                url = '%s/%s/%s' % (url, target[:sep], target[sep+1:])
-            else: 
-                url = '%s/search?q=%s' % (url, urllib.quote_plus(target))
-            return self._make_ext_link(url, label, '%s in %s' % (target, name))
-        else:
-            return None
-
-    def shorthand_intertrac_helper(self, ns, target, label, fullmatch):
-        if fullmatch: # short form
-            it_grp = fullmatch.group('it_%s' % ns)
-            if it_grp:
-                alias = it_grp.strip()
-                intertrac = self.env.config.get('intertrac', alias.upper(),
-                                                alias)
-                target = '%s:%s' % (ns, target[len(it_grp):])
-                it = self._make_intertrac_link(intertrac, target, label)
-                return it or label
-        return None
-
-    def _make_interwiki_link(self, ns, target, label):
-        interwiki = InterWikiMap(self.env)
-        if interwiki.has_key(ns):
-            url, title = interwiki.url(ns, target)
-            return self._make_ext_link(url, label, '%s in %s' % (target, title))
-        else:
-            return None
+            return match
 
     def _make_ext_link(self, url, text, title=''):
         title_attr = title and ' title="%s"' % title or ''
@@ -784,98 +727,3 @@ def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None,
     OutlineFormatter(env, absurls, db).format(None, '', wikitext,
                                               out, max_depth, min_depth)
     return out.getvalue()
-
-
-# -- InterWiki support
-
-class InterWikiMap(Component):
-
-    implements(IWikiChangeListener, IWikiMacroProvider)
-
-    _page_name = 'InterMapTxt'
-    _interwiki_re = re.compile(r"(\w+)[ \t]+([^ \t]+)(?:[ \t]+#(.*))?",
-                               re.UNICODE)
-    _argspec_re = re.compile(r"\$\d")
-
-    def __init__(self):
-        self._interwiki_map = None
-        # This dictionary maps upper-cased namespaces
-        # to (namespace, prefix, title) values
-
-    def has_key(self, ns):
-        if not self._interwiki_map:
-            self._update()
-        return self._interwiki_map.has_key(ns.upper())
-
-    def url(self, ns, target):
-        ns, url, title = self._interwiki_map[ns.upper()]
-        args = target.split(':')
-        def setarg(match):
-            num = int(match.group()[1:])
-            return 0 < num <= len(args) and args[num-1] or ''
-        url_with_args = re.sub(InterWikiMap._argspec_re, setarg, url)
-        if url_with_args == url: 
-            return url + target, title
-        else:
-            return url_with_args, title
-
-    # IWikiChangeListener methods
-
-    def wiki_page_added(self, page):
-        if page.name == InterWikiMap._page_name:
-            self._update()
-
-    def wiki_page_changed(self, page, version, t, comment, author, ipnr):
-        if page.name == InterWikiMap._page_name:
-            self._update()
-
-    def wiki_page_deleted(self, page):
-        if page.name == InterWikiMap._page_name:
-            self._interwiki_map.clear()
-
-    def _update(self):
-        from trac.wiki.model import WikiPage
-        self._interwiki_map = {}
-        content = WikiPage(self.env, InterWikiMap._page_name).text
-        in_map = False
-        for line in content.split('\n'):
-            if in_map:
-                if line.startswith('----'):
-                    in_map = False
-                else:
-                    m = re.match(InterWikiMap._interwiki_re, line)
-                    if m:
-                        prefix, url, title = m.groups()
-                        url = url.strip()
-                        title = title and title.strip() or prefix
-                        self._interwiki_map[prefix.upper()] = (prefix, url,
-                                                               title)
-            elif line.startswith('----'):
-                in_map = True
-
-    # IWikiMacroProvider
-
-    def get_macros(self):
-        yield 'InterWiki'
-
-    def get_macro_description(self, name): 
-        return "Provide a description list for the known InterWiki prefixes."
-
-    def render_macro(self, req, source, facet, name, content):
-        if not self._interwiki_map:
-            self._update()
-        keys = self._interwiki_map.keys()
-        keys.sort()
-        buf = StringIO()
-        buf.write('<table><tr><th>Prefix</th><td>Site</td></tr>\n')
-        for k in keys:
-            prefix, url, title = self._interwiki_map[k]
-            shortened_url = url and url[:-1]
-            description = title == prefix and shortened_url or title
-            buf.write('<tr>\n' +
-                      ('<td><a href="%sRecentChanges">%s</a></td>'
-                       '<td><a href="%s">%s</a></td>\n') \
-                      % (url, prefix, shortened_url, description) +
-                      '</tr>\n')
-        buf.write('</table>\n')
-        return buf.getvalue()

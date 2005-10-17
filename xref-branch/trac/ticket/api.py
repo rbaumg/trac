@@ -20,7 +20,7 @@ from trac import util
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.object import ITracObjectManager
-from trac.wiki import IWikiSyntaxProvider, INTERTRAC_SCHEME
+from trac.wiki import IWikiSyntaxProvider
 from trac.Search import ISearchSource, query_to_sql, shorten_result
 
 
@@ -151,15 +151,11 @@ class TicketSystem(Component):
                 ('ticket', self._format_link, self._parse_link)]
 
     def get_wiki_syntax(self):
-        yield (r"!?#(?P<it_ticket>%s)?\d+" % INTERTRAC_SCHEME,
-               lambda x, y, z: self._format_link(x, 'ticket', y[1:], y, z),
-               lambda x, y, z: self._parse_link(x, 'ticket', y[1:], y, z))
+        yield (r"!?#\d+",
+               lambda x, y, z: self._format_link(x, 'ticket', y[1:], y),
+               lambda x, y, z: self._parse_link(x, 'ticket', y[1:], y))
 
-    def _format_link(self, formatter, ns, target, label, fullmatch=None):
-        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
-                                                         fullmatch)
-        if intertrac:
-            return intertrac
+    def _format_link(self, formatter, ns, target, label):
         cursor = formatter.db.cursor()
         cursor.execute("SELECT summary,status FROM ticket WHERE id=%s",
                        (target,))
@@ -173,11 +169,8 @@ class TicketSystem(Component):
             return '<a class="missing ticket" href="%s" rel="nofollow">%s</a>' \
                    % (formatter.href.ticket(target), label)
 
-    def _parse_link(self, formatter, ns, target, label, fullmatch=None):
-        intertrac = formatter.shorthand_intertrac_helper(ns, target, label,
-                                                         fullmatch)
-        if not intertrac:
-            return self._ticket_factory(target)
+    def _parse_link(self, formatter, ns, target, label):
+        return self._ticket_factory(target)
     
     # ITracObjectManager methods
 
