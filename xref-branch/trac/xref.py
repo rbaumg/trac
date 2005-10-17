@@ -103,6 +103,8 @@ class XRefParser(Formatter):
 
     def parse(self, source, facet, wikitext):
         self.xrefs = []
+        self.source = source
+        self.facet = facet
         class NullOut:
             def write(self,*args): pass
         self.format(source, facet, wikitext, NullOut())
@@ -117,6 +119,8 @@ class XRefParser(Formatter):
                 # Check for preceding escape character '!'
                 if match[0] == '!':
                     continue
+                if itype == 'relation':
+                    self._relation_formatter(match, fullmatch)
                 target = None
                 if itype in wiki.xref_external_handlers:
                     target = wiki.xref_external_handlers[itype](self, match,
@@ -124,14 +128,26 @@ class XRefParser(Formatter):
                 else:
                     if itype == 'shref':
                         target = self._shref_formatter(match, fullmatch)
-                    elif itype == 'href':
+                    elif itype == 'lhref':
                         target = self._lhref_formatter(match, fullmatch)
                     # ignore the rest...
                 if target and issubclass(target.__class__, TracObject):
-                    self.xrefs.append((target, self._extract_context(fullmatch)))
+                    self.xrefs.append((target,
+                                       self._extract_context(fullmatch),
+                                       None))
 
     def _macro_formatter(self, match, fullmatch):
         pass
+                    
+    def _relation_formatter(self, match, fullmatch):
+        relname = fullmatch.group('relname')
+        reltgts = fullmatch.group('reltgts')
+        if reltgts:
+            xref_parser = XRefParser(self.env, self.req, self._absurls, self.db)
+            xrefs = xref_parser.parse(self.source, self.facet, reltgts)
+            context = self._extract_context(fullmatch)
+            for target, _1, _2 in xrefs:
+                self.xrefs.append((target, context, relname))
                     
     def _make_link(self, ns, target, match, label):
         wiki = WikiSystem(self.env)
@@ -242,6 +258,7 @@ class BacklinksMacro(Component):
 
     def get_macros(self):
         yield 'Backlinks'
+        yield 'Relation'
 
     def get_macro_description(self, name):
         return inspect.getdoc(BacklinksMacro)
@@ -250,7 +267,7 @@ class BacklinksMacro(Component):
         db = self.env.get_db_cnx()
         buf = StringIO()
         first = True
-        for backlink in source.find_backlinks(db):
+        for backlink in source.find_backlinks(db, content or None):
             target_type,target_id,facet,context,time,author,relation = backlink
             if not first:
                 buf.write(', ')

@@ -211,13 +211,14 @@ class TracObject:
             old_xrefs[(t_type,t_id,context,rel)] = (old_time, old_author)
         self.delete_links(db, facet=facet)
         new_xrefs = XRefParser(self.env, db).parse(self, facet, wikitext)
-        for target, context in new_xrefs:
-            key = (target.type, target.id, context, relation)
+        for target, context, relname in new_xrefs:
+            relname = relname or relation
+            key = (target.type, target.id, context, relname)
             if old_xrefs.has_key(key):
                 t, a = old_xrefs[key]
             else:
                 t, a = time, author
-            self.create_xref(db, facet, t, a, target, context, relation)
+            self.create_xref(db, facet, t, a, target, context, relname)
 
     def delete_links(self, db, relation=None, facet=None):
         cursor = db.cursor()

@@ -151,6 +151,8 @@ class Formatter(object):
                   r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
                   r"(?P<inlinecode2>!?%s(?P<inline2>.*?)%s)" % (INLINE_TOKEN,
                                                                 INLINE_TOKEN),
+                  (r"(?P<relation>!?&lt;&lt;(?P<relname>[a-z\-]+)"
+                   r"(?P<reltgts>.*?)&gt;&gt;)"),
                   r"(?P<htmlescapeentity>!?&#\d+;)"]
     _post_rules = [(r"(?P<shref>!?((?P<sns>%s):" % LINK_SCHEME +
                     r"(?P<stgt>'[^']+'|\"[^\"]+\"|"
@@ -388,6 +390,18 @@ class Formatter(object):
     def _inlinecode_formatter(self, match, fullmatch):
         return '<tt>%s</tt>' % fullmatch.group('inline')
 
+    def _relation_formatter(self, match, fullmatch):
+        relname = fullmatch.group('relname')
+        reltgts = fullmatch.group('reltgts')
+        if reltgts:
+            targets = wiki_to_oneliner(util.unescape(reltgts),
+                                       self.env, self.db, self._absurls)
+            return '&laquo;<span class="relation">%s</span> %s&raquo;' \
+                   % (relname, targets)
+        else:
+            rel = WikiProcessor(self.env, 'Relation')
+            return rel.process(self.req, self.source, self.facet, relname, True)
+    
     def _inlinecode2_formatter(self, match, fullmatch):
         return '<tt>%s</tt>' % fullmatch.group('inline2')
 

@@ -39,10 +39,13 @@
    each:item = xref.relations.in ?>
     <dt class="<?cs var:item.htmlclass ?>">
      <a href="<?cs var:item.href ?>">
-       <em><?cs var:item.name ?></em> <?cs call:relation(item.relation) ?> <?cs var:xref.base.name ?>
+       <em><?cs var:item.displayname ?></em> 
+       &laquo;<?cs call:relation(item.relation) ?> 
+              <?cs var:xref.me.displayname ?>&raquo;
      </a>
     </dt>
-    <dd><?cs var:item.context ?></dd><?cs
+    <dd><?cs var:item.context ?>
+     <span style="float:right">(by <?cs var:item.author ?>, <?cs var:item.age ?> ago, from the <?cs var:item.facet?>)</span></dd><?cs
    /each ?>
   </dl>
 
@@ -51,10 +54,13 @@
    each:item = xref.relations.out ?>
     <dt class="<?cs var:item.htmlclass ?>">
      <a href="<?cs var:item.href ?>">
-       <?cs var:xref.base.name ?> <?cs call:relation(item.relation) ?> <em><?cs var:item.name ?></em>
+       <?cs var:xref.me.displayname ?> 
+       &laquo;<?cs call:relation(item.relation) ?> 
+              <em><?cs var:item.displayname ?></em>&raquo;
      </a>
     </dt>
-    <dd><?cs var:item.context ?></dd><?cs
+    <dd><?cs var:item.context ?>
+     <em>(by <?cs var:item.author ?>, <?cs var:item.age ?> ago, from the <?cs var:item.facet?>)</em></dd><?cs
    /each ?>
   </dl>
 
