@@ -432,6 +432,9 @@ default_config = \
   ('timeline', 'default_daysback', '30'),
   ('browser', 'hide_properties', 'svk:merge'),
   ('wiki', 'ignore_missing_pages', 'false'),
+  ('components', 'trac.wiki.api.StandardWikiPageNames', 'enabled'),
+  ('components', 'trac.wiki.api.FlexibleWikiPageNames', 'disabled'),
+  ('components', 'trac.wiki.api.SubWikiPageNames', 'disabled'),
 )
 
 default_components = ('trac.About', 'trac.attachment', 

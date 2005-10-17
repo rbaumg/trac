@@ -6,10 +6,6 @@ See the wiki page ChristianBoos for more info.
 
 == TODO ==
 
-=== InterTrac Branch ===
- 
- * isolate InterTrac and InterWiki features (i.e. unmerge TracDiff)
-
 === TracCrossReferences Branch ===
  
  * isolate xref features (i.e. unmerge TracDiff and InterTrac)
@@ -59,6 +55,7 @@ The TicketTypes feature was integrated in the trunk in r1691.
 
 === InterTrac Branch ===
  
+ * isolate InterTrac and InterWiki features (i.e. unmerge TracDiff)
  * create patch against 0.9b1
  * create ticket for integration in trunk (#2041)
 
