@@ -6,8 +6,13 @@ See the wiki page ChristianBoos for more info.
 
 == TODO ==
 
+=== InterTrac Branch ===
+ 
+ * isolate InterTrac and InterWiki features (i.e. unmerge TracDiff)
+
 === TracCrossReferences Branch ===
  
+ * isolate xref features (i.e. unmerge TracDiff and InterTrac)
  * Get #787 done, and also manage cross-references on the attachment
    description facets
  * Implement the `<<...>>` syntax
