@@ -88,7 +88,7 @@ class BrowserModule(Component):
         rev = req.args.get('rev')
 
         repos = self.env.get_repository(req.authname)
-        node = repos.get_node(path, rev)
+        node = get_existing_node(self.env, repos, path, rev)
 
         db = self.env.get_db_cnx()
         SourceObject(self.env, path, node).xref_count_to_hdf(req, db)

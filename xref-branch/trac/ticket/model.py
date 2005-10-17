@@ -313,8 +313,11 @@ class Ticket(TracObject):
 
 class AbstractEnum(object):
     type = None
+    ticket_col = None
 
     def __init__(self, env, name=None, db=None):
+        if not self.ticket_col:
+            self.ticket_col = self.type
         self.env = env
         if name:
             if not db:
@@ -389,7 +392,7 @@ class AbstractEnum(object):
         if self.name != self._old_name:
             # Update tickets
             cursor.execute("UPDATE ticket SET %s=%%s WHERE %s=%%s" %
-                           (self.type, self.type), (self.name, self._old_name))
+                           (self.ticket_col, self.ticket_col), (self.name, self._old_name))
             self._old_name = self.name
             self._old_value = self.value
 
@@ -412,6 +415,7 @@ class AbstractEnum(object):
 
 class Type(AbstractEnum):
     type = 'ticket_type'
+    ticket_col = 'type'
 
 
 class Status(AbstractEnum):

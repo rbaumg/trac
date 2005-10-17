@@ -552,7 +552,12 @@ class ReportModule(Component):
                lambda x, y, z: self._parse_link(x, 'report', y[1:-1], y))
 
     def _format_link(self, formatter, ns, target, label):
-        return '<a class="report" href="%s">%s</a>' % (formatter.href.report(target), label)
+        report, args = target, ''
+        if '?' in target:
+            report, args = target.split('?')
+            args = '?' + args
+        return '<a class="report" href="%s">%s</a>' % (
+               formatter.href.report(report) + args, label)
 
     def _parse_link(self, formatter, ns, target, label, fullmatch=None):
         return self._report_factory(target)
