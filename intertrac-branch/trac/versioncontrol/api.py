@@ -122,17 +122,7 @@ class Repository(object):
         'None' is a valid revision value and represents the youngest revision.
         """
         return NotImplementedError
-
-    def get_changes(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
-        """
-        Generator that yields change tuples (old_node, new_node, kind, change)
-        for each node change between the two arbitrary (path,rev) pairs.
-
-        The old_node is assumed to be None when the change is an ADD,
-        the new_node is assumed to be None when the change is a DELETE.
-        """
-        raise NotImplementedError
-
+        
 
 class Node(object):
     """
@@ -173,18 +163,6 @@ class Node(object):
         Starts with an entry for the current revision.
         """
         raise NotImplementedError
-
-    def get_previous(self):
-        """
-        Return the (path, rev, chg) tuple corresponding to the previous
-        revision for that node.
-        """
-        skip = True
-        for p in self.get_history(2):
-            if skip:
-                skip = False
-            else:
-                return p
 
     def get_properties(self):
         """

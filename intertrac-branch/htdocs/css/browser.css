@@ -45,29 +45,6 @@ h1 .sep { color: #666; padding: 0 .1em }
 #dirlist td.name a, #dirlist td.rev a { border-bottom: none; display: block }
 #dirlist td.change * { font-size: 9px }
 
-/* Log */
-tr.diff input { 
- padding: 0 1em 0 1em;
- margin: 0; 
-}
-
-div.buttons {
- clear: left;
-}
-
-#anydiff {
- margin: 0 0 1em;
- float: left;
-}
-#anydiff form, #anydiff div, #anydiff h2 {
- display: inline;
-}
-#anydiff input { 
- vertical-align: baseline;
- margin: 0 -0.5em 0 1em;
-}
-
-
 /* Styles for the revision log table
    (extends the styles for "table.listing") */
 #chglist { margin-top: 0 }

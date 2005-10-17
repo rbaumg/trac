@@ -67,20 +67,6 @@ class LogModule(Component):
         stop_rev = req.args.get('stop_rev')
         verbose = req.args.get('verbose')
         limit = LOG_LIMIT
-        old = req.args.get('old')
-        new = req.args.get('new')
-
-        repos = self.env.get_repository(req.authname)
-        normpath = repos.normalize_path(path)
-        rev = str(repos.normalize_rev(rev))
-
-        if old and new:
-            osep = util.unescape(old).rindex('#')
-            nsep = util.unescape(new).rindex('#')
-            old_path, old_rev = old[:osep], old[osep+1:]
-            new_path, new_rev = new[:nsep], new[nsep+1:]
-            req.redirect(self.env.href.diff(new_path, new=new_rev,
-                                            old_path=old_path, old=old_rev))
 
         req.hdf['title'] = path + ' (log)'
         req.hdf['log'] = {
@@ -97,6 +83,9 @@ class LogModule(Component):
         if path_links:
             add_link(req, 'up', path_links[-1]['href'], 'Parent directory')
 
+        repos = self.env.get_repository(req.authname)
+        normpath = repos.normalize_path(path)
+        rev = str(repos.normalize_rev(rev))
 
         # ''Node'' history uses `get_node()`,
         # ''Path'' history uses `get_path_history()`

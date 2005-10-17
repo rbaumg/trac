@@ -125,9 +125,6 @@ class CachedRepository(Repository):
     def normalize_rev(self, rev):
         return self.repos.normalize_rev(rev)
 
-    def get_changes(self, old_path, old_rev, new_path, new_rev, ignore_ancestry=1):
-        return self.repos.get_deltas(old_path, old_rev, new_path, new_rev, ignore_ancestry)
-
 
 class CachedChangeset(Changeset):
 

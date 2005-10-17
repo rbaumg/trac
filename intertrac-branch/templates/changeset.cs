@@ -2,80 +2,36 @@
 <?cs include "macros.cs"?>
 
 <div id="ctxtnav" class="nav">
- <h2>Navigation</h2><?cs
+ <h2>Changeset Navigation</h2><?cs
  with:links = chrome.links ?>
   <ul><?cs
-   if:diff.chgset ?><?cs
-    if:len(links.prev) ?>
-     <li class="first<?cs if:!len(links.next) ?> last<?cs /if ?>">
-      <a class="prev" href="<?cs var:links.prev.0.href ?>" title="<?cs
-        var:links.prev.0.title ?>">Previous <?cs 
-         if:diff.restricted ?>Change<?cs else ?>Changeset<?cs /if ?></a>
-     </li><?cs
-    /if ?><?cs
-    if:len(links.next) ?>
-     <li class="<?cs if:len(links.prev) ?>first <?cs /if ?>last">
-      <a class="next" href="<?cs var:links.next.0.href ?>" title="<?cs
-        var:links.next.0.title ?>">Next <?cs 
-         if:diff.restricted ?>Change<?cs else ?>Changeset<?cs /if ?></a>
-     </li><?cs
-    /if ?><?cs
-   else ?>
-    <li class="first"><a href="<?cs var:diff.reverse_href ?>">Reverse Diff</a></li><?cs
+   if:len(links.prev) ?>
+    <li class="first<?cs if:!len(links.next) ?> last<?cs /if ?>">
+     <a class="prev" href="<?cs var:links.prev.0.href ?>" title="<?cs
+       var:links.prev.0.title ?>">Previous Changeset</a>
+    </li><?cs
+   /if ?><?cs
+   if:len(links.next) ?>
+    <li class="<?cs if:len(links.prev) ?>first <?cs /if ?>last">
+     <a class="next" href="<?cs var:links.next.0.href ?>" title="<?cs
+       var:links.next.0.title ?>">Next Changeset</a>
+    </li><?cs
    /if ?>
   </ul><?cs
  /with ?>
 </div>
 
 <div id="content" class="changeset">
- <div id="title"><?cs
-  if:diff.chgset ?><?cs
-   if:diff.restricted ?>
-    <h1>Changeset <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
-      <?cs var:diff.new_rev ?></a> 
-     for <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
-      <?cs var:diff.new_path ?></a> 
-    </h1><?cs
-   else ?>
-    <h1>Changeset <?cs var:diff.new_rev ?></h1><?cs
-   /if ?><?cs
-  else ?><?cs
-    if:diff.restricted ?>
-    <h1>Changes in <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
-      <?cs var:diff.new_path ?></a>
-     from revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
-      <?cs var:diff.old_rev ?></a>
-     to <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
-      <?cs var:diff.new_rev ?></a>
-    </h1><?cs
-   else ?>
-    <h1>Changes from <a title="Show entry in browser" href="<?cs var:diff.href.old_path ?>">
-      <?cs var:diff.old_path ?></a> 
-     at revision <a title="Show full changeset" href="<?cs var:diff.href.old_rev ?>">
-      <?cs var:diff.old_rev ?></a>
-     to <a title="Show entry in browser" href="<?cs var:diff.href.new_path ?>">
-     <?cs var:diff.new_path ?></a> 
-     at revision <a title="Show full changeset" href="<?cs var:diff.href.new_rev ?>">
-     <?cs var:diff.new_rev ?></a>
-    </h1><?cs
-   /if ?><?cs
-  /if ?>
- </div>
+<h1>Changeset <?cs var:changeset.revision ?></h1>
 
-<?cs each:change = diff.changes ?><?cs
+<?cs each:change = changeset.changes ?><?cs
  if:len(change.diff) ?><?cs
   set:has_diffs = 1 ?><?cs
  /if ?><?cs
 /each ?><?cs if:has_diffs || diff.options.ignoreblanklines 
   || diff.options.ignorecase || diff.options.ignorewhitespace ?>
 <form method="post" id="prefs" action="">
- <div><?cs 
-  if:!diff.chgset ?>
-   <input type="hidden" name="old_path" value="<?cs var:diff.old_path ?>" />
-   <input type="hidden" name="path" value="<?cs var:diff.new_path ?>" />
-   <input type="hidden" name="old" value="<?cs var:diff.old_rev ?>" />
-   <input type="hidden" name="new" value="<?cs var:diff.new_rev ?>" /><?cs
-  /if ?>
+ <div>
   <label for="style">View differences</label>
   <select id="style" name="style">
    <option value="inline"<?cs
@@ -144,24 +100,16 @@
   /if ?>
 <?cs /def ?>
 
-<dl id="overview"><?cs
- if:diff.chgset ?>
+<dl id="overview">
  <dt class="time">Timestamp:</dt>
  <dd class="time"><?cs var:changeset.time ?></dd>
  <dt class="author">Author:</dt>
  <dd class="author"><?cs var:changeset.author ?></dd>
  <dt class="message">Message:</dt>
- <dd class="message" id="searchable"><?cs var:changeset.message ?></dd><?cs
- /if ?>
- <dt class="files"><?cs 
-  if:len(diff.changes) > #0 ?>
-   Files:<?cs
-  else ?>
-   (None)<?cs
-  /if ?>
- </dt>
+ <dd class="message" id="searchable"><?cs var:changeset.message ?></dd>
+ <dt class="files">Files:</dt>
  <dd class="files">
-  <ul><?cs each:item = diff.changes ?>
+  <ul><?cs each:item = changeset.changes ?>
    <li><?cs
     if:item.change == 'add' ?><?cs
      call:node_change(item, 'add', 'added') ?><?cs
@@ -192,7 +140,7 @@
   </dl>
  </div>
  <ul class="entries"><?cs
- each:item = diff.changes ?><?cs
+ each:item = changeset.changes ?><?cs
   if:len(item.diff) || len(item.props) ?><li class="entry" id="file<?cs
    var:name(item) ?>"><h2><a href="<?cs
    var:item.browser_href.new ?>" title="Show new revision <?cs

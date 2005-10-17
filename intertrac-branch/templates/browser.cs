@@ -3,25 +3,19 @@
 
 <div id="ctxtnav" class="nav">
  <ul>
-  <li class="first"><a href="<?cs var:browser.restr_changeset_href ?>">
-   Last Change</a></li>
-  <li class="last"><a href="<?cs var:browser.log_href ?>">
-   Revision Log</a></li>
+  <li class="last"><a href="<?cs var:browser.log_href ?>">Revision Log</a></li>
  </ul>
 </div>
-
 
 <div id="content" class="browser">
  <h1><?cs call:browser_path_links(browser.path, browser) ?></h1>
 
  <div id="jumprev">
-  <form action="" method="get">
-   <div>
-    <label for="rev">View revision:</label>
-    <input type="text" id="rev" name="rev" value="<?cs
-       var:browser.revision ?>" size="4" />
-   </div>
-  </form>
+  <form action="" method="get"><div>
+   <label for="rev">View revision:</label>
+   <input type="text" id="rev" name="rev" value="<?cs
+     var:browser.revision ?>" size="4" />
+  </div></form>
  </div>
 
  <?cs if:browser.is_dir ?>
@@ -119,20 +113,6 @@
   <strong>Note:</strong> See <a href="<?cs var:trac.href.wiki
   ?>/TracBrowser">TracBrowser</a> for help on using the browser.
  </div>
-
-  <div id="anydiff"><?cs
-   if len(browser.path) > #1 ?>
-    <form action="<?cs var:browser.anydiff_href ?>" method="get">
-     <input type="hidden" name="new_path" value="<?cs var:browser.path ?>" />
-     <input type="hidden" name="old_path" value="<?cs var:browser.path ?>" />
-     <input type="hidden" name="new_rev" value="<?cs var:browser.revision ?>" />
-     <input type="hidden" name="old_rev" value="<?cs var:browser.revision ?>" />
-     <div class="buttons">
-      <input type="submit" value="View changes..." title="Prepare an Arbitrary Diff" />
-     </div>
-    </form><?cs
-   /if ?>
-  </div>
 
 </div>
 <?cs include:"footer.cs"?>
