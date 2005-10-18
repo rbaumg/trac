@@ -289,7 +289,7 @@ class AbstractDiffModule(Component):
         else: # Diff Mode
             # -- getting the change summary from the Repository.get_changes method
             def get_changes():
-                for d in repos.get_deltas(**diff):
+                for d in repos.get_changes(**diff):
                     yield d
                     
             reverse_href = self.env.href.diff(diff.old_path,
