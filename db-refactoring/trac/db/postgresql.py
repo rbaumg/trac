@@ -54,7 +54,7 @@ class Psycopg2Backend(PostgreSQLBackend):
     def identifiers(self):
         try:
             import psycopg2
-            yield ("psycopg2", 4)
+            yield ("psycopg2", 8)
             yield ("psycopg", 4)
             yield ("postgres", 4)
         except ImportError:
@@ -68,7 +68,7 @@ class Psycopg1Backend(PostgreSQLBackend):
     def identifiers(self):
         try:
             import psycopg
-            yield ("psycopg1", 4)
+            yield ("psycopg1", 8)
             yield ("psycopg", 2)
             yield ("postgres", 2)
         except ImportError:
@@ -78,11 +78,11 @@ class Psycopg1Backend(PostgreSQLBackend):
         return Psycopg1Connection(**args)
 
 
-class PgSQLlBackend(PostgreSQLBackend):
+class PgSQLBackend(PostgreSQLBackend):
     def identifiers(self):
         try:
             from pyPgSQL import PgSQL
-            yield ("pgsql", 4)
+            yield ("pgsql", 8)
             yield ("postgres", 1)
         except:
             pass

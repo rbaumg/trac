@@ -47,9 +47,6 @@ class IDatabaseBackend(Interface):
     def init_db(self, **params):
         """Initialize the database"""
 
-    def parse_connection_string(self,str):
-        """Convert a connection string to a dictionary"""
-
 
 class DatabaseBackendManager(Component):
 
@@ -275,7 +272,7 @@ class ConnectionPool(object):
 
 
 
-### Utilities (FIXME)
+### Utilities
 
 def _parse_db_str(db_str):
     scheme, rest = db_str.split(':', 1)
