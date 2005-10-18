@@ -18,7 +18,8 @@ from __future__ import generators
 
 import os
 
-from trac import db, db_default, util
+from trac import db_default, util
+from trac.db import DatabaseBackendManager
 from trac.config import Configuration
 from trac.core import Component, ComponentManager, implements, Interface, \
                       ExtensionPoint, TracError
@@ -133,7 +134,7 @@ class Environment(Component, ComponentManager):
     def get_db_cnx(self):
         """Return a database connection from the connection pool."""
         if not self.__cnx_pool:
-            self.__cnx_pool = db.get_cnx_pool(self)
+            self.__cnx_pool = DatabaseBackendManager(self).get_cnx_pool()
         return self.__cnx_pool.get_cnx()
 
     def shutdown(self):
@@ -194,7 +195,7 @@ class Environment(Component, ComponentManager):
         self.config.save()
 
         # Create the database
-        db.init_db(self.path, db_str)
+        DatabaseBackendManager(self).init_db(db_str)
 
     def get_version(self, db=None):
         """Return the current version of the database."""
