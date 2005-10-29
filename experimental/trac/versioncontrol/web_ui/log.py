@@ -54,7 +54,7 @@ class LogModule(Component):
         import re
         match = re.match(r'/log(?:(/.*)|$)', req.path_info)
         if match:
-            req.args['path'] = match.group(1)
+            req.args['path'] = match.group(1) or '/'
             return 1
 
     def process_request(self, req):
@@ -70,11 +70,12 @@ class LogModule(Component):
 
         req.hdf['title'] = path + ' (log)'
         req.hdf['log'] = {
+            'mode': mode,
             'path': path,
             'rev': rev,
             'verbose': verbose,
             'stop_rev': stop_rev,
-            'browser_href': self.env.href.browser(path, rev=rev),
+            'browser_href': self.env.href.browser(path),
             'log_href': self.env.href.log(path, rev=rev)
         }
 
@@ -87,25 +88,14 @@ class LogModule(Component):
         normpath = repos.normalize_path(path)
         rev = str(repos.normalize_rev(rev))
 
-        # ''Node'' history uses `get_node()`,
-        # ''Path'' history uses `get_path_history()`
-        if mode != 'path_history':
-            try:
-                node = repos.get_node(path, rev)
-            except TracError:
-                node = None
-            if not node:
-                # show 'path' history instead of 'node' history
-                mode = 'path_history'
-            else:
-                history = node.get_history
-
-        req.hdf['log.mode'] = mode # mode might have change (see 3 lines above)
-
+        # ''Node history'' uses `Node.history()`,
+        # ''Path history'' uses `Repository.get_path_history()`
         if mode == 'path_history':
             def history(limit):
                 for h in repos.get_path_history(path, rev, limit):
                     yield h
+        else:
+            history = get_existing_node(self.env, repos, path, rev).get_history
 
         # -- retrieve history, asking for limit+1 results
         info = []
@@ -214,10 +204,10 @@ class LogModule(Component):
         yield ('log', self._format_link)
 
     def _format_link(self, formatter, ns, path, label):
-        path, rev = get_path_rev(path)
+        path, rev, line = get_path_rev_line(path)
         stop_rev = None
         if rev and ':' in rev:
-            stop_rev, rev = rev.split(':',1)
+            stop_rev, rev = rev.split(':', 1)
         label = urllib.unquote(label)
         return '<a class="source" href="%s">%s</a>' \
                % (formatter.href.log(path, rev=rev, stop_rev=stop_rev), label)

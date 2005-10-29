@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
 # Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
@@ -23,14 +23,6 @@ from trac.wiki import IWikiSyntaxProvider
 from trac.Search import ISearchSource, query_to_sql, shorten_result
 
 
-class MyLinkResolver(Component):
-    """
-    A dummy macro used by the unit test. We need to supply our own macro
-    because the real HelloWorld-macro can not be loaded using our
-    'fake' environment.
-    """
-
-
 class TicketSystem(Component):
     implements(IPermissionRequestor, IWikiSyntaxProvider, ISearchSource)
 
@@ -52,7 +44,6 @@ class TicketSystem(Component):
     def get_ticket_fields(self):
         """Returns the list of fields available for tickets."""
         from trac.ticket import model
-        from trac.Milestone import Milestone
 
         db = self.env.get_db_cnx()
         fields = []
@@ -81,7 +72,7 @@ class TicketSystem(Component):
 
         # Default select and radio fields
         selects = [('type', model.Type), ('status', model.Status),
-                   ('priority', model.Priority), ('milestone', Milestone),
+                   ('priority', model.Priority), ('milestone', model.Milestone),
                    ('component', model.Component), ('version', model.Version),
                    ('severity', model.Severity), ('resolution', model.Resolution)]
         for name, cls in selects:
@@ -167,7 +158,7 @@ class TicketSystem(Component):
                    % (formatter.href.ticket(target), label)
 
     
-    # ISearchPrivider methods
+    # ISearchProvider methods
 
     def get_search_filters(self, req):
         if req.perm.has_permission('TICKET_VIEW'):
@@ -180,14 +171,9 @@ class TicketSystem(Component):
         sql = "SELECT DISTINCT a.summary,a.description,a.reporter, " \
               "a.keywords,a.id,a.time FROM ticket a " \
               "LEFT JOIN ticket_change b ON a.id = b.ticket " \
-              "WHERE (b.field='comment' AND %s ) OR " \
-              "%s OR %s OR %s OR %s OR %s" % \
+              "WHERE (b.field='comment' AND %s ) OR %s" % \
               (query_to_sql(db, query, 'b.newvalue'),
-               query_to_sql(db, query, 'summary'),
-               query_to_sql(db, query, 'keywords'),
-               query_to_sql(db, query, 'description'),
-               query_to_sql(db, query, 'reporter'),
-               query_to_sql(db, query, 'cc'))
+               query_to_sql(db, query, 'summary||keywords||description||reporter||cc'))
         cursor = db.cursor()
         cursor.execute(sql)
         for summary,desc,author,keywords,tid,date in cursor:

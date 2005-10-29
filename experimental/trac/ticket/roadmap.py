@@ -15,134 +15,19 @@
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
 from __future__ import generators
-import time
+import re
+from time import localtime, strftime, time
 
+from trac import __version__
 from trac.core import *
 from trac.perm import IPermissionRequestor
-from trac.ticket import Ticket, TicketSystem
+from trac.util import enum, escape, format_date, format_datetime, \
+                      parse_date, pretty_timedelta, shorten_line, CRLF
+from trac.ticket import Milestone, Ticket, TicketSystem
 from trac.Timeline import ITimelineEventProvider
-from trac.util import *
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
-
-
-class Milestone(object):
-
-    def __init__(self, env, name=None, db=None):
-        self.env = env
-        if name:
-            self._fetch(name, db)
-            self._old_name = name
-        else:
-            self.name = self._old_name = None
-            self.due = self.completed = 0
-            self.description = ''
-
-    def _fetch(self, name, db=None):
-        if not db:
-            db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("SELECT name,due,completed,description "
-                       "FROM milestone WHERE name=%s", (name,))
-        row = cursor.fetchone()
-        if not row:
-            raise TracError('Milestone %s does not exist.' % name,
-                            'Invalid Milestone Name')
-        self.name = row[0]
-        self.due = row[1] and int(row[1]) or 0
-        self.completed = row[2] and int(row[2]) or 0
-        self.description = row[3] or ''
-
-    exists = property(fget=lambda self: self._old_name is not None)
-    is_completed = property(fget=lambda self: self.completed != 0)
-    is_late = property(fget=lambda self: self.due and self.due < time.time())
-
-    def delete(self, retarget_to=None, db=None):
-        if not db:
-            db = self.env.get_db_cnx()
-            handle_ta = True
-        else:
-            handle_ta = False
-
-        cursor = db.cursor()
-        self.env.log.info('Deleting milestone %s' % self.name)
-        cursor.execute("DELETE FROM milestone WHERE name=%s", (self.name,))
-
-        if retarget_to:
-            self.env.log.info('Retargeting milestone field of all tickets '
-                              'associated with milestone "%s" to milestone "%s"'
-                              % (self.name, retarget_to))
-            cursor.execute("UPDATE ticket SET milestone=%s WHERE milestone=%s",
-                           (retarget_to, self.name))
-        else:
-            self.env.log.info('Resetting milestone field of all tickets '
-                              'associated with milestone %s' % self.name)
-            cursor.execute("UPDATE ticket SET milestone=NULL "
-                           "WHERE milestone=%s", (self.name,))
-
-        if handle_ta:
-            db.commit()
-
-    def insert(self, db=None):
-        assert self.name, 'Cannot create milestone with no name'
-        if not db:
-            db = self.env.get_db_cnx()
-            handle_ta = True
-        else:
-            handle_ta = False
-
-        cursor = db.cursor()
-        self.env.log.debug("Creating new milestone '%s'" % self.name)
-        cursor.execute("INSERT INTO milestone (name,due,completed,description) "
-                       "VALUES (%s,%s,%s,%s)",
-                       (self.name, self.due, self.completed, self.description))
-
-        if handle_ta:
-            db.commit()
-
-    def update(self, db=None):
-        assert self.name, 'Cannot update milestone with no name'
-        if not db:
-            db = self.env.get_db_cnx()
-            handle_ta = True
-        else:
-            handle_ta = False
-
-        cursor = db.cursor()
-        self.env.log.info('Updating milestone "%s"' % self.name)
-        cursor.execute("UPDATE milestone SET name=%s,due=%s,"
-                       "completed=%s,description=%s WHERE name=%s",
-                       (self.name, self.due, self.completed, self.description,
-                        self._old_name))
-        self.env.log.info('Updating milestone field of all tickets '
-                          'associated with milestone "%s"' % self.name)
-        cursor.execute("UPDATE ticket SET milestone=%s WHERE milestone=%s",
-                       (self.name, self._old_name))
-        # FIXME: Insert change into the change history of the tickets
-        self._old_name = self.name
-
-        if handle_ta:
-            db.commit()
-
-    def select(cls, env, include_completed=True, db=None):
-        if not db:
-            db = env.get_db_cnx()
-        sql = "SELECT name,due,completed,description FROM milestone "
-        if not include_completed:
-            sql += "WHERE COALESCE(completed,0)=0 "
-        sql += "ORDER BY COALESCE(due,0)=0,due,name"
-        cursor = db.cursor()
-        cursor.execute(sql)
-        for name,due,completed,description in cursor:
-            milestone = Milestone(env)
-            milestone.name = milestone._old_name = name
-            milestone.due = due and int(due) or 0
-            milestone.completed = completed and int(completed) or 0
-            milestone.description = description or ''
-            yield milestone
-    select = classmethod(select)
-
 
 def get_tickets_for_milestone(env, db, milestone, field='component'):
     cursor = db.cursor()
@@ -199,20 +84,22 @@ def calc_ticket_stats(tickets):
     }
 
 def milestone_to_hdf(env, db, req, milestone):
+    safe_name = None
+    if milestone.exists:
+        safe_name = milestone.name.replace('/', '%2F')
     hdf = {'name': escape(milestone.name),
-           'href': escape(env.href.milestone(milestone.name))}
+           'href': escape(env.href.milestone(safe_name))}
     if milestone.description:
         hdf['description_source'] = escape(milestone.description)
         hdf['description'] = wiki_to_html(milestone.description, env, req, db)
     if milestone.due:
         hdf['due'] = milestone.due
-        hdf['due_date'] = time.strftime('%x', time.localtime(milestone.due))
+        hdf['due_date'] = format_date(milestone.due)
         hdf['due_delta'] = pretty_timedelta(milestone.due)
         hdf['late'] = milestone.is_late
     if milestone.completed:
         hdf['completed'] = milestone.completed
-        hdf['completed_date'] = time.strftime('%x %X',
-                                              time.localtime(milestone.completed))
+        hdf['completed_date'] = format_datetime(milestone.completed)
         hdf['completed_delta'] = pretty_timedelta(milestone.completed)
     return hdf
 
@@ -228,21 +115,165 @@ def _get_groups(env, db, by='component'):
                 return [row[0] for row in cursor]
     return []
 
-def _parse_date(datestr):
-    seconds = None
-    datestr = datestr.strip()
-    for format in ['%x %X', '%x, %X', '%X %x', '%X, %x', '%x', '%c',
-                   '%b %d, %Y']:
-        try:
-            date = time.strptime(datestr, format)
-            seconds = time.mktime(date)
-            break
-        except ValueError:
-            continue
-    if seconds == None:
-        raise TracError('%s is not a known date format.' % datestr,
-                        'Invalid Date Format')
-    return seconds
+
+class RoadmapModule(Component):
+
+    implements(INavigationContributor, IPermissionRequestor, IRequestHandler)
+
+    # INavigationContributor methods
+
+    def get_active_navigation_item(self, req):
+        return 'roadmap'
+
+    def get_navigation_items(self, req):
+        if not req.perm.has_permission('ROADMAP_VIEW'):
+            return
+        yield 'mainnav', 'roadmap', '<a href="%s" accesskey="3">Roadmap</a>' \
+                                    % self.env.href.roadmap()
+
+    # IPermissionRequestor methods
+
+    def get_permission_actions(self):
+        return ['ROADMAP_VIEW']
+
+    # IRequestHandler methods
+
+    def match_request(self, req):
+        return re.match(r'/roadmap/?', req.path_info) is not None
+
+    def process_request(self, req):
+        req.perm.assert_permission('ROADMAP_VIEW')
+        req.hdf['title'] = 'Roadmap'
+
+        showall = req.args.get('show') == 'all'
+        req.hdf['roadmap.showall'] = showall
+
+        db = self.env.get_db_cnx()
+        milestones = []
+        for idx, milestone in enum(Milestone.select(self.env, showall)):
+            hdf = milestone_to_hdf(self.env, db, req, milestone)
+            milestones.append(hdf)
+        req.hdf['roadmap.milestones'] = milestones
+
+        for idx,milestone in enum(milestones):
+            prefix = 'roadmap.milestones.%d.' % idx
+            tickets = get_tickets_for_milestone(self.env, db, milestone['name'],
+                                                'owner')
+            req.hdf[prefix + 'stats'] = calc_ticket_stats(tickets)
+            for k, v in get_query_links(self.env, milestone['name']).items():
+                req.hdf[prefix + 'queries.' + k] = escape(v)
+            milestone['tickets'] = tickets # for the iCalendar view
+
+        if req.args.get('format') == 'ics':
+            self.render_ics(req, db, milestones)
+            return
+
+        add_stylesheet(req, 'common/css/roadmap.css')
+
+        # FIXME should use the 'webcal:' scheme, probably
+        username = None
+        if req.authname and req.authname != 'anonymous':
+            username = req.authname
+        icshref = self.env.href.roadmap(show=req.args.get('show'),
+                                        user=username, format='ics')
+        add_link(req, 'alternate', icshref, 'iCalendar', 'text/calendar', 'ics')
+
+        return 'roadmap.cs', None
+
+    # Internal methods
+
+    def render_ics(self, req, db, milestones):
+        req.send_response(200)
+        req.send_header('Content-Type', 'text/calendar;charset=utf-8')
+        req.end_headers()
+
+        from trac.ticket import Priority
+        priorities = {}
+        for priority in Priority.select(self.env):
+            priorities[priority.name] = float(priority.value)
+        def get_priority(ticket):
+            value = priorities.get(ticket['priority'])
+            if value:
+                return int(value * 9 / len(priorities))
+
+        def get_status(ticket):
+            status = ticket['status']
+            if status == 'new' or status == 'reopened' and not ticket['owner']:
+                return 'NEEDS-ACTION'
+            elif status == 'assigned' or status == 'reopened':
+                return 'IN-PROCESS'
+            elif status == 'closed':
+                if ticket['resolution'] == 'fixed': return 'COMPLETED'
+                else: return 'CANCELLED'
+            else: return ''
+
+        def write_prop(name, value, params={}):
+            text = ';'.join([name] + [k + '=' + v for k, v in params.items()]) \
+                 + ':' + '\\n'.join(re.split(r'[\r\n]+', value))
+            firstline = 1
+            while text:
+                if not firstline: text = ' ' + text
+                else: firstline = 0
+                req.write(text[:75] + CRLF)
+                text = text[75:]
+
+        def write_date(name, value, params={}):
+            params['VALUE'] = 'DATE'
+            write_prop(name, strftime('%Y%m%d', value), params)
+
+        def write_utctime(name, value, params={}):
+            write_prop(name, strftime('%Y%m%dT%H%M%SZ', value), params)
+
+        host = req.base_url[req.base_url.find('://') + 3:]
+        user = req.args.get('user', 'anonymous')
+
+        write_prop('BEGIN', 'VCALENDAR')
+        write_prop('VERSION', '2.0')
+        write_prop('PRODID', '-//Edgewall Software//NONSGML Trac %s//EN'
+                   % __version__)
+        write_prop('METHOD', 'PUBLISH')
+        write_prop('X-WR-CALNAME',
+                   self.config.get('project', 'name') + ' - Roadmap')
+        for milestone in milestones:
+            uid = '<%s/milestone/%s@%s>' % (req.cgi_location,
+                                            milestone['name'], host)
+            if milestone.has_key('due'):
+                write_prop('BEGIN', 'VEVENT')
+                write_prop('UID', uid)
+                write_date('DTSTAMP', localtime(milestone['due']))
+                write_date('DTSTART', localtime(milestone['due']))
+                write_prop('SUMMARY', 'Milestone %s' % milestone['name'])
+                write_prop('URL', req.base_url + '/milestone/' +
+                           milestone['name'])
+                if milestone.has_key('description_source'):
+                    write_prop('DESCRIPTION', milestone['description_source'])
+                write_prop('END', 'VEVENT')
+            for tkt_id in [ticket['id'] for ticket in milestone['tickets']
+                           if ticket['owner'] == user]:
+                ticket = Ticket(self.env, tkt_id)
+                write_prop('BEGIN', 'VTODO')
+                if milestone.has_key('date'):
+                    write_prop('RELATED-TO', uid)
+                    write_date('DUE', localtime(milestone['due']))
+                write_prop('SUMMARY', 'Ticket #%i: %s' % (ticket.id,
+                                                          ticket['summary']))
+                write_prop('URL', self.env.abs_href.ticket(ticket.id))
+                write_prop('DESCRIPTION', ticket['description'])
+                priority = get_priority(ticket)
+                if priority:
+                    write_prop('PRIORITY', str(priority))
+                write_prop('STATUS', get_status(ticket))
+                if ticket['status'] == 'closed':
+                    cursor = db.cursor()
+                    cursor.execute("SELECT time FROM ticket_change "
+                                   "WHERE ticket=%s AND field='status' "
+                                   "ORDER BY time desc LIMIT 1",
+                                   (ticket.id,))
+                    row = cursor.fetchone()
+                    if row:
+                        write_utctime('COMPLETED', localtime(row[0]))
+                write_prop('END', 'VTODO')
+        write_prop('END', 'VCALENDAR')
 
 
 class MilestoneModule(Component):
@@ -287,19 +318,19 @@ class MilestoneModule(Component):
                                            absurls=True)
                 else:
                     href = self.env.href.milestone(name)
-                    message = wiki_to_oneliner(shorten_line(description),
-                                               self.env, db)
+                    message = wiki_to_oneliner(description, self.env, db,
+                                               shorten=True)
                 yield 'milestone', href, title, completed, None, message
 
     # IRequestHandler methods
 
     def match_request(self, req):
         import re, urllib
-        match = re.match(r'/milestone(?:/([^\?]+))?(?:/(.*)/?)?', req.path_info)
+        match = re.match(r'/milestone(?:/(.+))?', req.path_info)
         if match:
             if match.group(1):
                 req.args['id'] = urllib.unquote(match.group(1))
-            return 1
+            return True
 
     def process_request(self, req):
         req.perm.assert_permission('MILESTONE_VIEW')
@@ -313,7 +344,8 @@ class MilestoneModule(Component):
         if req.method == 'POST':
             if req.args.has_key('cancel'):
                 if milestone.exists:
-                    req.redirect(self.env.href.milestone(milestone.name))
+                    safe_name = milestone.name.replace('/', '%2F')
+                    req.redirect(self.env.href.milestone(safe_name))
                 else:
                     req.redirect(self.env.href.roadmap())
             elif action == 'edit':
@@ -338,7 +370,7 @@ class MilestoneModule(Component):
         retarget_to = None
         if req.args.has_key('retarget'):
             retarget_to = req.args.get('target')
-        milestone.delete(retarget_to)
+        milestone.delete(retarget_to, req.authname)
         db.commit()
         req.redirect(self.env.href.roadmap())
 
@@ -354,11 +386,17 @@ class MilestoneModule(Component):
         milestone.name = req.args.get('name')
 
         due = req.args.get('duedate', '')
-        milestone.due = due and _parse_date(due) or 0
+        try:
+            milestone.due = due and parse_date(due) or 0
+        except ValueError, e:
+            raise TracError(e, 'Invalid Date Format')
         if req.args.has_key('completed'):
             completed = req.args.get('completeddate', '')
-            milestone.completed = completed and _parse_date(completed) or 0
-            if milestone.completed > time.time():
+            try:
+                milestone.completed = completed and parse_date(completed) or 0
+            except ValueError, e:
+                raise TracError(e, 'Invalid Date Format')
+            if milestone.completed > time():
                 raise TracError('Completion date may not be in the future',
                                 'Invalid Completion Date')
         else:
@@ -371,7 +409,9 @@ class MilestoneModule(Component):
         else:
             milestone.insert()
         db.commit()
-        req.redirect(self.env.href.milestone(milestone.name))
+
+        safe_name = milestone.name.replace('/', '%2F')
+        req.redirect(self.env.href.milestone(safe_name))
 
     def _render_confirm(self, req, db, milestone):
         req.perm.assert_permission('MILESTONE_DELETE')
@@ -395,20 +435,15 @@ class MilestoneModule(Component):
             req.hdf['title'] = 'New Milestone'
             req.hdf['milestone.mode'] = 'new'
 
+        from trac.util import get_date_format_hint, get_datetime_format_hint
         req.hdf['milestone'] = milestone_to_hdf(self.env, db, req, milestone)
         req.hdf['milestone.date_hint'] = get_date_format_hint()
         req.hdf['milestone.datetime_hint'] = get_datetime_format_hint()
-        req.hdf['milestone.datetime_now'] = time.strftime('%x %X',
-                                                          time.localtime(time.time()))
+        req.hdf['milestone.datetime_now'] = format_datetime()
 
     def _render_view(self, req, db, milestone):
         req.hdf['title'] = 'Milestone %s' % milestone.name
         req.hdf['milestone.mode'] = 'view'
-
-        # If the milestone name contains slashes, we'll need to include the 'id'
-        # parameter in the forms for editing/deleting the milestone. See #806.
-        if milestone.name.find('/') >= 0:
-            req.hdf['milestone.id_param'] = 1
 
         req.hdf['milestone'] = milestone_to_hdf(self.env, db, req, milestone)
 
@@ -459,10 +494,10 @@ class MilestoneModule(Component):
         req.hdf['milestone.stats.max_percent_total'] = max_percent_total * 100
 
     # IWikiSyntaxProvider methods
-    
+
     def get_wiki_syntax(self):
         return []
-    
+
     def get_link_resolvers(self):
         yield ('milestone', self._format_link)
 

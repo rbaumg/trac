@@ -21,7 +21,7 @@ import os
 from trac.core import *
 from trac.env import open_environment
 from trac.perm import PermissionCache, PermissionError
-from trac.util import escape, enum
+from trac.util import escape, enum, format_datetime, http_date, to_utf8
 from trac.web.api import absolute_url, Request, RequestDone, IAuthenticator, \
                          IRequestHandler
 from trac.web.chrome import Chrome
@@ -127,7 +127,7 @@ def dispatch_request(path_info, req, env):
     if not base_url:
         base_url = absolute_url(req)
     req.base_url = base_url
-    req.path_info = path_info
+    req.path_info = to_utf8(path_info)
 
     env.href = Href(req.cgi_location)
     env.abs_href = Href(req.base_url)
@@ -147,11 +147,10 @@ def populate_hdf(hdf, env, req=None):
     project information and request-related information.
     """
     from trac import __version__
-    from time import gmtime, localtime, strftime
     hdf['trac'] = {
         'version': __version__,
-        'time': strftime('%c', localtime()),
-        'time.gmt': strftime('%a, %d %b %Y %H:%M:%S GMT', gmtime())
+        'time': format_datetime(),
+        'time.gmt': http_date()
     }
     hdf['trac.href'] = {
         'wiki': env.href.wiki(),
@@ -247,13 +246,17 @@ def send_pretty_error(e, env, req=None):
         if env and env.log:
             env.log.error('Failed to render pretty error page: %s', e2,
                           exc_info=True)
-        req.send_response(500)
-        req.send_header('Content-Type', 'text/plain')
-        req.end_headers()
-        req.write('Oops...\n\nTrac detected an internal error:\n\n')
-        req.write(str(e))
-        req.write('\n')
-        req.write(tb.getvalue())
+        try:
+            req.send_response(500)
+            req.send_header('Content-Type', 'text/plain')
+            req.end_headers()
+            req.write('Oops...\n\nTrac detected an internal error:\n\n')
+            req.write(str(e))
+            req.write('\n')
+            req.write(tb.getvalue())
+        except IOError:
+            # Cannot send response, but the error has hopefully been logged
+            pass
 
 def send_project_index(req, options, env_paths=None):
     from trac.web.clearsilver import HDFWrapper
@@ -307,7 +310,7 @@ def send_project_index(req, options, env_paths=None):
             except Exception, e:
                 proj = {'name': project, 'description': str(e)}
             projects.append(proj)
-        projects.sort(lambda x, y: cmp(x['name'], y['name']))
+        projects.sort(lambda x, y: cmp(x['name'].lower(), y['name'].lower()))
         req.hdf['projects'] = projects
 
         # TODO maybe this should be 404 if index wasn't specifically requested

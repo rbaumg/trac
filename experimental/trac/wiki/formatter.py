@@ -19,7 +19,6 @@
 from __future__ import generators
 import re
 import os
-import string
 import urllib
 
 try:
@@ -33,19 +32,6 @@ from trac.wiki.api import WikiSystem
 
 __all__ = ['wiki_to_html', 'wiki_to_oneliner', 'wiki_to_outline']
 
-#
-# Customization of the Wiki syntax  ***use with care***
-#
-BOLDITALIC_TOKEN = "'''''"
-BOLD_TOKEN = "'''"
-ITALIC_TOKEN = "''"
-UNDERLINE_TOKEN = "__"
-STRIKE_TOKEN = "~~"
-SUBSCRIPT_TOKEN = ",,"
-SUPERSCRIPT_TOKEN = r"\^"
-INLINE_TOKEN = "`"
-
-LINK_SCHEME = r"[\w.+-]+" # as per RFC 2396
 
 def system_message(msg, text):
     return """<div class="system-message">
@@ -136,38 +122,66 @@ class WikiProcessor(object):
 class Formatter(object):
     flavor = 'default'
 
-    _link_resolvers = None
-    # Rules provided by IWikiSyntaxProviders are inserted between pre_rules and post_rules
-    _pre_rules = [r"(?P<bolditalic>%s)" % BOLDITALIC_TOKEN,
-                  r"(?P<bold>%s)" % BOLD_TOKEN,
-                  r"(?P<italic>%s)" % ITALIC_TOKEN,
-                  r"(?P<underline>!?%s)" % UNDERLINE_TOKEN,
-                  r"(?P<strike>!?%s)" % STRIKE_TOKEN,
-                  r"(?P<subscript>!?%s)" % SUBSCRIPT_TOKEN,
-                  r"(?P<superscript>!?%s)" % SUPERSCRIPT_TOKEN,
-                  r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
-                  r"(?P<inlinecode2>!?%s(?P<inline2>.*?)%s)" % (INLINE_TOKEN,
-                                                                INLINE_TOKEN),
-                  r"(?P<htmlescapeentity>!?&#\d+;)"]
-    _post_rules = [(r"(?P<shref>!?((?P<sns>%s):" % LINK_SCHEME +
-                    r"(?P<stgt>'[^']+'|\"[^\"]+\"|"
-                    r"((\|(?=[^| ])|[^| ])*[^|'~_\., \)]))))"),
-                   (r"(?P<lhref>!?\[(?:(?P<lns>%s):" % LINK_SCHEME +
-                    r"(?P<ltgt>'[^']+'|\"[^\"]+\"|[^\] ]+)"
-                    r"|(?P<rel>[/.][^ [\]]*))"
-                    r"(?: (?P<label>.*?))?\])"),
-                   (r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)"
-                    r"(\]\]|\((?P<macroargs>.*?)\)\]\]))"),
-                   r"(?P<heading>^\s*(?P<hdepth>=+)\s.*\s(?P=hdepth)\s*$)",
-                   r"(?P<list>^(?P<ldepth>\s+)(?:\*|\d+\.) )",
-                   r"(?P<definition>^\s+(.+)::)\s*",
-                   r"(?P<indent>^(?P<idepth>\s+)(?=\S))",
-                   r"(?P<last_table_cell>\|\|\s*$)",
-                   r"(?P<table_cell>\|\|)"]
+    # Some constants used for clarifying the Wiki regexps:
 
-    _compiled_rules = None
-    _helper_patterns = None
-    _external_handlers = None
+    BOLDITALIC_TOKEN = "'''''"
+    BOLD_TOKEN = "'''"
+    ITALIC_TOKEN = "''"
+    UNDERLINE_TOKEN = "__"
+    STRIKE_TOKEN = "~~"
+    SUBSCRIPT_TOKEN = ",,"
+    SUPERSCRIPT_TOKEN = r"\^"
+    INLINE_TOKEN = "`"
+
+    LINK_SCHEME = r"[\w.+-]+" # as per RFC 2396
+
+    QUOTED_STRING = r"'[^']+'|\"[^\"]+\""
+
+    SHREF_TARGET_FIRST = r"[\w/?!#@]"
+    SHREF_TARGET_MIDDLE = r"(?:\|(?=[^|\s])|&(?!lt;|gt;)|[^|&\s])"
+    SHREF_TARGET_LAST = r"[a-zA-Z0-9/=]" # we don't want "_"
+
+    LHREF_RELATIVE_TARGET = r"[/.][^\s[\]]*"
+
+
+    # Rules provided by IWikiSyntaxProviders will be inserted,
+    # between _pre_rules and _post_rules
+
+    _pre_rules = [
+        # Font styles
+        r"(?P<bolditalic>%s)" % BOLDITALIC_TOKEN,
+        r"(?P<bold>%s)" % BOLD_TOKEN,
+        r"(?P<italic>%s)" % ITALIC_TOKEN,
+        r"(?P<underline>!?%s)" % UNDERLINE_TOKEN,
+        r"(?P<strike>!?%s)" % STRIKE_TOKEN,
+        r"(?P<subscript>!?%s)" % SUBSCRIPT_TOKEN,
+        r"(?P<superscript>!?%s)" % SUPERSCRIPT_TOKEN,
+        r"(?P<inlinecode>!?\{\{\{(?P<inline>.*?)\}\}\})",
+        r"(?P<inlinecode2>!?%s(?P<inline2>.*?)%s)" \
+        % (INLINE_TOKEN, INLINE_TOKEN),
+        # Prevent HTML entities to be recognized as ticket shorthand links
+        r"(?P<htmlescapeentity>!?&#\d+;)"]
+
+    _post_rules = [
+        # shref corresponds to short TracLinks, i.e. sns:stgt
+        r"(?P<shref>!?((?P<sns>%s):(?P<stgt>%s|%s(?:%s*%s)?)))" \
+        % (LINK_SCHEME, QUOTED_STRING,
+           SHREF_TARGET_FIRST, SHREF_TARGET_MIDDLE, SHREF_TARGET_LAST),
+        # lhref corresponds to long TracLinks, i.e. [lns:ltgt label?]
+        r"(?P<lhref>!?\[(?:(?P<lns>%s):(?P<ltgt>%s|[^\]\s]*)|(?P<rel>%s))"
+        r"(?:\s+(?P<label>%s|[^\]]+))?\])" \
+        % (LINK_SCHEME, QUOTED_STRING, LHREF_RELATIVE_TARGET, QUOTED_STRING),
+        # macro call
+        (r"(?P<macro>!?\[\[(?P<macroname>[\w/+-]+)"
+         r"(\]\]|\((?P<macroargs>.*?)\)\]\]))"),
+        # heading, list, definition, indent, table...
+        r"(?P<heading>^\s*(?P<hdepth>=+)\s.*\s(?P=hdepth)\s*$)",
+        r"(?P<list>^(?P<ldepth>\s+)(?:\*|\d+\.) )",
+        r"(?P<definition>^\s+(.+)::)\s*",
+        r"(?P<indent>^(?P<idepth>\s+)(?=\S))",
+        r"(?P<last_table_cell>\|\|\s*$)",
+        r"(?P<table_cell>\|\|)"]
+
     _processor_re = re.compile('#\!([\w+-][\w+-/]*)')
     _anchor_re = re.compile('[^\w\d\.-:]+', re.UNICODE)
     
@@ -194,47 +208,22 @@ class Formatter(object):
     db = property(fget=_get_db)
 
     def _get_rules(self):
-        if not Formatter._compiled_rules:
-            helpers = []
-            handlers = {}
-            syntax = Formatter._pre_rules[:]
-            wiki = WikiSystem(self.env)
-            i = 0
-            for resolver in wiki.syntax_providers:
-                for regexp, handler in resolver.get_wiki_syntax():
-                    handlers['i'+str(i)] = handler
-                    syntax.append('(?P<i%d>%s)' % (i, regexp))
-                    i += 1
-            syntax += Formatter._post_rules[:]
-            helper_re = re.compile(r'\?P<([a-z\d]+)>')
-            for rule in syntax:
-                helpers += helper_re.findall(rule)[1:]
-            rules = re.compile('(?:' + string.join(syntax, '|') + ')')
-            Formatter._external_handlers = handlers
-            Formatter._helper_patterns = helpers
-            Formatter._compiled_rules = rules
-        return Formatter._compiled_rules
+        return WikiSystem(self.env).rules
     rules = property(_get_rules)
 
     def _get_link_resolvers(self):
-        if not self._link_resolvers:
-            resolvers = {}
-            wiki = WikiSystem(self.env)
-            for resolver in wiki.syntax_providers:
-                for namespace, handler in resolver.get_link_resolvers():
-                    resolvers[namespace] = handler
-            self._link_resolvers = resolvers
-        return self._link_resolvers
+        return WikiSystem(self.env).link_resolvers
     link_resolvers = property(_get_link_resolvers)
 
     def replace(self, fullmatch):
+        wiki = WikiSystem(self.env)        
         for itype, match in fullmatch.groupdict().items():
-            if match and not itype in Formatter._helper_patterns:
+            if match and not itype in wiki.helper_patterns:
                 # Check for preceding escape character '!'
                 if match[0] == '!':
                     return match[1:]
-                if itype in self._external_handlers:
-                    return self._external_handlers[itype](self, match, fullmatch)
+                if itype in wiki.external_handlers:
+                    return wiki.external_handlers[itype](self, match, fullmatch)
                 else:
                     return getattr(self, '_' + itype + '_formatter')(match, fullmatch)
 
@@ -287,9 +276,19 @@ class Formatter(object):
     def _lhref_formatter(self, match, fullmatch):
         ns = fullmatch.group('lns')
         target = fullmatch.group('ltgt') 
-        if target and target[0] in "'\"":
+        if target and target[0] in ("'",'"'):
             target = target[1:-1]
-        label = fullmatch.group('label') or target
+        label = fullmatch.group('label')
+        if not label: # e.g. `[http://target]` or `[wiki:target]`
+            if target:
+                if target.startswith('//'): # for `[http://target]`
+                    label = ns+':'+target   # use `http://target`
+                else:                       # for `wiki:target`
+                    label = target          # use only `target`
+            else: # e.g. `[search:]` 
+                label = ns
+        if label and label[0] in ("'",'"'):
+            label = label[1:-1]
         rel = fullmatch.group('rel')
         if rel:
             return self._make_relative_link(rel, label or rel)
@@ -298,7 +297,7 @@ class Formatter(object):
 
     def _make_link(self, ns, target, match, label):
         if ns in self.link_resolvers:
-            return self._link_resolvers[ns](self, ns, target, label)
+            return self.link_resolvers[ns](self, ns, target, label)
         elif target.startswith('//') or ns == "mailto":
             return self._make_ext_link(ns+':'+target, label)
         else:
@@ -332,7 +331,8 @@ class Formatter(object):
         if match[0] == '!':
             return match[1:]
         else:
-            return self.simple_tag_handler('<span class="underline">', '</span>')
+            return self.simple_tag_handler('<span class="underline">',
+                                           '</span>')
 
     def _strike_formatter(self, match, fullmatch):
         if match[0] == '!':
@@ -637,25 +637,62 @@ class OneLinerFormatter(Formatter):
     """
     flavor = 'oneliner'
 
+    _non_nested_block_re = re.compile(r"(?:^|\n)\{\{\{(?:\n(#![\w+-/]+))?"
+                                      r"(?:\n([^{}]|\{(?!\{\{)|\}(?!\}\}))+)+"
+                                      r"\}\}\}")
+    
     def __init__(self, env, absurls=0, db=None):
         Formatter.__init__(self, env, None, absurls, db)
 
     # Override a few formatters to disable some wiki syntax in "oneliner"-mode
     def _list_formatter(self, match, fullmatch): return match
-    def _macro_formatter(self, match, fullmatch): return match
     def _indent_formatter(self, match, fullmatch): return match
     def _heading_formatter(self, match, fullmatch): return match
     def _definition_formatter(self, match, fullmatch): return match
     def _table_cell_formatter(self, match, fullmatch): return match
     def _last_table_cell_formatter(self, match, fullmatch): return match
 
-    def format(self, text, out):
+    def _macro_formatter(self, match, fullmatch):
+        name = fullmatch.group('macroname')
+        if name.lower() == 'br':
+            return ' '
+        elif name == 'comment':
+            return ''
+        else:
+            args = fullmatch.group('macroargs')
+            return '[[%s%s]]' % (name,  args and '(...)' or '')
+
+    def format(self, text, out, shorten=False):
         if not text:
             return
         self.out = out
         self._open_tags = []
 
-        result = re.sub(self.rules, self.replace, util.escape(text.strip(), False))
+        result = text.strip()
+
+        # Simplify code blocks
+        def simplify(fullmatch):
+            processor = fullmatch.group(1)
+            if processor == '#!comment':
+                return ''
+            elif '\n' in fullmatch.group():
+                return ' ![...]'
+            else:
+                return '`%s`' % match[3:-3]
+
+        old = ''
+        while old != result:
+            old = result
+            result = re.sub(self._non_nested_block_re, simplify, old)
+
+        if shorten:
+            result = util.shorten_line(result)
+
+        result = re.sub(self.rules, self.replace, util.escape(result, False))
+        result = result.replace('[...]', '[&hellip;]')
+        if result.endswith('...'):
+            result = result[:-3] + '&hellip;'
+
         # Close all open 'one line'-tags
         result += self.close_tag(None)
         out.write(result)
@@ -670,17 +707,23 @@ class OutlineFormatter(Formatter):
         Formatter.__init__(self, env, None, absurls, db)
 
     # Override a few formatters to disable some wiki syntax in "outline"-mode
-    def _macro_formatter(self, match, fullmatch): return match
+    def _macro_formatter(self, match, fullmatch):
+        return match
 
-    def format(self, text, out, max_depth=None):
+    def format(self, text, out, max_depth=6, min_depth=1):
         self.outline = []
         class NullOut(object):
             def write(self, data): pass
         Formatter.format(self, text, NullOut())
 
-        curr_depth = 0
-        for depth,link in self.outline:
-            if max_depth is not None and depth > max_depth:
+        if min_depth > max_depth:
+            min_depth, max_depth = max_depth, min_depth
+        max_depth = min(6, max_depth)
+        min_depth = max(1, min_depth)
+
+        curr_depth = min_depth - 1
+        for depth, link in self.outline:
+            if depth < min_depth or depth > max_depth:
                 continue
             if depth < curr_depth:
                 out.write('</li></ol><li>' * (curr_depth - depth))
@@ -702,24 +745,20 @@ class OutlineFormatter(Formatter):
         text = re.sub(r'</?a(?: .*?)?>', '', text) # Strip out link tags
         self.outline.append((depth, '<a href="#%s">%s</a>' % (anchor, text)))
 
-    def handle_code_block(self, line):
-        if line.strip() == '{{{':
-            self.in_code_block += 1
-        elif line.strip() == '}}}':
-            self.in_code_block -= 1
-
 
 def wiki_to_html(wikitext, env, req, db=None, absurls=0, escape_newlines=False):
     out = StringIO()
     Formatter(env, req, absurls, db).format(wikitext, out, escape_newlines)
     return out.getvalue()
 
-def wiki_to_oneliner(wikitext, env, db=None, absurls=0):
+def wiki_to_oneliner(wikitext, env, db=None, shorten=False, absurls=0):
     out = StringIO()
-    OneLinerFormatter(env, absurls, db).format(wikitext, out)
+    OneLinerFormatter(env, absurls, db).format(wikitext, out, shorten)
     return out.getvalue()
 
-def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None):
+def wiki_to_outline(wikitext, env, db=None, absurls=0, max_depth=None,
+                    min_depth=None):
     out = StringIO()
-    OutlineFormatter(env, absurls, db).format(wikitext, out, max_depth)
+    OutlineFormatter(env, absurls, db).format(wikitext, out, max_depth,
+                                              min_depth)
     return out.getvalue()

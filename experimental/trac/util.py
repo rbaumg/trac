@@ -21,12 +21,12 @@ import sys
 import time
 import tempfile
 import re
+import md5
 
 TRUE =  ['yes', '1', 1, 'true',  'on',  'aye']
 FALSE = ['no',  '0', 0, 'false', 'off', 'nay']
 
 CRLF = '\r\n'
-
 
 def enum(iterable):
     """
@@ -65,46 +65,9 @@ def unescape(text):
                     .replace('&lt;', '<') \
                     .replace('&amp;', '&') 
 
-def get_first_line(text, maxlen):
-    """
-    returns the first line of text. If the line is longer then
-    maxlen characters it is truncated. The line is also html escaped.
-    """
-    lines = text.splitlines()
-    line  = lines[0]
-    if len(lines) > 1:
-        return escape(line[:maxlen] + '...')
-    elif len(line) > maxlen-3:
-        return escape(line[:maxlen] + '...')
-    else:
-        return escape(line)
-
-def lstrip(text, skip):
-    """Python2.1 doesn't support custom skip characters"""
-    while text:
-        if text[0] in skip:
-            text = text[1:]
-        else:
-            break
-    return text
-
-def rstrip(text, skip):
-    """Python2.1 doesn't support custom skip characters"""
-    while text:
-        if text[-1] in skip:
-            text = text[:-1]
-        else:
-            break
-    return text
-
-def strip(text, skip):
-    """Python < 2.2.2 doesn't support custom skip characters"""
-    return lstrip(rstrip(text, skip), skip)
-
 def to_utf8(text, charset='iso-8859-15'):
-    """
-    Convert a string to utf-8, assume the encoding is either utf-8 or latin1
-    """
+    """Convert a string to UTF-8, assuming the encoding is either UTF-8, ISO
+    Latin-1, or as specified by the optional `charset` parameter."""
     try:
         # Do nothing if it's already utf-8
         u = unicode(text, 'utf-8')
@@ -152,16 +115,6 @@ def hex_entropy(bytes=32):
     import random
     return md5.md5(str(random.random() + time.time())).hexdigest()[:bytes]
 
-def http_date(t):
-    """Format t as a rfc822 timestamp"""
-    t = time.gmtime(t)
-    weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-              'Oct', 'Nov', 'Dec']
-    return '%s, %d %s %04d %02d:%02d:%02d GMT' % (
-           weekdays[t.tm_wday], t.tm_mday, months[t.tm_mon - 1], t.tm_year,
-           t.tm_hour, t.tm_min, t.tm_sec)
-
 def pretty_size(size):
     if size is None:
         return ''
@@ -193,7 +146,7 @@ def pretty_timedelta(time1, time2=None):
              (60,              'minute', 'minutes'))
     age_s = int(time2 - time1)
     if age_s < 60:
-        return '%i second%s' % (age_s, age_s > 1 and 's' or '')
+        return '%i second%s' % (age_s, age_s != 1 and 's' or '')
     for u, unit, unit_plural in units:
         r = float(age_s) / float(u)
         if r >= 0.9:
@@ -231,6 +184,26 @@ def get_reporter_id(req):
     else:
         return req.authname
 
+# Date/time utilities
+
+def format_datetime(t=None, format='%x %X', gmt=False):
+    if t is None:
+        t = time.time()
+    if not isinstance(t, (list, tuple, time.struct_time)):
+        if gmt:
+            t = time.gmtime(int(t))
+        else:
+            t = time.localtime(int(t))
+
+    text = time.strftime(format, t)
+    return to_utf8(text)
+
+def format_date(t=None, format='%x', gmt=False):
+    return format_datetime(t, format, gmt)
+
+def format_time(t=None, format='%X', gmt=False):
+    return format_datetime(t, format, gmt)
+
 def get_date_format_hint():
     t = time.localtime(0)
     t = (1999, 10, 29, t[3], t[4], t[5], t[6], t[7], t[8])
@@ -247,6 +220,34 @@ def get_datetime_format_hint():
                .replace('23', 'hh', 1).replace('59', 'mm', 1) \
                .replace('58', 'ss', 1)
 
+def http_date(t=None):
+    """Format t as a rfc822 timestamp"""
+    if t is None:
+        t = time.time()
+    if not isinstance(t, (list, tuple, time.struct_time)):
+        t = time.gmtime(int(t))
+    weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+              'Oct', 'Nov', 'Dec']
+    return '%s, %d %s %04d %02d:%02d:%02d GMT' % (
+           weekdays[t.tm_wday], t.tm_mday, months[t.tm_mon - 1], t.tm_year,
+           t.tm_hour, t.tm_min, t.tm_sec)
+
+def parse_date(text):
+    seconds = None
+    text = text.strip()
+    for format in ['%x %X', '%x, %X', '%X %x', '%X, %x', '%x', '%c',
+                   '%b %d, %Y']:
+        try:
+            date = time.strptime(text, format)
+            seconds = time.mktime(date)
+            break
+        except ValueError:
+            continue
+    if seconds == None:
+        raise ValueError, '%s is not a known date format.' % text
+    return seconds
+
 
 class TracError(Exception):
     def __init__(self, message, title=None, show_traceback=0):
@@ -257,31 +258,42 @@ class TracError(Exception):
 
 
 class NaivePopen:
-   """
-   This is a deadlock-safe version of popen that returns
-   an object with errorlevel, out (a string) and err (a string).
-   (capturestderr may not work under windows.)
-   Example: print Popen3('grep spam','\n\nhere spam\n\n').out
-   """
-   def __init__(self,command,input=None,capturestderr=None):
-       outfile=tempfile.mktemp()
-       command="( %s ) > %s" % (command,outfile)
-       if input:
-           infile=tempfile.mktemp()
-           open(infile,"w").write(input)
-           command=command+" <"+infile
-       if capturestderr:
-           errfile=tempfile.mktemp()
-           command=command+" 2>"+errfile
-       self.errorlevel=os.system(command) >> 8
-       self.out=open(outfile,"r").read()
-       os.remove(outfile)
-       if input:
-           os.remove(infile)
-       self.err = None
-       if capturestderr:
-           self.err=open(errfile,"r").read()
-           os.remove(errfile)
+    """This is a deadlock-safe version of popen that returns an object with
+    errorlevel, out (a string) and err (a string).
+    
+    (capturestderr may not work under Windows 9x.)
+
+    Example: print Popen3('grep spam','\n\nhere spam\n\n').out
+    """
+    def __init__(self, command, input=None, capturestderr=None):
+        outfile = tempfile.mktemp()
+        command = '( %s ) > %s' % (command, outfile)
+        if input:
+            infile = tempfile.mktemp()
+            tmp = open(infile, 'w')
+            tmp.write(input)
+            tmp.close()
+            command = command + ' <' + infile
+        if capturestderr:
+            errfile = tempfile.mktemp()
+            command = command + ' 2>' + errfile
+        try:
+            self.err = None
+            self.errorlevel = os.system(command) >> 8
+            outfd = file(outfile, 'r')
+            self.out = outfd.read()
+            outfd.close()
+            if capturestderr:
+                errfd = file(errfile,'r')
+                self.err = errfd.read()
+                errfd.close()
+        finally:
+            if os.path.isfile(outfile):
+                os.remove(outfile)
+            if input and os.path.isfile(infile):
+                os.remove(infile)
+            if capturestderr and os.path.isfile(errfile):
+                os.remove(errfile)
 
 
 def wrap(t, cols=75, initial_indent='', subsequent_indent='',
@@ -341,3 +353,71 @@ class Deuglifier(object):
                     return '</span>'
                 return '<span class="code-%s">' % mtype
 
+# Original license for md5crypt:
+# Based on FreeBSD src/lib/libcrypt/crypt.c 1.2
+#
+# "THE BEER-WARE LICENSE" (Revision 42):
+# <phk@login.dknet.dk> wrote this file.  As long as you retain this notice you
+# can do whatever you want with this stuff. If we meet some day, and you think
+# this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
+
+def md5crypt(password, salt, magic='$1$'):
+    # /* The password first, since that is what is most unknown */
+    # /* Then our magic string */
+    # /* Then the raw salt */
+    m = md5.new()
+    m.update(password + magic + salt)
+
+    # /* Then just as many characters of the MD5(pw,salt,pw) */
+    mixin = md5.md5(password + salt + password).digest()
+    for i in range(0, len(password)):
+        m.update(mixin[i % 16])
+
+    # /* Then something really weird... */
+    # Also really broken, as far as I can tell.  -m
+    i = len(password)
+    while i:
+        if i & 1:
+            m.update('\x00')
+        else:
+            m.update(password[0])
+        i >>= 1
+
+    final = m.digest()
+
+    # /* and now, just to make sure things don't run too fast */
+    for i in range(1000):
+        m2 = md5.md5()
+        if i & 1:
+            m2.update(password)
+        else:
+            m2.update(final)
+
+        if i % 3:
+            m2.update(salt)
+
+        if i % 7:
+            m2.update(password)
+
+        if i & 1:
+            m2.update(final)
+        else:
+            m2.update(password)
+
+        final = m2.digest()
+
+    # This is the bit that uses to64() in the original code.
+
+    itoa64 = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+
+    rearranged = ''
+    for a, b, c in ((0, 6, 12), (1, 7, 13), (2, 8, 14), (3, 9, 15), (4, 10, 5)):
+        v = ord(final[a]) << 16 | ord(final[b]) << 8 | ord(final[c])
+        for i in range(4):
+            rearranged += itoa64[v & 0x3f]; v >>= 6
+
+    v = ord(final[11])
+    for i in range(2):
+        rearranged += itoa64[v & 0x3f]; v >>= 6
+
+    return magic + salt + '$' + rearranged

@@ -31,6 +31,9 @@
    if:wiki.only_version ?>
     This is the only version the page, so the page will be removed
     completely!<?cs
+   /if ?><?cs
+   if:?wiki.version ?>
+    <input type="hidden" name="version" value="<?cs var:wiki.version ?>" /><?cs
    /if ?>
    This is an irreversible operation.</p>
    <div class="buttons">
@@ -58,7 +61,7 @@
     </select></label>
     <div class="field">
      Show <input type="text" name="contextlines" id="contextlines" size="2"
-       maxlength="2" value="<?cs var:diff.options.contextlines ?>" />
+       maxlength="3" value="<?cs var:diff.options.contextlines ?>" />
      <label for="contextlines">lines around each change</label>
     </div>
     <fieldset id="ignore">
@@ -261,7 +264,7 @@
      <input type="submit" name="cancel" value="Cancel" />
     </div>
     <script type="text/javascript" src="<?cs
-      var:chrome.href ?>/common/js/wikitoolbar.js"></script>
+      var:htdocs_location ?>js/wikitoolbar.js"></script>
    </form>
   <?cs /if ?>
   <?cs if wiki.action == "view" ?>

@@ -78,7 +78,7 @@
     <input type="submit" name="cancel" value="Cancel" />
    </div>
    <script type="text/javascript" src="<?cs
-     var:chrome.href ?>/common/js/wikitoolbar.js"></script>
+     var:htdocs_location ?>js/wikitoolbar.js"></script>
   </form>
  <?cs elif:milestone.mode == "delete" ?>
   <form action="<?cs var:milestone.href ?>" method="post">
@@ -126,7 +126,7 @@
         if:#stats.total_tickets != #1 ?>s<?cs /if ?> closed"></a>
       <a class="open" href="<?cs
         var:milestone.queries.active_tickets ?>" style="width: <?cs
-        var:#stats.percent_active ?>%" title="<?cs
+        var:#stats.percent_active - 1 ?>%" title="<?cs
         var:#stats.active_tickets ?> of <?cs
         var:#stats.total_tickets ?> ticket<?cs
         if:#stats.total_tickets != #1 ?>s<?cs /if ?> active"></a>
@@ -144,10 +144,7 @@
    /with ?>
   </div>
   <form id="stats" action="" method="get">
-   <fieldset><?cs
-    if:milestone.id_param ?>
-     <input type="hidden" name="id" value="<?cs var:milestone.name ?>" /><?cs
-    /if ?>
+   <fieldset>
     <legend>
      <label for="by">Ticket status by</label>
      <select id="by" name="by" onchange="this.form.submit()"><?cs

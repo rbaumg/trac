@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
 # Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
@@ -18,7 +18,6 @@
 
 from __future__ import generators
 import re
-import time
 import StringIO
 
 from trac.attachment import attachment_to_hdf, Attachment
@@ -26,8 +25,8 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.Search import ISearchSource, query_to_sql, shorten_result
 from trac.Timeline import ITimelineEventProvider
-from trac.util import enum, escape, get_reporter_id, pretty_timedelta, \
-                      shorten_line
+from trac.util import enum, escape, format_datetime, get_reporter_id, \
+                      pretty_timedelta, shorten_line
 from trac.versioncontrol.diff import get_diff_options, hdf_diff
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.web import IRequestHandler
@@ -84,7 +83,6 @@ class WikiModule(Component):
                 if req.args.has_key('cancel'):
                     req.redirect(self.env.href.wiki(page.name))
                 elif int(version) != latest_version:
-                    print version, latest_version
                     action = 'collision'
                     self._render_editor(req, db, page)
                 elif req.args.has_key('preview'):
@@ -143,8 +141,8 @@ class WikiModule(Component):
                                            absurls=True)
                 else:
                     href = self.env.href.wiki(name)
-                    comment = wiki_to_oneliner(shorten_line(comment), self.env,
-                                               db)
+                    comment = wiki_to_oneliner(comment, self.env, db,
+                                               shorten=True)
                 yield 'wiki', href, title, t, author, comment
 
     # Internal methods
@@ -159,7 +157,7 @@ class WikiModule(Component):
             req.redirect(self.env.href.wiki(page.name))
 
         version = None
-        if req.args.has_key('delete_version'):
+        if req.args.has_key('version'):
             version = int(req.args.get('version', 0))
 
         page.delete(version, db)
@@ -243,7 +241,7 @@ class WikiModule(Component):
         for version,t,author,comment,ipnr in page.get_history():
             if version == page.version:
                 if t:
-                    info['time'] = time.strftime('%c', time.localtime(int(t)))
+                    info['time'] = format_datetime(t)
                     info['time_delta'] = pretty_timedelta(t)
                 info['author'] = escape(author or 'anonymous')
                 info['comment'] = escape(comment or '--')
@@ -269,6 +267,8 @@ class WikiModule(Component):
             if option.startswith('-U'):
                 context = int(option[2:])
                 break
+        if context < 0:
+            context = None
         changes = hdf_diff(oldtext, newtext, context=context,
                            ignore_blank_lines='-B' in diff_options,
                            ignore_case='-i' in diff_options,
@@ -333,7 +333,7 @@ class WikiModule(Component):
                                                       version=version,
                                                       action='diff')),
                 'version': version,
-                'time': time.strftime('%x %X', time.localtime(int(t))),
+                'time': format_datetime(t),
                 'time_delta': pretty_timedelta(t),
                 'author': escape(author),
                 'comment': wiki_to_oneliner(comment or '', self.env, db),
@@ -377,7 +377,7 @@ class WikiModule(Component):
             attach_href = self.env.href.attachment('wiki', page.name)
             req.hdf['wiki.attach_href'] = attach_href
 
-    # ISearchPrivider methods
+    # ISearchProvider methods
 
     def get_search_filters(self, req):
         if req.perm.has_permission('WIKI_VIEW'):
@@ -392,10 +392,8 @@ class WikiModule(Component):
               "(SELECT name,max(version) AS ver " \
               "FROM wiki GROUP BY name) w2 " \
               "WHERE w1.version = w2.ver AND w1.name = w2.name " \
-              "AND (%s OR %s OR %s)" % \
-              (query_to_sql(db, query, 'w1.name'),
-               query_to_sql(db, query, 'w1.author'),
-               query_to_sql(db, query, 'w1.text'))
+              "AND %s" % \
+              (query_to_sql(db, query, 'w1.name||w1.author||w1.text'),)
         
         cursor = db.cursor()
         cursor.execute(sql)

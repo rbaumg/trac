@@ -44,8 +44,12 @@ def add_stylesheet(req, filename, mimetype='text/css'):
     """Add a link to a style sheet to the HDF data set so that it gets included
     in the generated HTML page.
     """
-    href = Href(req.cgi_location)
-    add_link(req, 'stylesheet', href.chrome(filename), mimetype=mimetype)
+    if filename.startswith('common/') and 'htdocs_location' in req.hdf:
+        href = Href(req.hdf['htdocs_location'])
+        filename = filename[7:]
+    else:
+        href = Href(req.cgi_location).chrome
+    add_link(req, 'stylesheet', href(filename), mimetype=mimetype)
 
 
 class INavigationContributor(Interface):
@@ -113,7 +117,8 @@ class Chrome(Component):
 
         if self.env.path:
             templates_dir = os.path.join(self.env.path, 'templates')
-            os.mkdir(templates_dir)
+            if not os.path.exists(templates_dir):
+                os.mkdir(templates_dir)
             _create_file(os.path.join(templates_dir, 'README'),
                         'This directory contains project-specific custom '
                         'templates and style sheet.\n')
@@ -156,10 +161,11 @@ class Chrome(Component):
         prefix = req.args.get('prefix')
         filename = req.args.get('filename')
 
-        dirs = {}
+        dirs = []
         for provider in self.template_providers:
             for dir in [os.path.normpath(dir[1]) for dir
                         in provider.get_htdocs_dirs() if dir[0] == prefix]:
+                dirs.append(dir)
                 path = os.path.normpath(os.path.join(dir, filename))
                 assert os.path.commonprefix([dir, path]) == dir
                 if os.path.isfile(path):
@@ -174,7 +180,7 @@ class Chrome(Component):
     def get_htdocs_dirs(self):
         from trac.config import default_dir
         return [('common', default_dir('htdocs')),
-                ('project', self.env.get_htdocs_dir())]
+                ('site', self.env.get_htdocs_dir())]
 
     def get_templates_dirs(self):
         return [self.env.get_templates_dir(),
@@ -197,7 +203,9 @@ class Chrome(Component):
 
         href = Href(req.cgi_location)
         req.hdf['chrome.href'] = href.chrome()
-        req.hdf['htdocs_location'] = href.chrome('common', '/')
+        htdocs_location = self.config.get('trac', 'htdocs_location',
+                                          href.chrome('common'))
+        req.hdf['htdocs_location'] = htdocs_location.rstrip('/') + '/'
 
         # HTML <head> links
         add_link(req, 'start', self.env.href.wiki())

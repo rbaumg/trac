@@ -15,13 +15,14 @@
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
 from __future__ import generators
-from time import gmtime, localtime, strftime, time
 import re
+import time
 
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.ticket import Ticket, TicketSystem
-from trac.util import escape, shorten_line, sql_escape, CRLF, TRUE
+from trac.util import escape, unescape, format_datetime, http_date, \
+                      shorten_line, sql_escape, CRLF, TRUE
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiMacroProvider, \
@@ -29,7 +30,7 @@ from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiMacroProvider, \
 
 
 class QuerySyntaxError(Exception):
-    pass
+    """Exception raised when a ticket query cannot be parsed from a string."""
 
 
 class Query(object):
@@ -60,7 +61,7 @@ class Query(object):
                 raise QuerySyntaxError, 'Query filter requires field and ' \
                                         'constraints separated by a "="'
             field,values = filter
-            if not field:#
+            if not field:
                 raise QuerySyntaxError, 'Query filter requires field name'
             values = values.split('|')
             mode, neg = '', ''
@@ -145,15 +146,13 @@ class Query(object):
             for i in range(1, len(columns)):
                 name, val = columns[i][0], row[i]
                 if name == self.group:
-                    val = escape(val or 'None')
+                    val = val or 'None'
                 elif name == 'reporter':
-                    val = escape(val or 'anonymous')
+                    val = val or 'anonymous'
                 elif name in ['changetime', 'time']:
                     val = int(val)
                 elif val is None:
                     val = '--'
-                elif name != 'description':
-                    val = escape(val)
                 result[name] = val
             results.append(result)
         cursor.close()
@@ -162,7 +161,7 @@ class Query(object):
     def get_href(self, format=None):
         return self.env.href.query(order=self.order,
                                    desc=self.desc and 1 or None,
-                                   group=self.group,
+                                   group=self.group or None,
                                    groupdesc=self.groupdesc and 1 or None,
                                    verbose=self.verbose and 1 or None,
                                    format=format,
@@ -198,7 +197,7 @@ class Query(object):
            sql.append("\n  LEFT OUTER JOIN ticket_custom AS %s ON " \
                       "(id=%s.ticket AND %s.name='%s')" % (k, k, k, k))
 
-        for col in [c for c in ['status', 'resolution', 'priority', 'severity']
+        for col in [c for c in ('status', 'resolution', 'priority', 'severity')
                     if c == self.order or c == self.group or c == 'priority']:
             sql.append("\n  LEFT OUTER JOIN enum AS %s ON (%s.type='%s' AND %s.name=%s)"
                        % (col, col, col, col, col))
@@ -210,6 +209,8 @@ class Query(object):
             value = sql_escape(value[len(mode and '!' or '' + mode):])
             if name not in custom_fields:
                 name = 't.' + name
+            else:
+                name = name + '.value'
             if mode == '~' and value:
                 return "COALESCE(%s,'') %sLIKE '%%%s%%'" % (
                        name, neg and 'NOT ' or '', value)
@@ -237,20 +238,24 @@ class Query(object):
                 inlist = ",".join(["'" + sql_escape(val[neg and 1 or 0:]) + "'"
                                    for val in v])
                 if k not in custom_fields:
-                    col = 't.'+k
+                    col = 't.' + k
                 else:
-                    col = k
+                    col = k + '.value'
                 clauses.append("COALESCE(%s,'') %sIN (%s)"
                                % (col, neg and 'NOT ' or '', inlist))
             elif len(v) > 1:
-                constraint_sql = [get_constraint_sql(k, val, mode, neg)
-                                  for val in v]
+                constraint_sql = filter(lambda x: x is not None,
+                                        [get_constraint_sql(k, val, mode, neg)
+                                         for val in v])
+                if not constraint_sql:
+                    continue
                 if neg:
                     clauses.append("(" + " AND ".join(constraint_sql) + ")")
                 else:
                     clauses.append("(" + " OR ".join(constraint_sql) + ")")
             elif len(v) == 1:
-                clauses.append(get_constraint_sql(k, v[0][neg and 1 or 0:], mode, neg))
+                clauses.append(get_constraint_sql(k, v[0][neg and 1 or 0:],
+                                                  mode, neg))
 
         clauses = filter(None, clauses)
         if clauses:
@@ -262,9 +267,9 @@ class Query(object):
             order_cols.insert(0, (self.group, self.groupdesc))
         for name, desc in order_cols:
             if name not in custom_fields:
-                col = 't.'+name
+                col = 't.' + name
             else:
-                col = name
+                col = name + '.value'
             if name == 'id':
                 # FIXME: This is a somewhat ugly hack.  Can we also have the
                 #        column type for this?  If it's an integer, we do first
@@ -395,16 +400,6 @@ class QueryModule(Component):
         ticket_fields = [f['name'] for f in
                          TicketSystem(self.env).get_ticket_fields()]
 
-        # A special hack for Safari/WebKit, which will not submit dynamically
-        # created check-boxes with their real value, but with the default value
-        # 'on'. See also htdocs/query.js#addFilter()
-        checkboxes = [k for k in req.args.keys() if k.startswith('__')]
-        if checkboxes:
-            import cgi
-            for checkbox in checkboxes:
-                (real_k, real_v) = checkbox[2:].split(':', 2)
-                req.args.list.append(cgi.MiniFieldStorage(real_k, real_v))
-
         # For clients without JavaScript, we remove constraints here if
         # requested
         remove_constraints = {}
@@ -491,24 +486,24 @@ class QueryModule(Component):
         req.hdf['query.order'] = query.order
         req.hdf['query.href'] = escape(href)
         if query.desc:
-            req.hdf['query.desc'] = 1
+            req.hdf['query.desc'] = True
         if query.group:
             req.hdf['query.group'] = query.group
             if query.groupdesc:
-                req.hdf['query.groupdesc'] = 1
+                req.hdf['query.groupdesc'] = True
         if query.verbose:
-            req.hdf['query.verbose'] = 1
+            req.hdf['query.verbose'] = True
 
         tickets = query.execute(db)
         req.hdf['query.num_matches'] = len(tickets)
 
         # The most recent query is stored in the user session
         orig_list = rest_list = None
-        orig_time = int(time())
+        orig_time = int(time.time())
         if str(query.constraints) != req.session.get('query_constraints'):
             # New query, initialize session vars
             req.session['query_constraints'] = str(query.constraints)
-            req.session['query_time'] = int(time())
+            req.session['query_time'] = int(time.time())
             req.session['query_tickets'] = ' '.join([str(t['id']) for t in tickets])
         else:
             orig_list = [int(id) for id in req.session.get('query_tickets', '').split()]
@@ -537,14 +532,16 @@ class QueryModule(Component):
                     ticket['added'] = True
                 elif int(ticket['changetime']) > orig_time:
                     ticket['changed'] = True
-            ticket['time'] = strftime('%c', localtime(ticket['time']))
-            if ticket.has_key('description'):
-                ticket['description'] = wiki_to_html(ticket['description'] or '',
-                                                     self.env, req, db)
-
-        req.session['query_tickets'] = ' '.join([str(t['id']) for t in tickets])
+            for field, value in ticket.items():
+                if field == 'time':
+                    ticket[field] = escape(format_datetime(value))
+                elif field == 'description':
+                    ticket[field] = wiki_to_html(value or '', self.env, req, db)
+                else:
+                    ticket[field] = escape(value)
 
         req.hdf['query.results'] = tickets
+        req.session['query_tickets'] = ' '.join([str(t['id']) for t in tickets])
 
         # Kludge: only show link to available reports if the report module is
         # actually enabled
@@ -569,7 +566,7 @@ class QueryModule(Component):
                                 for col in cols]) + CRLF)
 
     def display_rss(self, req, query):
-        query.verbose = 1
+        query.verbose = True
         db = self.env.get_db_cnx()
         results = query.execute(db)
         for result in results:
@@ -581,8 +578,7 @@ class QueryModule(Component):
                                                             self.env, req, db,
                                                             absurls=1))
             if result['time']:
-                result['time'] = strftime('%a, %d %b %Y %H:%M:%S GMT',
-                                          gmtime(result['time']))
+                result['time'] = http_date(result['time'])
         req.hdf['query.results'] = results
 
     # IWikiSyntaxProvider methods
@@ -596,13 +592,14 @@ class QueryModule(Component):
     def _format_link(self, formatter, ns, query, label):
         if query[0] == '?':
             return '<a class="query" href="%s">%s</a>' \
-                   % (formatter.href.query() + escape(query), escape(label))
+                   % (escape(formatter.href.query()) + query.replace(' ', '+'),
+                      label)
         else:
             from trac.ticket.query import Query, QuerySyntaxError
             try:
-                query = Query.from_string(formatter.env, query)
+                query = Query.from_string(formatter.env, unescape(query))
                 return '<a class="query" href="%s">%s</a>' \
-                       % (escape(query.get_href()), escape(label))
+                       % (escape(query.get_href()), label)
             except QuerySyntaxError, e:
                 return '<em class="error">[Error: %s]</em>' % escape(e)
 

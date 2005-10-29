@@ -22,6 +22,7 @@ from trac.versioncontrol import Changeset, Node, Repository
 import os.path
 import time
 import weakref
+import posixpath
 
 from svn import fs, repos, core, delta
 
@@ -51,6 +52,19 @@ def _get_history(path, authz, fs_ptr, pool, start, end, limit=None):
         repos.svn_repos_history(fs_ptr, path, history_cb, start, end, 1, pool())
     for item in history:
         yield item
+
+
+def _normalize_path(path):
+    """Remove leading "/", except for the root"""
+    return path and path.strip('/') or '/'
+
+def _scoped_path(scope, fullpath):
+    """Remove the leading scope from repository paths"""
+    if fullpath:
+        if scope == '/':
+            return _normalize_path(fullpath)
+        elif fullpath.startswith(scope.rstrip('/')):
+            return fullpath[len(scope):] or '/'
 
 
 def _mark_weakpool_invalid(weakpool):
@@ -136,7 +150,8 @@ class Pool(object):
             # Set up callbacks to mark pool as invalid when parents
             # are destroyed
             self._weakref = weakref.ref(self._parent_pool._is_valid,
-                                        lambda x: _mark_weakpool_invalid(weakself));
+                                        lambda x: \
+                                        _mark_weakpool_invalid(weakself));
 
         # mark pool as valid
         self._is_valid = lambda: 1
@@ -162,35 +177,38 @@ class SubversionRepository(Repository):
     """
 
     def __init__(self, path, authz, log):
-        Repository.__init__(self, authz, log)
-
         if core.SVN_VER_MAJOR < 1:
             raise TracError, \
                   "Subversion >= 1.0 required: Found %d.%d.%d" % \
                   (core.SVN_VER_MAJOR, core.SVN_VER_MINOR, core.SVN_VER_MICRO)
 
-        self.pool = None
-        self.repos = None
-        self.fs_ptr = None
-        self.path = path
         self.pool = Pool()
-
+        
         # Remove any trailing slash or else subversion might abort
         if not os.path.split(path)[1]:
             path = os.path.split(path)[0]
         self.path = repos.svn_repos_find_root_path(path, self.pool())
         if self.path is None:
-            raise TracError, "%s does not appear to be a Subversion repository." % (path, )
+            raise TracError, \
+                  "%s does not appear to be a Subversion repository." % path
+
+        self.repos = repos.svn_repos_open(self.path, self.pool())
+        self.fs_ptr = repos.svn_repos_fs(self.repos)
+        
+        uuid = fs.get_uuid(self.fs_ptr, self.pool())
+        name = 'svn:%s:%s' % (uuid, path)
+
+        Repository.__init__(self, name, authz, log)
+
         if self.path != path:
             self.scope = path[len(self.path):]
             if not self.scope[-1] == '/':
                 self.scope += '/'
         else:
             self.scope = '/'
-        self.log.debug("Opening subversion file-system at %s with scope %s" % (self.path, self.scope))
+        self.log.debug("Opening subversion file-system at %s with scope %s" \
+                       % (self.path, self.scope))
 
-        self.repos = repos.svn_repos_open(self.path, self.pool())
-        self.fs_ptr = repos.svn_repos_fs(self.repos)
         self.rev = fs.youngest_rev(self.fs_ptr, self.pool())
 
         self.history = None
@@ -203,8 +221,15 @@ class SubversionRepository(Repository):
     def __del__(self):
         self.close()
 
+    def has_node(self, path, rev, pool=None):
+        if not pool:
+            pool = self.pool
+        rev_root = fs.revision_root(self.fs_ptr, rev, pool())
+        node_type = fs.check_path(rev_root, self.scope + path, pool())
+        return node_type in _kindmap
+
     def normalize_path(self, path):
-        return path == '/' and path or path.strip('/')
+        return _normalize_path(path)
 
     def normalize_rev(self, rev):
         try:
@@ -229,7 +254,7 @@ class SubversionRepository(Repository):
                                    self.fs_ptr, self.pool)
 
     def get_node(self, path, rev=None):
-        self.authz.assert_permission(self.scope + path)
+        self.authz.assert_permission(posixpath.join(self.scope, path))
         if path and path[-1] == '/':
             path = path[:-1]
 
@@ -278,11 +303,12 @@ class SubversionRepository(Repository):
         return self.normalize_rev(rev1) < self.normalize_rev(rev2)
 
     def get_youngest_rev_in_cache(self, db):
-        """
-        Get the latest stored revision by sorting the revision strings numerically
+        """Get the latest stored revision by sorting the revision strings
+        numerically
         """
         cursor = db.cursor()
-        cursor.execute("SELECT rev FROM revision ORDER BY -LENGTH(rev), rev DESC LIMIT 1")
+        cursor.execute("SELECT rev FROM revision "
+                       "ORDER BY -LENGTH(rev), rev DESC LIMIT 1")
         row = cursor.fetchone()
         return row and row[0] or None
 
@@ -293,28 +319,31 @@ class SubversionRepository(Repository):
         subpool = Pool(self.pool)
         while rev:
             subpool.clear()
-            rev_root = fs.revision_root(self.fs_ptr, rev, subpool())
-            node_type = fs.check_path(rev_root, path, subpool())
-            if node_type in _kindmap: # then path exists at that rev
+            if self.has_node(path, rev, subpool):
                 if expect_deletion:
-                    # it was missing, now it's there again: rev+1 must be a delete
+                    # it was missing, now it's there again:
+                    #  rev+1 must be a delete
                     yield path, rev+1, Changeset.DELETE
                 newer = None # 'newer' is the previously seen history tuple
                 older = None # 'older' is the currently examined history tuple
-                for p, r in _get_history(path, self.authz, self.fs_ptr,
-                                         subpool, 0, rev, limit):
-                    older = (self.normalize_path(p), r, Changeset.ADD)
+                for p, r in _get_history(self.scope + path, self.authz,
+                                         self.fs_ptr, subpool, 0, rev, limit):
+                    older = (_scoped_path(self.scope, p), r, Changeset.ADD)
                     rev = self.previous_rev(r)
                     if newer:
-                        if older[0] == path: # still on the path: 'newer' was an edit
+                        if older[0] == path:
+                            # still on the path: 'newer' was an edit
                             yield newer[0], newer[1], Changeset.EDIT
-                        else: # the path changed: 'newer' was a copy
-                            rev = self.previous_rev(newer[1]) # restart before the copy op
+                        else:
+                            # the path changed: 'newer' was a copy
+                            rev = self.previous_rev(newer[1])
+                            # restart before the copy op
                             yield newer[0], newer[1], Changeset.COPY
                             older = (older[0], older[1], 'unknown')
                             break
                     newer = older
-                if older: # either a real ADD or the source of a COPY
+                if older:
+                    # either a real ADD or the source of a COPY
                     yield older
             else:
                 expect_deletion = True
@@ -338,8 +367,10 @@ class SubversionNode(Node):
         node_type = fs.check_path(self.root, self.scoped_path, self.pool())
         if not node_type in _kindmap:
             raise TracError, "No node at %s in revision %s" % (path, rev)
-        self.created_rev = fs.node_created_rev(self.root, self.scoped_path, self.pool())
-        self.created_path = fs.node_created_path(self.root, self.scoped_path, self.pool())
+        self.created_rev = fs.node_created_rev(self.root, self.scoped_path,
+                                               self.pool())
+        self.created_path = fs.node_created_path(self.root, self.scoped_path,
+                                                 self.pool())
         # 'created_path' differs from 'path' if the last operation is a copy,
         # and furthermore, 'path' might not exist at 'create_rev'
         self.rev = self.created_rev
@@ -349,8 +380,12 @@ class SubversionNode(Node):
     def get_content(self):
         if self.isdir:
             return None
-        return core.Stream(fs.file_contents(self.root, self.scoped_path,
-                                            self.pool()))
+        s = core.Stream(fs.file_contents(self.root, self.scoped_path,
+                                         self.pool()))
+        # Make sure the stream object references the pool to make sure the pool
+        # is not destroyed before the stream object.
+        s._pool = self.pool
+        return s
 
     def get_entries(self):
         if self.isfile:
@@ -370,10 +405,12 @@ class SubversionNode(Node):
         pool = Pool(self.pool)
         for path, rev in _get_history(self.scoped_path, self.authz, self.fs_ptr,
                                       pool, 0, self._requested_rev, limit):
-            if rev > 0 and path.startswith(self.scope):
-                older = (path[len(self.scope):], rev, Changeset.ADD)
+            scoped_path = _scoped_path(self.scope, path)
+            if rev > 0 and scoped_path:
+                older = (scoped_path, rev, Changeset.ADD)
                 if newer:
-                    change = newer[0] == older[0] and Changeset.EDIT or Changeset.COPY
+                    change = newer[0] == older[0] and Changeset.EDIT or \
+                             Changeset.COPY
                     newer = (newer[0], newer[1], change)
                     yield newer
                 newer = older
@@ -435,12 +472,7 @@ class SubversionChangeset(Changeset):
                 continue
             if not path.startswith(self.scope[1:]):
                 continue
-            base_path = None
-            if change.base_path:
-                if change.base_path.startswith(self.scope):
-                    base_path = change.base_path[len(self.scope):]
-                else:
-                    base_path = None
+            base_path = _scoped_path(self.scope, change.base_path)
             action = ''
             if not change.path:
                 action = Changeset.DELETE

@@ -1,11 +1,12 @@
 from trac.config import Configuration
-from trac.ticket.model import Ticket, Component, Priority
+from trac.core import TracError
+from trac.ticket.model import Ticket, Component, Milestone, Priority, Type
 from trac.test import EnvironmentStub
 
 import unittest
 
 
-class TicketModelTestCase(unittest.TestCase):
+class TicketTestCase(unittest.TestCase):
 
     def setUp(self):
         self.env = EnvironmentStub(default_data=True)
@@ -189,30 +190,196 @@ class TicketModelTestCase(unittest.TestCase):
                 self.fail('Unexpected change (%s)'
                           % ((t, author, field, old, new),))
 
-    def test_abstractenum(self):
+
+class EnumTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.env = EnvironmentStub(default_data=True)
+
+    def test_priority_fetch(self):
+        prio = Priority(self.env, 'major')
+        self.assertEqual(prio.name, 'major')
+        self.assertEqual(prio.value, '3')
+
+    def test_priority_insert(self):
+        prio = Priority(self.env)
+        prio.name = 'foo'
+        prio.insert()
+        self.assertEqual(True, prio.exists)
+
+    def test_priority_insert_with_value(self):
+        prio = Priority(self.env)
+        prio.name = 'bar'
+        prio.value = 100
+        prio.insert()
+        self.assertEqual(True, prio.exists)
+
+    def test_priority_update(self):
+        prio = Priority(self.env, 'major')
+        prio.name = 'foo'
+        prio.update()
+        Priority(self.env, 'foo')
+        self.assertRaises(TracError, Priority, self.env, 'major')
+
+    def test_priority_delete(self):
+        prio = Priority(self.env, 'major')
+        prio.delete()
+        self.assertEqual(False, prio.exists)
+        self.assertRaises(TracError, Priority, self.env, 'major')
+
+    def test_ticket_type_update(self):
+        tkttype = Type(self.env, 'task')
+        self.assertEqual(tkttype.name, 'task')
+        self.assertEqual(tkttype.value, '3')
+        tkttype.name = 'foo'
+        tkttype.update()
+        Type(self.env, 'foo')
+
+
+class MilestoneTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.env = EnvironmentStub(default_data=True)
+        self.db = self.env.get_db_cnx()
+
+    def test_new_milestone(self):
+        milestone = Milestone(self.env)
+        self.assertEqual(False, milestone.exists)
+        self.assertEqual(None, milestone.name)
+        self.assertEqual(0, milestone.due)
+        self.assertEqual(0, milestone.completed)
+        self.assertEqual('', milestone.description)
+
+    def test_new_milestone_empty_name(self):
         """
-        Verify basic AbstractEnum functionality.
+        Verifies that specifying an empty milestone name results in the
+        milestone being correctly detected as non-existent.
         """
-        p = Priority(self.env, 'major')
-        self.assertEqual(p.name, 'major')
-        self.assertEqual(p.value, '3')
-        p = Priority(self.env)
-        p.name = 'foo'
-        p.insert()
-        p = Priority(self.env)
-        p.name = 'bar'
-        p.value = 100
-        p.insert()
-        p = Priority(self.env, 'foo')
-        p.name = 'foo2'
-        p.update()
-        p = Priority(self.env, 'foo2')
-        p.delete()        
-        p = Priority(self.env, 'bar')
-        p.delete()        
+        milestone = Milestone(self.env, '')
+        self.assertEqual(False, milestone.exists)
+        self.assertEqual(None, milestone.name)
+        self.assertEqual(0, milestone.due)
+        self.assertEqual(0, milestone.completed)
+        self.assertEqual('', milestone.description)
+
+    def test_existing_milestone(self):
+        cursor = self.db.cursor()
+        cursor.execute("INSERT INTO milestone (name) VALUES ('Test')")
+        cursor.close()
+
+        milestone = Milestone(self.env, 'Test')
+        self.assertEqual(True, milestone.exists)
+        self.assertEqual('Test', milestone.name)
+        self.assertEqual(0, milestone.due)
+        self.assertEqual(0, milestone.completed)
+        self.assertEqual('', milestone.description)
+
+    def test_create_milestone(self):
+        milestone = Milestone(self.env)
+        milestone.name = 'Test'
+        milestone.insert()
+
+        cursor = self.db.cursor()
+        cursor.execute("SELECT name,due,completed,description FROM milestone "
+                       "WHERE name='Test'")
+        self.assertEqual(('Test', 0, 0, ''), cursor.fetchone())
+
+    def test_create_milestone_without_name(self):
+        milestone = Milestone(self.env)
+        self.assertRaises(AssertionError, milestone.insert)
+
+    def test_delete_milestone(self):
+        cursor = self.db.cursor()
+        cursor.execute("INSERT INTO milestone (name) VALUES ('Test')")
+        cursor.close()
+
+        milestone = Milestone(self.env, 'Test')
+        milestone.delete()
+
+        cursor = self.db.cursor()
+        cursor.execute("SELECT * FROM milestone WHERE name='Test'")
+        self.assertEqual(None, cursor.fetchone())
+
+    def test_delete_milestone_retarget_tickets(self):
+        cursor = self.db.cursor()
+        cursor.execute("INSERT INTO milestone (name) VALUES ('Test')")
+        cursor.close()
+
+        tkt1 = Ticket(self.env)
+        tkt1.populate({'summary': 'Foo', 'milestone': 'Test'})
+        tkt1.insert()
+        tkt2 = Ticket(self.env)
+        tkt2.populate({'summary': 'Bar', 'milestone': 'Test'})
+        tkt2.insert()
+
+        milestone = Milestone(self.env, 'Test')
+        milestone.delete(retarget_to='Other')
+
+        self.assertEqual('Other', Ticket(self.env, tkt1.id)['milestone'])
+        self.assertEqual('Other', Ticket(self.env, tkt2.id)['milestone'])
+
+    def test_update_milestone(self):
+        cursor = self.db.cursor()
+        cursor.execute("INSERT INTO milestone (name) VALUES ('Test')")
+        cursor.close()
+
+        milestone = Milestone(self.env, 'Test')
+        milestone.due = 42
+        milestone.completed = 43
+        milestone.description = 'Foo bar'
+        milestone.update()
+
+        cursor = self.db.cursor()
+        cursor.execute("SELECT * FROM milestone WHERE name='Test'")
+        self.assertEqual(('Test', 42, 43, 'Foo bar'), cursor.fetchone())
+
+    def test_update_milestone_without_name(self):
+        cursor = self.db.cursor()
+        cursor.execute("INSERT INTO milestone (name) VALUES ('Test')")
+        cursor.close()
+
+        milestone = Milestone(self.env, 'Test')
+        milestone.name = None
+        self.assertRaises(AssertionError, milestone.update)
+
+    def test_update_milestone_update_tickets(self):
+        cursor = self.db.cursor()
+        cursor.execute("INSERT INTO milestone (name) VALUES ('Test')")
+        cursor.close()
+
+        tkt1 = Ticket(self.env)
+        tkt1.populate({'summary': 'Foo', 'milestone': 'Test'})
+        tkt1.insert()
+        tkt2 = Ticket(self.env)
+        tkt2.populate({'summary': 'Bar', 'milestone': 'Test'})
+        tkt2.insert()
+
+        milestone = Milestone(self.env, 'Test')
+        milestone.name = 'Testing'
+        milestone.update()
+
+        self.assertEqual('Testing', Ticket(self.env, tkt1.id)['milestone'])
+        self.assertEqual('Testing', Ticket(self.env, tkt2.id)['milestone'])
+
+    def test_select_milestones(self):
+        cursor = self.db.cursor()
+        cursor.executemany("INSERT INTO milestone (name) VALUES (%s)",
+                           [('1.0',), ('2.0',)])
+        cursor.close()
+
+        milestones = list(Milestone.select(self.env))
+        self.assertEqual('1.0', milestones[0].name)
+        assert milestones[0].exists
+        self.assertEqual('2.0', milestones[1].name)
+        assert milestones[1].exists
+
 
 def suite():
-    return unittest.makeSuite(TicketModelTestCase, 'test')
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TicketTestCase, 'test'))
+    suite.addTest(unittest.makeSuite(EnumTestCase, 'test'))
+    suite.addTest(unittest.makeSuite(MilestoneTestCase, 'test'))
+    return suite
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(defaultTest='suite')

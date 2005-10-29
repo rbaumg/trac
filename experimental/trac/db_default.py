@@ -18,7 +18,7 @@ from trac.config import default_dir
 from trac.db import Table, Column, Index
 
 # Database version identifier. Used for automatic upgrades.
-db_version = 14
+db_version = 15
 
 def __mkreports(reports):
     """Utility function used to create report data in same syntax as the
@@ -47,12 +47,11 @@ schema = [
         Column('name'),
         Column('ipnr'),
         Column('time', type='int')],
-    Table('session', key=('sid', 'var_name'))[
+    Table('session', key=('sid', 'authenticated', 'var_name'))[
         Column('sid'),
         Column('authenticated', type='int'),
         Column('var_name'),
-        Column('var_value'),
-        Index(['sid', 'var_name'])],
+        Column('var_value')],
 
     # Attachments
     Table('attachment', key=('type', 'id', 'filename'))[
@@ -74,8 +73,7 @@ schema = [
         Column('ipnr'),
         Column('text'),
         Column('comment'),
-        Column('readonly', type='int'),
-        Index(['name', 'version'])],
+        Column('readonly', type='int')],
 
     # Version control cache
     Table('revision', key='rev')[
@@ -413,7 +411,6 @@ default_config = \
   ('header_logo', 'width', '236'),
   ('header_logo', 'height', '73'),
   ('attachment', 'max_size', '262144'),
-  ('diff', 'tab_width', '8'),
   ('mimeviewer', 'enscript_path', 'enscript'),
   ('mimeviewer', 'php_path', 'php'),
   ('mimeviewer', 'tab_width', '8'),
@@ -430,6 +427,7 @@ default_config = \
   ('notification', 'smtp_replyto', 'trac@localhost'),
   ('timeline', 'changeset_show_files', '0'),
   ('timeline', 'default_daysback', '30'),
+  ('timeline', 'ticket_details', 'no'),
   ('browser', 'hide_properties', 'svk:merge'),
   ('wiki', 'ignore_missing_pages', 'false'),
 )
@@ -438,10 +436,9 @@ default_components = ('trac.About', 'trac.attachment',
                       'trac.mimeview.enscript', 'trac.mimeview.patch',
                       'trac.mimeview.php', 'trac.mimeview.rst',
                       'trac.mimeview.silvercity', 'trac.mimeview.txtl',
-                      'trac.Roadmap',
                       'trac.Search', 'trac.Settings',
                       'trac.ticket.query', 'trac.ticket.report',
-                      'trac.ticket.web_ui',
+                      'trac.ticket.roadmap', 'trac.ticket.web_ui',
                       'trac.Timeline',
                       'trac.versioncontrol.web_ui',
                       'trac.wiki.macros', 'trac.wiki.web_ui',

@@ -119,11 +119,14 @@ class NotifyEmail(Notify):
             self.server.login(self.user_name, self.password)
 
     def send(self, rcpt, mime_headers={}):
+        from email.MIMEMultipart import MIMEMultipart
         from email.MIMEText import MIMEText
         from email.Header import Header
         from email.Utils import formatdate
         body = self.hdf.render(self.template_name)
-        msg = MIMEText(body, 'plain', 'utf-8')
+        msg = MIMEMultipart()
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        msg.epilogue = ''
         msg['X-Mailer'] = 'Trac %s, by Edgewall Software' % __version__
         msg['X-Trac-Version'] =  __version__
         projname = self.config.get('project','name')
@@ -195,8 +198,8 @@ class TicketNotifyEmail(NotifyEmail):
                 else:
                     newv = new
                     l = 7 + len(field)
-                    chg = wrap('%s => %s' % (old, new), self.COLS-l,'', l*' ',
-                               CRLF)
+                    chg = wrap('%s => %s' % (old, new), self.COLS - l, '',
+                               l * ' ', CRLF)
                     changes += '  * %s:  %s%s' % (field, chg, CRLF)
                 if newv:
                     self.hdf['%s.oldvalue' % pfx] = old
@@ -210,41 +213,44 @@ class TicketNotifyEmail(NotifyEmail):
 
     def format_props(self):
         tkt = self.ticket
-        fields = [f for f in tkt.fields if f['type'] != 'textarea'
-                                       and f['name'] not in ('summary', 'cc')]
-        t = self.modtime or tkt.time_changed
+        fields = [f for f in tkt.fields if f['name'] not in ('summary', 'cc')]
         width = [0, 0, 0, 0]
-        for i, f in enum([f['name'] for f in fields]):
+        i = 0
+        for f in [f['name'] for f in fields if f['type'] != 'textarea']:
             if not tkt.values.has_key(f):
                 continue
             fval = tkt[f]
-            if fval.find('\n') > -1:
+            if fval.find('\n') != -1:
                 continue
             idx = 2 * (i % 2)
             if len(f) > width[idx]:
                 width[idx] = len(f)
             if len(fval) > width[idx + 1]:
                 width[idx + 1] = len(fval)
+            i += 1
         format = ('%%%is:  %%-%is  |  ' % (width[0], width[1]),
                   ' %%%is:  %%-%is%s' % (width[2], width[3], CRLF))
-        i = 1
         l = (width[0] + width[1] + 5)
-        sep = l*'-' + '+' + (self.COLS-l)*'-'
+        sep = l * '-' + '+' + (self.COLS - l) * '-'
         txt = sep + CRLF
         big = []
-        for i, f in enum([f['name'] for f in fields]):
-            if not tkt.values.has_key(f): continue
-            fval = tkt[f]
-            if '\n' in str(fval):
-                big.append((f.capitalize(), fval))
+        i = 0
+        for f in [f for f in fields if f['name'] != 'description']:
+            fname = f['name']
+            if not tkt.values.has_key(fname):
+                continue
+            fval = tkt[fname]
+            if f['type'] == 'textarea' or '\n' in str(fval):
+                big.append((fname.capitalize(), CRLF.join(fval.splitlines())))
             else:
-                txt += format[i % 2] % (f.capitalize(), fval)
-        if not i % 2:
-            txt += '\n'
+                txt += format[i % 2] % (fname.capitalize(), fval)
+                i += 1
+        if i % 2:
+            txt += CRLF
         if big:
             txt += sep
-            for k,v in big:
-                txt += '\n%s:\n%s\n\n' % (k,v)
+            for name, value in big:
+                txt += CRLF.join(['', name + ':', value, '', ''])
         txt += sep
         return txt
 

@@ -30,11 +30,11 @@
     </tr>
    </thead>
    <tbody>
-    <?cs if:len(links.up) != "/" ?>
+    <?cs if:len(chrome.links.up) ?>
      <tr class="even">
-      <td class="name" colspan="4">
+      <td class="name" colspan="5">
        <a class="parent" title="Parent Directory" href="<?cs
-         var:links.up.0.href ?>">../</a>
+         var:chrome.links.up.0.href ?>">../</a>
       </td>
      </tr>
     <?cs /if ?>
@@ -100,8 +100,8 @@
    if:file.preview ?><?cs
     var:file.preview ?><?cs
    elif:file.max_file_size_reached ?>
-    <strong>HTML preview not available</strong>, since file-size exceeds <?cs
-    var:file.max_file_size  ?> bytes. Try <a href="<?cs
+    <strong>HTML preview not available</strong>, since the file size exceeds
+    <?cs var:file.max_file_size ?> bytes. Try <a href="<?cs
     var:file.raw_href ?>">downloading</a> the file instead.<?cs
    else ?><strong>HTML preview not available</strong>. To view, <a href="<?cs
     var:file.raw_href ?>">download</a> the file.<?cs
