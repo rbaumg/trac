@@ -1,4 +1,4 @@
-trac (0.9-0beta2+r2418-1) UNRELEASED; urgency=low
+trac (0.9-0beta2+r2418-1) experimental; urgency=low
 
   * Trac Subversion snapshot at r2418
     - Fix leak of temporary files; (Closes: #327803)
@@ -8,7 +8,7 @@ trac (0.9-0beta2+r2418-1) UNRELEASED; urgency=low
   * debian/control: add depends of python2.3 package to leave lintain
     happy.
 
- -- Otavio Salvador <otavio@debian.org>  Sat, 29 Oct 2005 10:23:05 -0200
+ -- Otavio Salvador <otavio@debian.org>  Sat, 29 Oct 2005 10:24:32 -0200
 
 trac (0.9-0beta1+r2227-1) experimental; urgency=low
 
