@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
@@ -222,20 +222,6 @@ try:
                 sql = sql % (('?',) * len(args[0]))
             return self._rollback_on_error(sqlite.Cursor.executemany, sql,
                                            args or [])
-        def _convert_row(self, row):
-            return tuple([(isinstance(v, unicode) and [v.encode('utf-8')] or [v])[0]
-                          for v in row])
-        def fetchone(self):
-            row = sqlite.Cursor.fetchone(self)
-            return row and self._convert_row(row) or None
-        def fetchmany(self, num):
-            rows = sqlite.Cursor.fetchmany(self, num)
-            return rows != None and [self._convert_row(row)
-                                     for row in rows] or None
-        def fetchall(self):
-            rows = sqlite.Cursor.fetchall(self)
-            return rows != None and [self._convert_row(row)
-                                     for row in rows] or None
 
 except ImportError:
     try:
@@ -273,8 +259,8 @@ class SQLiteConnection(ConnectionWrapper):
             timeout = int(params.get('timeout', 10.0))
             # Convert unicode to UTF-8 bytestrings. This is case-sensitive, so
             # we need two converters
-            sqlite.register_converter('text', str)
-            sqlite.register_converter('TEXT', str)
+            #sqlite.register_converter('text', str)
+            #sqlite.register_converter('TEXT', str)
 
             cnx = sqlite.connect(path, detect_types=sqlite.PARSE_DECLTYPES,
                                  timeout=timeout)
@@ -349,7 +335,7 @@ class SQLiteConnection(ConnectionWrapper):
     to_sql = classmethod(to_sql)
 
 
-psycopg = None
+psycopg2 = None
 PgSQL = None
 
 class PostgreSQLConnection(ConnectionWrapper):
@@ -363,18 +349,17 @@ class PostgreSQLConnection(ConnectionWrapper):
                  params={}):
         if path.startswith('/'):
             path = path[1:]
-        # We support both psycopg and PgSQL but prefer psycopg
-        global psycopg
+        # We support both psycopg2 and PgSQL but prefer psycopg
+        global psycopg2
         global PgSQL
-        if not psycopg and not PgSQL:
+        if not psycopg2 and not PgSQL:
             try:
-                try:
-                    import psycopg2 as psycopg
-                except ImportError:
-                    import psycopg
+                import psycopg2
+                import psycopg2.extensions
+                psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
             except ImportError:
                 from pyPgSQL import PgSQL
-        if psycopg:
+        if psycopg2:
             dsn = []
             if path:
                 dsn.append('dbname=' + path)
@@ -384,9 +369,14 @@ class PostgreSQLConnection(ConnectionWrapper):
                 dsn.append('password=' + password)
             if host:
                 dsn.append('host=' + host)
-            cnx = psycopg.connect(' '.join(dsn))
+            cnx = psycopg2.connect(' '.join(dsn))
+            cnx.set_client_encoding('UNICODE')
         else:
-            cnx = PgSQL.connect('', user, password, host, path, port)
+            cnx = PgSQL.connect('', user, password, host, path, port,
+                                client_encoding=("utf-8", "ignore"),
+                                unicode_results=True)
+            cnx.cursor().execute("SET CLIENT_ENCODING TO UNICODE" )  # FIXME: untested
+
         ConnectionWrapper.__init__(self, cnx)
 
     def cast(self, column, type):

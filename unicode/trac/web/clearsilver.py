@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
@@ -61,10 +61,10 @@ class HDFWrapper:
     >>> hdf = HDFWrapper()
     >>> hdf['time'] = 42
     >>> hdf['time']
-    '42'
+    u'42'
     >>> hdf['name'] = 'Foo'
     >>> hdf['name']
-    'Foo'
+    u'Foo'
 
     An attempt to retrieve a value that hasn't been set will raise a KeyError,
     just like a standard dictionary:
@@ -78,13 +78,13 @@ class HDFWrapper:
     It will return 'None' when the specified key is not present:
 
     >>> hdf.get('time')
-    '42'
+    u'42'
     >>> hdf.get('undef')
 
     A second argument may be passed to specify the default return value:
 
     >>> hdf.get('time', 'Undefined Key')
-    '42'
+    u'42'
     >>> hdf.get('undef', 'Undefined Key')
     'Undefined Key'
 
@@ -145,7 +145,7 @@ class HDFWrapper:
         value = self.hdf.getValue(str(name), '<<NONE>>')
         if value == '<<NONE>>':
             return default
-        return value
+        return value.decode('utf-8')
 
     def __getitem__(self, name):
         value = self.get(name, None)
@@ -167,20 +167,20 @@ class HDFWrapper:
 
         >>> hdf['test.num'] = 42
         >>> hdf['test.num']
-        '42'
+        u'42'
         >>> hdf['test.str'] = 'foo'
         >>> hdf['test.str']
-        'foo'
+        u'foo'
 
         The boolean literals `True` and `False` are converted to there integer
         representation before being added:
 
         >>> hdf['test.true'] = True
         >>> hdf['test.true']
-        '1'
+        u'1'
         >>> hdf['test.false'] = False
         >>> hdf['test.false']
-        '0'
+        u'0'
 
         If value is `None`, nothing is added to the HDF:
 
@@ -195,8 +195,10 @@ class HDFWrapper:
                 return
             elif value in (True, False):
                 self.hdf.setValue(prefix, str(int(value)))
-            elif isinstance(value, (str, unicode)):
+            elif isinstance(value, str):
                 self.hdf.setValue(prefix, value)
+            elif isinstance(value, unicode):
+                self.hdf.setValue(prefix, value.encode('utf-8'))
             elif isinstance(value, dict):
                 for k in value.keys():
                     add_value('%s.%s' % (prefix, k), value[k])

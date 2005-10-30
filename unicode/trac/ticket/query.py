@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2004-2005 Edgewall Software
 # Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
@@ -72,7 +72,7 @@ class Query(object):
                 neg = '!'
                 field = field[:-1]
             values = map(lambda x: neg + mode + x, values)
-            constraints[field] = values
+            constraints[str(field)] = values
         return cls(env, constraints, **kw)
     from_string = classmethod(from_string)
 

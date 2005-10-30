@@ -1,7 +1,7 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
-# Copyright (C) 2003-2004 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2004 Jonas BorgstrÃ¶m <jonas@edgewall.com>
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
 # All rights reserved.
 #
@@ -13,7 +13,7 @@
 # individuals. For the exact contribution history, see the revision
 # history and logs, available at http://projects.edgewall.com/trac/.
 #
-# Author: Jonas Borgström <jonas@edgewall.com>
+# Author: Jonas BorgstrÃ¶m <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
 
 from urllib import quote, urlencode
@@ -138,7 +138,7 @@ class Href(object):
                 args = args[:-1]
 
         # build the path
-        path = '/'.join([quote(str(arg).strip('/')) for arg in args
+        path = '/'.join([quote(unicode(arg).strip('/')) for arg in args
                          if arg != None])
         if path:
             href += '/' + path

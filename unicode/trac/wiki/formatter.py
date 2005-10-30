@@ -1,7 +1,7 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
-# Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
+# Copyright (C) 2003-2005 Jonas BorgstrÃ¶m <jonas@edgewall.com>
 # Copyright (C) 2004-2005 Christopher Lenz <cmlenz@gmx.de>
 # All rights reserved.
 #
@@ -13,7 +13,7 @@
 # individuals. For the exact contribution history, see the revision
 # history and logs, available at http://projects.edgewall.com/trac/.
 #
-# Author: Jonas Borgström <jonas@edgewall.com>
+# Author: Jonas BorgstrÃ¶m <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
 
 from __future__ import generators
@@ -21,10 +21,7 @@ import re
 import os
 import urllib
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from StringIO import StringIO
 
 from trac import util
 from trac.mimeview import *
@@ -394,12 +391,12 @@ class Formatter(object):
                                 self._absurls)
         sans_markup = re.sub(r'</?\w+(?: .*?)?>', '', text)
 
-        anchor = self._anchor_re.sub('', sans_markup.decode('utf-8'))
+        anchor = self._anchor_re.sub('', sans_markup)
         if not anchor or not anchor[0].isalpha():
             # an ID must start with a letter in HTML
             anchor = 'a' + anchor
         i = 1
-        anchor = anchor_base = anchor.encode('utf-8')
+        anchor = anchor_base = anchor
         while anchor in self._anchors:
             anchor = anchor_base + str(i)
             i += 1

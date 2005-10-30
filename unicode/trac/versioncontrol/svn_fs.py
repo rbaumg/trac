@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
@@ -356,21 +356,22 @@ class SubversionNode(Node):
         self.authz = authz
         self.scope = scope
         if scope != '/':
-            self.scoped_path = scope + path
+            self.scoped_path = (scope + path).encode('utf-8')
         else:
-            self.scoped_path = path
+            self.scoped_path = path.encode('utf-8')
         self.fs_ptr = fs_ptr
         self.pool = Pool(pool)
         self._requested_rev = rev
 
         self.root = fs.revision_root(fs_ptr, rev, self.pool())
-        node_type = fs.check_path(self.root, self.scoped_path, self.pool())
+        node_type = fs.check_path(self.root, self.scoped_path,
+                                  self.pool())
         if not node_type in _kindmap:
             raise TracError, "No node at %s in revision %s" % (path, rev)
         self.created_rev = fs.node_created_rev(self.root, self.scoped_path,
                                                self.pool())
         self.created_path = fs.node_created_path(self.root, self.scoped_path,
-                                                 self.pool())
+                                                 self.pool()).decode('utf-8')
         # 'created_path' differs from 'path' if the last operation is a copy,
         # and furthermore, 'path' might not exist at 'create_rev'
         self.rev = self.created_rev
@@ -393,7 +394,7 @@ class SubversionNode(Node):
         pool = Pool(self.pool)
         entries = fs.dir_entries(self.root, self.scoped_path, pool())
         for item in entries.keys():
-            path = '/'.join((self.path, item))
+            path = '/'.join((self.path, item.decode('utf-8')))
             if not self.authz.has_permission(path):
                 continue
             yield SubversionNode(path, self._requested_rev, self.authz,

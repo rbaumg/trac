@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
@@ -86,8 +86,22 @@ class CGIRequest(Request):
 class TracFieldStorage(cgi.FieldStorage):
     """
     FieldStorage class with a few more functions to make it behave a bit
-    more like a dictionary
+    more like a dictionary. Parameter values are also decoded into unicode
+    strings (utf-8 encoding assumed).
     """
+    def __init__(self, *args, **kwargs):
+        cgi.FieldStorage.__init__(self, *args, **kwargs)
+        
+        def decode(arg):
+            if isinstance(arg, (tuple, list)):
+                for a in arg:
+                    decode(a)
+            elif isinstance(arg.value, str):
+                arg.value = arg.value.decode('utf-8')
+                
+        for key in self.keys():
+            decode(self[key])
+
     get = cgi.FieldStorage.getvalue
 
     def __setitem__(self, name, value):

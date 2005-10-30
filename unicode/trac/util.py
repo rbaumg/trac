@@ -47,7 +47,7 @@ def escape(text, quotes=True):
     """
     if not text:
         return ''
-    text = str(text).replace('&', '&amp;') \
+    text = unicode(text).replace('&', '&amp;') \
                     .replace('<', '&lt;') \
                     .replace('>', '&gt;')
     if quotes:
@@ -60,7 +60,7 @@ def unescape(text):
     """
     if not text:
         return ''
-    return str(text).replace('&#34;', '"') \
+    return unicode(text).replace('&#34;', '"') \
                     .replace('&gt;', '>') \
                     .replace('&lt;', '<') \
                     .replace('&amp;', '&') 
