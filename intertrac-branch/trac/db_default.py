@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
 # Copyright (C) 2003-2005 Daniel Lundin <daniel@edgewall.com>
@@ -18,7 +18,7 @@ from trac.config import default_dir
 from trac.db import Table, Column, Index
 
 # Database version identifier. Used for automatic upgrades.
-db_version = 14
+db_version = 16
 
 def __mkreports(reports):
     """Utility function used to create report data in same syntax as the
@@ -47,12 +47,11 @@ schema = [
         Column('name'),
         Column('ipnr'),
         Column('time', type='int')],
-    Table('session', key=('sid', 'var_name'))[
+    Table('session', key=('sid', 'authenticated', 'var_name'))[
         Column('sid'),
         Column('authenticated', type='int'),
         Column('var_name'),
-        Column('var_value'),
-        Index(['sid', 'var_name'])],
+        Column('var_value')],
 
     # Attachments
     Table('attachment', key=('type', 'id', 'filename'))[
@@ -75,14 +74,15 @@ schema = [
         Column('text'),
         Column('comment'),
         Column('readonly', type='int'),
-        Index(['name', 'version'])],
+        Index(['time'])],
 
     # Version control cache
     Table('revision', key='rev')[
         Column('rev'),
         Column('time', type='int'),
         Column('author'),
-        Column('message')],
+        Column('message'),
+        Index(['time'])],
     Table('node_change', key=('rev', 'path', 'change'))[
         Column('rev'),
         Column('path'),
@@ -110,7 +110,9 @@ schema = [
         Column('resolution'),
         Column('summary'),
         Column('description'),
-        Column('keywords')],
+        Column('keywords'),
+        Index(['time']),
+        Index(['status'])],    
     Table('ticket_change', key=('ticket', 'time', 'field'))[
         Column('ticket', type='int'),
         Column('time', type='int'),
@@ -142,7 +144,7 @@ schema = [
         Column('description')],
 
     # Report system
-    Table('report')[
+    Table('report', key='id')[
         Column('id', auto_increment=True),
         Column('author'),
         Column('title'),
