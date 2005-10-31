@@ -24,7 +24,7 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
-from trac.wiki import wiki_to_html, IWikiSyntaxProvider, INTERTRAC_SCHEME
+from trac.wiki import wiki_to_html, IWikiSyntaxProvider, Formatter
 
 
 dynvars_re = re.compile('\$([A-Z]+)')
@@ -510,7 +510,7 @@ class ReportModule(Component):
         yield ('report', self._format_link)
 
     def get_wiki_syntax(self):
-        yield (r"!?\{(?P<it_report>%s\s*)?\d+\}" % INTERTRAC_SCHEME,
+        yield (r"!?\{(?P<it_report>%s\s*)?\d+\}" % Formatter.INTERTRAC_SCHEME,
                lambda x, y, z: self._format_link(x, 'report', y[1:-1], y, z))
 
     def _format_link(self, formatter, ns, target, label, fullmatch=None):

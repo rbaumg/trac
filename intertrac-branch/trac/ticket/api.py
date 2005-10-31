@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
 # Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
@@ -19,16 +19,8 @@ from __future__ import generators
 from trac import util
 from trac.core import *
 from trac.perm import IPermissionRequestor
-from trac.wiki import IWikiSyntaxProvider, INTERTRAC_SCHEME
+from trac.wiki import IWikiSyntaxProvider, Formatter
 from trac.Search import ISearchSource, query_to_sql, shorten_result
-
-
-class MyLinkResolver(Component):
-    """
-    A dummy macro used by the unit test. We need to supply our own macro
-    because the real HelloWorld-macro can not be loaded using our
-    'fake' environment.
-    """
 
 
 class TicketSystem(Component):
@@ -52,7 +44,6 @@ class TicketSystem(Component):
     def get_ticket_fields(self):
         """Returns the list of fields available for tickets."""
         from trac.ticket import model
-        from trac.Milestone import Milestone
 
         db = self.env.get_db_cnx()
         fields = []
@@ -81,7 +72,7 @@ class TicketSystem(Component):
 
         # Default select and radio fields
         selects = [('type', model.Type), ('status', model.Status),
-                   ('priority', model.Priority), ('milestone', Milestone),
+                   ('priority', model.Priority), ('milestone', model.Milestone),
                    ('component', model.Component), ('version', model.Version),
                    ('severity', model.Severity), ('resolution', model.Resolution)]
         for name, cls in selects:
@@ -149,7 +140,7 @@ class TicketSystem(Component):
                 ('ticket', self._format_link)]
 
     def get_wiki_syntax(self):
-        yield (r"!?#(?P<it_ticket>%s)?\d+" % INTERTRAC_SCHEME,
+        yield (r"!?#(?P<it_ticket>%s)?\d+" % Formatter.INTERTRAC_SCHEME,
                lambda x, y, z: self._format_link(x, 'ticket', y[1:], y, z))
 
     def _format_link(self, formatter, ns, target, label, fullmatch=None):
@@ -184,14 +175,9 @@ class TicketSystem(Component):
         sql = "SELECT DISTINCT a.summary,a.description,a.reporter, " \
               "a.keywords,a.id,a.time FROM ticket a " \
               "LEFT JOIN ticket_change b ON a.id = b.ticket " \
-              "WHERE (b.field='comment' AND %s ) OR " \
-              "%s OR %s OR %s OR %s OR %s" % \
+              "WHERE (b.field='comment' AND %s ) OR %s" % \
               (query_to_sql(db, query, 'b.newvalue'),
-               query_to_sql(db, query, 'summary'),
-               query_to_sql(db, query, 'keywords'),
-               query_to_sql(db, query, 'description'),
-               query_to_sql(db, query, 'reporter'),
-               query_to_sql(db, query, 'cc'))
+               query_to_sql(db, query, 'summary||keywords||description||reporter||cc'))
         cursor = db.cursor()
         cursor.execute(sql)
         for summary,desc,author,keywords,tid,date in cursor:

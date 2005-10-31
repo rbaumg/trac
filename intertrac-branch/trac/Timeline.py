@@ -22,9 +22,7 @@ import time
 
 from trac.core import *
 from trac.perm import IPermissionRequestor
-from trac.util import enum, escape, format_date, format_time, http_date, \
-                      shorten_line
-from trac.versioncontrol.svn_authz import SubversionAuthorizer
+from trac.util import enum, escape, format_date, format_time, http_date
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 
@@ -36,18 +34,22 @@ class ITimelineEventProvider(Interface):
     """
 
     def get_timeline_filters(self, req):
-        """
-        Return a list of filters that this event provider supports. Each
-        filter must be a (name, label) tuple, where `name` is the internal
+        """Return a list of filters that this event provider supports.
+        
+        Each filter must be a (name, label) tuple, where `name` is the internal
         name, and `label` is a human-readable name for display.
+
+        Optionally, the tuple can contain a third element, `checked`.
+        If `checked` is omitted or True, the filter is active by default,
+        otherwise it will be inactive.
         """
 
     def get_timeline_events(self, req, start, stop, filters):
-        """
-        Return a list of events in the time range given by the `start` and
-        `stop` parameters. The `filters` parameters is a list of the enabled
-        filters, each item being the name of the tuples returned by
-        `get_timeline_events`.
+        """Return a list of events in the time range given by the `start` and
+        `stop` parameters.
+        
+        The `filters` parameters is a list of the enabled filters, each item
+        being the name of the tuples returned by `get_timeline_filters`.
 
         The events returned by this function must be tuples of the form
         (kind, href, title, date, author, message).
@@ -109,14 +111,14 @@ class TimelineModule(Component):
             available_filters += event_provider.get_timeline_filters(req)
 
         filters = []
-        # check the request or session for enabled filters, or enable all
-        for test in (lambda f: req.args.has_key(f),
-                     lambda f: req.session.get('timeline.filter.%s' % f, '') \
-                                   == '1',
-                     lambda f: True):
+        # check the request or session for enabled filters, or use default
+        for test in (lambda f: req.args.has_key(f[0]),
+                     lambda f: req.session.get('timeline.filter.%s' % f[0], '')\
+                               == '1',
+                     lambda f: len(f) == 2 or f[2]):
             if filters:
                 break
-            filters = [f[0] for f in available_filters if test(f[0])]
+            filters = [f[0] for f in available_filters if test(f)]
 
         # save the results of submitting the timeline form to the session
         if req.args.has_key('update'):
