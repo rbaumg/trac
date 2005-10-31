@@ -1,4 +1,4 @@
-trac (0.9-1) UNRELEASED; urgency=low
+trac (0.9-1) unstable; urgency=low
 
   * New upstream release
     - 10_stolen_from_0.8-branch.patch: not need anymore.
@@ -14,7 +14,7 @@ trac (0.9-1) UNRELEASED; urgency=low
   * debian/README.Debian: cite the need of a ready to use Subversion
     repository to setup Trac environment. (Closes: #327205)
   
- -- Otavio Salvador <otavio@debian.org>  Mon, 31 Oct 2005 17:49:52 -0200
+ -- Otavio Salvador <otavio@debian.org>  Mon, 31 Oct 2005 18:02:30 -0200
 
 trac (0.8.4-2) unstable; urgency=low
 
