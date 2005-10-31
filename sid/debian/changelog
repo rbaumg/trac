@@ -1,3 +1,21 @@
+trac (0.9-1) UNRELEASED; urgency=low
+
+  * New upstream release
+    - 10_stolen_from_0.8-branch.patch: not need anymore.
+    - 11_fix_misleading_error.patch: not need anymore.
+    - Fix leak of temporary files; (Closes: #327803)
+    - Apache configuration snip was improved; (Closes: #327206)
+  * debian/control:
+    - Add recommends of python2.3-setuptools to support plugins;
+    - Add python2.3-pysqlite2 and python2.3-psycopg as alternatives to
+      python2.3-sqlite;
+    - Add suggests of libapache2-mod-python;
+    - Add depends of python2.3 package to leave lintain happy.
+  * debian/README.Debian: cite the need of a ready to use Subversion
+    repository to setup Trac environment. (Closes: #327205)
+  
+ -- Otavio Salvador <otavio@debian.org>  Mon, 31 Oct 2005 17:49:52 -0200
+
 trac (0.8.4-2) unstable; urgency=low
 
   * Add 10_stolen_from_0.8-branch.patch sync with r2041.
