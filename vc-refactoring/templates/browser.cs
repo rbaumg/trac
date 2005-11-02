@@ -10,12 +10,35 @@
 <div id="content" class="browser">
  <h1><?cs call:browser_path_links(browser.path, browser) ?></h1>
 
- <div id="jumprev">
-  <form action="" method="get"><div>
+ <div id="prefs">
+  <form action="<?cs var:trac.href.browser ?>" method="get">
+   <div><?cs
+   if:len(browser.branches) ?>
+    <label for="tags">Browse branch:</label>
+    <select name="branch" id="branches">
+     <option <?cs if:!browser.branch ?>selected="selected" <?cs /if ?>/><?cs
+     each:branch = browser.branches ?>
+     <option value="<?cs var:branch.rev ?>" 
+      <?cs if:browser.branch == branch.rev ?>selected="selected" <?cs /if ?>><?cs var:branch.name ?></option><?cs
+     /each ?>
+    </select><?cs
+   /if ?><?cs
+   if:len(browser.tags) ?>
+    <label for="tags">Jump to tag:</label>
+    <select name="tag" id="tags">
+     <option <?cs if:!browser.tag ?>selected="selected" <?cs /if ?>/><?cs
+     each:tag = browser.tags ?>
+     <option <?cs if:browser.tag == tag.name ?>selected="selected" <?cs /if ?>><?cs var:tag.name ?></option><?cs
+     /each ?>
+    </select><?cs
+   /if ?>
    <label for="rev">View revision:</label>
    <input type="text" id="rev" name="rev" value="<?cs
      var:browser.revision ?>" size="4" />
-  </div></form>
+   <input class="button" type="submit" value="Update" 
+          title="Warning: by updating, you will clear the page history" />
+  </div>
+  </form>
  </div>
 
  <?cs if:browser.is_dir ?>
