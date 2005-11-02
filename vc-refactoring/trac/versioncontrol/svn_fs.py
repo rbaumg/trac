@@ -58,7 +58,7 @@ def _normalize_path(path):
     """Remove leading "/", except for the root"""
     return path and path.strip('/') or '/'
 
-def _scoped_path(scope, fullpath):
+def _path_within_scope(scope, fullpath):
     """Remove the leading scope from repository paths"""
     if fullpath:
         if scope == '/':
@@ -328,7 +328,8 @@ class SubversionRepository(Repository):
                 older = None # 'older' is the currently examined history tuple
                 for p, r in _get_history(self.scope + path, self.authz,
                                          self.fs_ptr, subpool, 0, rev, limit):
-                    older = (_scoped_path(self.scope, p), r, Changeset.ADD)
+                    older = (_path_within_scope(self.scope, p), r,
+                             Changeset.ADD)
                     rev = self.previous_rev(r)
                     if newer:
                         if older[0] == path:
@@ -405,9 +406,9 @@ class SubversionNode(Node):
         pool = Pool(self.pool)
         for path, rev in _get_history(self.scoped_path, self.authz, self.fs_ptr,
                                       pool, 0, self._requested_rev, limit):
-            scoped_path = _scoped_path(self.scope, path)
-            if rev > 0 and scoped_path:
-                older = (scoped_path, rev, Changeset.ADD)
+            path = _path_within_scope(self.scope, path)
+            if rev > 0 and path:
+                older = (path, rev, Changeset.ADD)
                 if newer:
                     change = newer[0] == older[0] and Changeset.EDIT or \
                              Changeset.COPY
@@ -472,7 +473,7 @@ class SubversionChangeset(Changeset):
                 continue
             if not path.startswith(self.scope[1:]):
                 continue
-            base_path = _scoped_path(self.scope, change.base_path)
+            base_path = _path_within_scope(self.scope, change.base_path)
             action = ''
             if not change.path:
                 action = Changeset.DELETE
