@@ -45,7 +45,10 @@ def load_components(env):
     def enable_modules(egg_path, modules):
         """Automatically enable any components provided by plugins loaded from
         the environment plugins directory."""
-        if os.path.dirname(egg_path) == os.path.realpath(plugins_dir):
+        plugins_path = os.path.realpath(plugins_dir)
+        if os.name == 'nt':
+            plugins_path = plugins_path.lower()
+        if os.path.dirname(egg_path) == plugins_path:
             for module in modules:
                 env.config.setdefault('components', module + '.*', 'enabled')
 
