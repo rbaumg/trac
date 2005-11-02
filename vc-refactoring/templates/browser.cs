@@ -11,7 +11,7 @@
  <h1><?cs call:browser_path_links(browser.path, browser) ?></h1>
 
  <div id="prefs">
-  <form action="<?cs var:trac.href.browser ?>" method="get">
+  <form action="" method="get">
    <div><?cs
    if:len(browser.branches) ?>
     <label for="tags">Browse branch:</label>
@@ -34,7 +34,7 @@
    /if ?>
    <label for="rev">View revision:</label>
    <input type="text" id="rev" name="rev" value="<?cs
-     var:browser.revision ?>" size="4" />
+     var:browser.revision ?>" size="14" />
    <input class="button" type="submit" value="Update" 
           title="Warning: by updating, you will clear the page history" />
   </div>
