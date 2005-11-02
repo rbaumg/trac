@@ -181,6 +181,12 @@ class Repository(object):
         'None' is a valid revision value and represents the youngest revision.
         """
         return NotImplementedError
+
+    def short_rev(self, rev):
+        """
+        Return a compact representation of a revision in the repos.
+        """
+        return self.normalize_rev(rev)
         
 
 class Node(object):

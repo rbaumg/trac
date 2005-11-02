@@ -183,12 +183,12 @@ class ChangesetModule(Component):
             info = {'change': change}
             if base_path:
                 info['path.old'] = base_path
-                info['rev.old'] = base_rev
+                info['rev.old'] = repos.short_rev(base_rev)
                 info['browser_href.old'] = self.env.href.browser(base_path,
                                                                  rev=base_rev)
             if path:
                 info['path.new'] = path
-                info['rev.new'] = chgset.rev
+                info['rev.new'] = repos.short_rev(chgset.rev)
                 info['browser_href.new'] = self.env.href.browser(path,
                                                                  rev=chgset.rev)
             if change in (Changeset.COPY, Changeset.EDIT, Changeset.MOVE):
