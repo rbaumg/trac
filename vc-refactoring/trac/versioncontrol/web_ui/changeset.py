@@ -108,45 +108,34 @@ class ChangesetModule(Component):
                                              'changeset_show_files'))
             db = self.env.get_db_cnx()
             repos = self.env.get_repository()
-            authzperm = SubversionAuthorizer(self.env, req.authname)
-            rev = repos.youngest_rev
-            while rev:
-                if not authzperm.has_permission_for_changeset(rev):
-                    rev = repos.previous_rev(rev)
-                    continue
-
-                chgset = repos.get_changeset(rev)
-                if chgset.date < start:
-                    return
-                if chgset.date < stop:
-                    message = chgset.message or '--'
-                    if format == 'rss':
-                        title = 'Changeset <em>[%s]</em>: %s' \
-                                % (util.escape(chgset.rev),
-                                   util.escape(util.shorten_line(message)))
-                        href = self.env.abs_href.changeset(chgset.rev)
-                        message = wiki_to_html(message, self.env, db,
-                                               absurls=True)
-                    else:
-                        title = 'Changeset <em>[%s]</em> by %s' \
-                                % (util.escape(chgset.rev),
-                                   util.escape(chgset.author))
-                        href = self.env.href.changeset(chgset.rev)
-                        message = wiki_to_oneliner(message, self.env, db,
-                                                   shorten=True)
-                    if show_files:
-                        files = []
-                        for chg in chgset.get_changes():
-                            if show_files > 0 and len(files) >= show_files:
-                                files.append('...')
-                                break
-                            files.append('<span class="%s">%s</span>'
-                                         % (chg[2], util.escape(chg[0])))
-                        message = '<span class="changes">' + ', '.join(files) +\
-                                  '</span>: ' + message
-                    yield 'changeset', href, title, chgset.date, chgset.author,\
-                          message
-                rev = repos.previous_rev(rev)
+            for chgset in repos.get_changesets(start, stop):
+                message = chgset.message or '--'
+                if format == 'rss':
+                    title = 'Changeset <em>[%s]</em>: %s' \
+                            % (util.escape(chgset.rev),
+                               util.escape(util.shorten_line(message)))
+                    href = self.env.abs_href.changeset(chgset.rev)
+                    message = wiki_to_html(message, self.env, db,
+                                           absurls=True)
+                else:
+                    title = 'Changeset <em>[%s]</em> by %s' \
+                            % (util.escape(chgset.rev),
+                               util.escape(chgset.author))
+                    href = self.env.href.changeset(chgset.rev)
+                    message = wiki_to_oneliner(message, self.env, db,
+                                               shorten=True)
+                if show_files:
+                    files = []
+                    for chg in chgset.get_changes():
+                        if show_files > 0 and len(files) >= show_files:
+                            files.append('...')
+                            break
+                        files.append('<span class="%s">%s</span>'
+                                     % (chg[2], util.escape(chg[0])))
+                    message = '<span class="changes">' + ', '.join(files) +\
+                              '</span>: ' + message
+                yield 'changeset', href, title, chgset.date, chgset.author,\
+                      message
 
     # Internal methods
 

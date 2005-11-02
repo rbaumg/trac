@@ -99,6 +99,20 @@ class Repository(object):
         """
         raise NotImplementedError
 
+    def get_changesets(self, start, stop):
+        """
+        Generate Changeset belonging to the given time period (start, stop).
+        """
+        rev = self.youngest_rev
+        while rev:
+            if self.authz.has_permission_for_changeset(rev):
+                chgset = self.get_changeset(rev)
+                if chgset.date < start:
+                    return
+                if chgset.date < stop:
+                    yield chgset
+            rev = self.previous_rev(rev)
+
     def has_node(self, path, rev):
         """
         Tell if there's a node at the specified (path,rev) combination.
