@@ -35,6 +35,8 @@ from trac.wiki import wiki_to_html, wiki_to_oneliner, IWikiSyntaxProvider
 
 class ChangesetModule(Component):
 
+    abstract = True
+
     implements(INavigationContributor, IPermissionRequestor, IRequestHandler,
                ITimelineEventProvider, IWikiSyntaxProvider, ISearchSource)
 
@@ -169,8 +171,9 @@ class ChangesetModule(Component):
         youngest_rev = repos.youngest_rev
         if str(chgset.rev) != str(youngest_rev):
             next_rev = repos.next_rev(chgset.rev)
-            add_link(req, 'next', self.env.href.changeset(next_rev),
-                     'Changeset %s' % next_rev)
+            if next_rev:
+                add_link(req, 'next', self.env.href.changeset(next_rev),
+                         'Changeset %s' % next_rev)
             add_link(req, 'last', self.env.href.changeset(youngest_rev),
                      'Changeset %s' % youngest_rev)
 

@@ -20,6 +20,7 @@ from trac.util import TracError
 from trac.versioncontrol import Changeset, Node, Repository, IScmBackend
 from trac.versioncontrol.cache import CachedRepository
 from trac.versioncontrol.svn_authz import SubversionAuthorizer
+from trac.versioncontrol.web_ui import ChangesetModule, BrowserModule
 from trac.core import *
 
 import os.path
@@ -43,6 +44,8 @@ except ImportError:
 _kindmap = {core.svn_node_dir: Node.DIRECTORY,
             core.svn_node_file: Node.FILE}
 
+
+### Components
 
 class SvnFsBackend(Component):
 
@@ -71,6 +74,15 @@ class SvnFsBackend(Component):
             db = self.env.get_db_cnx()
             return CachedRepository(db, repos, authz, self.log)
 
+
+class SvnFsBrowserModule(BrowserModule):
+    pass
+
+class SvnFsChangesetModule(ChangesetModule):
+    pass
+
+
+### Helpers
 
 application_pool = None
 

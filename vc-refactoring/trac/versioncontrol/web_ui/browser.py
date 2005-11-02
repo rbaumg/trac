@@ -50,6 +50,8 @@ def _natural_order(x, y):
 
 class BrowserModule(Component):
 
+    abstract = True
+
     implements(INavigationContributor, IPermissionRequestor, IRequestHandler,
                IWikiSyntaxProvider)
 
