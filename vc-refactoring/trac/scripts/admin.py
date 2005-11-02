@@ -541,13 +541,14 @@ class TracAdmin(cmd.Cmd):
         prompt = 'Database connection string [%s]> ' % ddb
         returnvals.append(raw_input(prompt).strip()  or ddb)
         print
-        print ' Please specify the absolute path to the project Subversion repository.'
-        print ' Repository must be local, and trac-admin requires read+write'
-        print ' permission to initialize the Trac database.'
+        print ' Please specify the absolute path to the project SCM repository,'
+        print ' or leave it blank to use Trac without a repository.'
         print
-        drp = '/var/svn/test'
-        prompt = 'Path to repository [%s]> ' % drp
-        returnvals.append(raw_input(prompt).strip()  or drp)
+        print ' Also, the repository can be specified later.'
+        print 
+        drp = 'svn:/path/to/repos/optional_scope_within_repos'
+        prompt = 'Path to repository, e.g. "%s"> ' % drp
+        returnvals.append(raw_input(prompt).strip())
         print
         print ' Please enter location of Trac page templates.'
         print ' Default is the location of the site-wide templates installed with Trac.'
@@ -605,9 +606,10 @@ class TracAdmin(cmd.Cmd):
             self._do_wiki_load(default_dir('wiki'), cursor)
             cnx.commit()
 
-            print ' Indexing repository'
             repos = self.__env.get_repository()
-            repos.sync()
+            if repos:
+                print ' Indexing repository'
+                repos.sync()
 
         except Exception, e:
             print 'Failed to initialize environment.', e

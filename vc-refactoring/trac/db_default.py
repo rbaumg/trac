@@ -445,5 +445,6 @@ default_components = ('trac.About', 'trac.attachment',
                       'trac.ticket.roadmap', 'trac.ticket.web_ui',
                       'trac.Timeline',
                       'trac.versioncontrol.web_ui',
+                      'trac.versioncontrol.svn_fs',
                       'trac.wiki.macros', 'trac.wiki.web_ui',
                       'trac.web.auth')

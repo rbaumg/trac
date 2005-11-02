@@ -16,6 +16,65 @@
 
 from __future__ import generators
 from trac.perm import PermissionError
+from trac.core import *
+
+### Source Configuration Management interface and manager
+
+class IScmBackend(Interface):
+    """SCM backend for Trac"""
+
+    def identifiers(self):
+        """SCM string prefixes that are supported by the backend,
+        and their relative priorities.
+
+        Highest number is highest priority.
+        """
+
+    def repository(self, scheme, args, authname):
+        """Get a Repository object.
+
+        `scheme` is the scheme that was used to select this backend,
+        `args` is the remaining specification for the repository and
+        `authname` is the user name, for authentication purpose.
+        """
+
+    def init_repository(self, **params): # TBD
+        """Initialize a repository"""
+
+
+class ScmBackendManager(Component):
+    """TODO: share some code with the DatabaseBackendManager"""
+
+    backends = ExtensionPoint(IScmBackend)
+
+    def __init__(self):
+        self._backend_map = None
+
+    def get_repository(self, repos_str, authname):
+        if ':' in repos_str and len(repos_str) > 2 and repos_str[1] != ':':
+            scheme, args = repos_str.split(':', 1)
+        else:
+            scheme, args = 'svn', repos_str
+        backend = self._get_backend(scheme)
+        return backend.repository(scheme, args, authname)
+
+    def _get_backend(self, scheme):
+        if not self._backend_map:
+            self._backend_map = {}
+            for backend in self.backends:
+                for ident, prio in backend.identifiers():
+                    if ident in self._backend_map:
+                        highest = self._backend_map[ident][1]
+                    else:
+                        highest = 0
+                    if prio > highest:
+                        self._backend_map[ident] = (backend, prio)
+        if not scheme in self._backend_map:
+            raise TracError, 'Unsupported SCM "%s"' % scheme
+        return self._backend_map[scheme][0]
+
+
+### Abstract classes for the backends
 
 class Repository(object):
     """

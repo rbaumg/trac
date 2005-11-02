@@ -22,6 +22,7 @@ from trac import db, db_default, util
 from trac.config import Configuration
 from trac.core import Component, ComponentManager, implements, Interface, \
                       ExtensionPoint, TracError
+from trac.versioncontrol import ScmBackendManager
 
 __all__ = ['Environment', 'IEnvironmentSetupParticipant', 'open_environment']
 
@@ -120,6 +121,10 @@ class Environment(Component, ComponentManager):
                     and component_name.startswith(pattern[:-1]):
                 return enabled
 
+        # versioncontrol components are enabled if the repository is configured
+        if component_name.startswith('trac.versioncontrol'):
+            return self.config.get('trac', 'repository_dir') != ''
+
         # By default, all components in the trac package are enabled
         return component_name.startswith('trac.')
 
@@ -146,21 +151,12 @@ class Environment(Component, ComponentManager):
         """Return the version control repository configured for this
         environment.
         
-        The repository is wrapped in a `CachedRepository`.
-        
         @param authname: user name for authorization
         """
-        from trac.versioncontrol.cache import CachedRepository
-        from trac.versioncontrol.svn_authz import SubversionAuthorizer
-        from trac.versioncontrol.svn_fs import SubversionRepository
         repos_dir = self.config.get('trac', 'repository_dir')
         if not repos_dir:
             raise EnvironmentError, 'Path to repository not configured'
-        authz = None
-        if authname:
-            authz = SubversionAuthorizer(self, authname)
-        repos = SubversionRepository(repos_dir, authz, self.log)
-        return CachedRepository(self.get_db_cnx(), repos, authz, self.log)
+        return ScmBackendManager(self).get_repository(repos_dir, authname)
 
     def create(self, db_str=None):
         """Create the basic directory structure of the environment, initialize

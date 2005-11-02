@@ -17,17 +17,60 @@
 from __future__ import generators
 
 from trac.util import TracError
-from trac.versioncontrol import Changeset, Node, Repository
+from trac.versioncontrol import Changeset, Node, Repository, IScmBackend
+from trac.versioncontrol.cache import CachedRepository
+from trac.versioncontrol.svn_authz import SubversionAuthorizer
+from trac.core import *
 
 import os.path
 import time
 import weakref
 import posixpath
 
-from svn import fs, repos, core, delta
+try:
+    from svn import fs, repos, core, delta
+    has_subversion = True
+except ImportError:
+    has_subversion = False
+    class dummy_svn(object):
+        svn_node_dir = 1
+        svn_node_file = 2
+        def apr_pool_destroy(): pass
+        def apr_terminate(): pass
+        def apr_pool_clear(): pass
+    core = dummy_svn()
 
 _kindmap = {core.svn_node_dir: Node.DIRECTORY,
             core.svn_node_file: Node.FILE}
+
+
+class SvnFsBackend(Component):
+
+    implements(IScmBackend)
+
+    def identifiers(self):
+        global has_subversion
+        if has_subversion:
+            yield ("direct-svn-fs", 8)
+            yield ("svn-fs", 4)
+            yield ("svn", 2)
+
+    def repository(self, scheme, args, authname):
+        """Return a `SubversionRepository`.
+
+        The repository is generally wrapped in a `CachedRepository`,
+        unless `direct-svn-fs` is the specified scheme.
+        """
+        authz = None
+        if authname:
+            authz = SubversionAuthorizer(self.env, authname)
+        repos = SubversionRepository(args, authz, self.log)
+        if scheme == 'direct-svn-fs':
+            return repos
+        else:
+            db = self.env.get_db_cnx()
+            return CachedRepository(db, repos, authz, self.log)
+
 
 application_pool = None
 
@@ -168,8 +211,8 @@ class Pool(object):
                 del self._weakref
 
 # Initialize application-level pool
-Pool()
-
+if has_subversion:
+    Pool()
 
 class SubversionRepository(Repository):
     """
