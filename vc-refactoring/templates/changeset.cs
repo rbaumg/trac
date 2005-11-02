@@ -105,6 +105,10 @@
  <dd class="time"><?cs var:changeset.time ?></dd>
  <dt class="author">Author:</dt>
  <dd class="author"><?cs var:changeset.author ?></dd>
+ <?cs each:prop = changeset.properties ?>
+ <dt class="<?cs var:prop.htmlclass ?>"><?cs var:prop.name ?>:</dt>
+ <dd class="<?cs var:prop.htmlclass ?>"><?cs var:prop.value ?></dd>
+ <?cs /each ?>
  <dt class="message">Message:</dt>
  <dd class="message" id="searchable"><?cs
   alt:changeset.message ?>&nbsp;<?cs /alt ?></dd>
