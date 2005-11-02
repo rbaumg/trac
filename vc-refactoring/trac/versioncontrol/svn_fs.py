@@ -207,15 +207,8 @@ class SubversionRepository(Repository):
             self.scope = '/'
         self.log.debug("Opening subversion file-system at %s with scope %s" \
                        % (self.path, self.scope))
-
-        self.rev = fs.youngest_rev(self.fs_ptr, self.pool())
-
-        self.history = None
-        if self.scope != '/':
-            self.history = []
-            for path,rev in _get_history(self.scope[1:], self.authz,
-                                         self.fs_ptr, self.pool, 0, self.rev):
-                self.history.append(rev)
+        self.youngest = None
+        self.oldest = None
 
     def __del__(self):
         self.close()
@@ -245,7 +238,6 @@ class SubversionRepository(Repository):
         self.log.debug("Closing subversion file-system at %s" % self.path)
         self.repos = None
         self.fs_ptr = None
-        self.rev = None
         self.pool = None
 
     def get_changeset(self, rev):
@@ -262,40 +254,47 @@ class SubversionRepository(Repository):
         return SubversionNode(path, rev, self.authz, self.scope, self.fs_ptr,
                               self.pool)
 
+    def _history(self, path, start, end, limit=None):
+        scoped_path = self.scope[1:]+path
+        return _get_history(scoped_path, self.authz, self.fs_ptr, self.pool,
+                            start, end, limit)
+
     def get_oldest_rev(self):
-        rev = 0
-        if self.scope == '/':
-            return rev
-        return self.history[-1]
+        if self.oldest is None:
+            self.oldest = 1
+            if self.scope != '/':
+                self.oldest = self.next_rev(0)
+        return self.oldest
 
     def get_youngest_rev(self):
-        rev = self.rev
-        if self.scope == '/':
-            return rev
-        return self.history[0]
+        if not self.youngest:
+            self.youngest = fs.youngest_rev(self.fs_ptr, self.pool())
+            if self.scope != '/':
+                for path, rev in self._history('', 0, self.youngest, limit=1):
+                    self.youngest = rev
+        return self.youngest
 
     def previous_rev(self, rev):
-        rev = int(rev)
-        if rev == 0:
-            return None
-        if self.scope == '/':
-            return rev - 1
-        idx = self.history.index(rev)
-        if idx + 1 < len(self.history):
-            return self.history[idx + 1]
+        rev = self.normalize_rev(rev)
+        if rev > 1: # don't use oldest here, as it's too expensive
+            try:
+                for path, prev in self._history('', 0, rev-1, limit=1):
+                    return prev
+            except SystemError:
+                pass
         return None
 
     def next_rev(self, rev):
-        rev = int(rev)
-        if rev == self.rev:
-            return None
-        if self.scope == '/':
-            return rev + 1
-        if rev == 0:
-            return self.oldest_rev
-        idx = self.history.index(rev)
-        if idx > 0:
-            return self.history[idx - 1]
+        rev = self.normalize_rev(rev)
+        next = rev + 1
+        youngest = self.youngest_rev
+        while next <= youngest:
+            try:
+                for path, next in self._history('', rev+1, next, limit=1):
+                    return next
+                next += 1
+            except SystemError: # i.e. "null arg to internal routine"
+                return next # a 'delete' event is also interesting... 
         return None
 
     def rev_older_than(self, rev1, rev2):
