@@ -380,8 +380,10 @@ class SubversionRepository(Repository):
             def authz_cb(root, path, pool): return 1
             text_deltas = 0 # as this is anyway re-done in Diff.py...
             entry_props = 0 # "... typically used only for working copy updates"
-            repos.svn_repos_dir_delta(old_root, old_path, '',
-                                      new_root, new_path,
+            repos.svn_repos_dir_delta(old_root,
+                                      (self.scope + old_path).strip('/'), '',
+                                      new_root,
+                                      (self.scope + new_path).strip('/'),
                                       e_ptr, e_baton, authz_cb,
                                       text_deltas,
                                       1, # directory
@@ -397,13 +399,15 @@ class SubversionRepository(Repository):
                     new_node = self.get_node(posixpath.join(new_path, path),
                                              new_rev)
                 else:
-                    kind = _kindmap[fs.check_path(old_root, old_node.path,
+                    kind = _kindmap[fs.check_path(old_root,
+                                                  self.scope + old_node.path,
                                                   subpool())]
                 yield  (old_node, new_node, kind, change)
         else:
             old_root = fs.revision_root(self.fs_ptr, old_rev, subpool())
             new_root = fs.revision_root(self.fs_ptr, new_rev, subpool())
-            if fs.contents_changed(old_root, old_path, new_root, new_path,
+            if fs.contents_changed(old_root, self.scope + old_path,
+                                   new_root, self.scope + new_path,
                                    subpool()):
                 yield (old_node, new_node, Node.FILE, Changeset.EDIT)
 
@@ -442,8 +446,12 @@ class SubversionNode(Node):
     def get_content(self):
         if self.isdir:
             return None
-        return core.Stream(fs.file_contents(self.root, self.scoped_path,
-                                            self.pool()))
+        s = core.Stream(fs.file_contents(self.root, self.scoped_path,
+                                         self.pool()))
+        # Make sure the stream object references the pool to make sure the pool
+        # is not destroyed before the stream object.
+        s._pool = self.pool
+        return s
 
     def get_entries(self):
         if self.isfile:

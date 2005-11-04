@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
 # Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
@@ -17,7 +17,6 @@
 #         Christopher Lenz <cmlenz@gmx.de>
 #         Christian Boos <cboos@neuf.fr>
 
-from __future__ import generators
 import time
 import re
 import posixpath
@@ -350,16 +349,18 @@ class AbstractDiffModule(Component):
             old_content = old_node.get_content().read()            
             if mimeview.is_binary(old_content):
                 return None
-            charset = mimeview.get_charset(old_node.content_type) or \
-                      default_charset
-            old_content = util.to_utf8(old_content, charset)
+            charset = mimeview.get_charset(old_node.content_type)
+            if not charset:
+                charset = mimeview.detect_unicode(old_content)
+            old_content = util.to_utf8(old_content, charset or default_charset)
 
             new_content = new_node.get_content().read()
             if mimeview.is_binary(new_content):
                 return None
-            charset = mimeview.get_charset(new_node.content_type) or \
-                      default_charset
-            new_content = util.to_utf8(new_content, charset)
+            charset = mimeview.get_charset(new_node.content_type)
+            if not charset:
+                charset = mimeview.detect_unicode(new_content)
+            new_content = util.to_utf8(new_content, charset or default_charset)
 
             if old_content != new_content:
                 context = 3
@@ -368,6 +369,8 @@ class AbstractDiffModule(Component):
                     if option.startswith('-U'):
                         context = int(option[2:])
                         break
+                if context < 0:
+                    context = None
                 tabwidth = int(self.config.get('diff', 'tab_width',
                                                self.config.get('mimeviewer',
                                                                'tab_width')))

@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 # 
 # Copyright (C) 2004-2005 Edgewall Software
 # All rights reserved.
@@ -14,7 +14,7 @@
 # Author: Tim Moloney <t.moloney@verizon.net>
 
 
-from trac.db_default import data as default_data
+from trac.db_default import data as default_data, default_config
 from trac.config import Configuration
 from trac.env import Environment
 from trac.scripts import admin
@@ -85,7 +85,9 @@ class InMemoryEnvironment(Environment):
 
     def load_config(self):
         self.config = Configuration(None)
-
+        for section, name, value in default_config:
+            self.config.setdefault(section, name, value)
+            
     def save_config(self):
         pass
 
@@ -136,10 +138,6 @@ class TracadminTestCase(unittest.TestCase):
             sys.stderr = _err
             sys.stdout = _out
 
-    def _require_python(self, version):
-        if sys.version_info < version:
-            raise SkipTest, 'requires Python %d.%d.%d' % version
-
     # About test
 
     def test_about(self):
@@ -188,9 +186,6 @@ Trac Admin Console %s
         """
         test_name = sys._getframe().f_code.co_name
         try:
-            # textwrap not available in python < 2.3
-            self._require_python((2, 3, 0))
-
             rv, output = self._execute('permission list')
             self.assertEqual(0, rv)
             self.assertEqual(self.expected_results[test_name], output)
@@ -205,9 +200,6 @@ Trac Admin Console %s
         """
         test_name = sys._getframe().f_code.co_name
         try:
-            # textwrap not available in python < 2.3
-            self._require_python((2, 3, 0))
-
             self._execute('permission add test_user WIKI_VIEW')
             rv, output = self._execute('permission list')
             self.assertEqual(0, rv)
@@ -223,9 +215,6 @@ Trac Admin Console %s
         """
         test_name = sys._getframe().f_code.co_name
         try:
-            # textwrap not available in python < 2.3
-            self._require_python((2, 3, 0))
-
             self._execute('permission add test_user LOG_VIEW FILE_VIEW')
             rv, output = self._execute('permission list')
             self.assertEqual(0, rv)
@@ -241,9 +230,6 @@ Trac Admin Console %s
         """
         test_name = sys._getframe().f_code.co_name
         try:
-            # textwrap not available in python < 2.3
-            self._require_python((2, 3, 0))
-
             self._execute('permission remove anonymous TICKET_MODIFY')
             rv, output = self._execute('permission list')
             self.assertEqual(0, rv)
@@ -259,9 +245,6 @@ Trac Admin Console %s
         """
         test_name = sys._getframe().f_code.co_name
         try:
-            # textwrap not available in python < 2.3
-            self._require_python((2, 3, 0))
-
             test_name = sys._getframe().f_code.co_name
             self._execute('permission remove anonymous WIKI_CREATE WIKI_MODIFY')
             rv, output = self._execute('permission list')
@@ -466,6 +449,38 @@ Trac Admin Console %s
         self.assertEqual(2, rv)
         self.assertEqual(self.expected_results[test_name], output)
 
+    def test_ticket_type_order_down_ok(self):
+        """
+        Tests the 'ticket_type order' command in trac-admin.  This particular
+        test passes a valid argument and checks for success.
+        """
+        test_name = sys._getframe().f_code.co_name
+        self._execute('ticket_type order defect down')
+        rv, output = self._execute('ticket_type list')
+        self.assertEqual(0, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
+    def test_ticket_type_order_up_ok(self):
+        """
+        Tests the 'ticket_type order' command in trac-admin.  This particular
+        test passes a valid argument and checks for success.
+        """
+        test_name = sys._getframe().f_code.co_name
+        self._execute('ticket_type order enhancement up')
+        rv, output = self._execute('ticket_type list')
+        self.assertEqual(0, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
+    def test_ticket_type_order_error_bad_type(self):
+        """
+        Tests the 'priority order' command in trac-admin.  This particular
+        test tries to reorder a priority that does not exist.
+        """
+        test_name = sys._getframe().f_code.co_name
+        rv, output = self._execute('ticket_type order bad_type up')
+        self.assertEqual(2, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
     # Priority tests
 
     def test_priority_list_ok(self):
@@ -547,6 +562,38 @@ Trac Admin Console %s
         """
         Tests the 'priority remove' command in trac-admin.  This particular
         test tries to remove a priority that does not exist.
+        """
+        test_name = sys._getframe().f_code.co_name
+        rv, output = self._execute('priority remove bad_priority')
+        self.assertEqual(2, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
+    def test_priority_order_down_ok(self):
+        """
+        Tests the 'priority order' command in trac-admin.  This particular
+        test passes a valid argument and checks for success.
+        """
+        test_name = sys._getframe().f_code.co_name
+        self._execute('priority order blocker down')
+        rv, output = self._execute('priority list')
+        self.assertEqual(0, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
+    def test_priority_order_up_ok(self):
+        """
+        Tests the 'priority order' command in trac-admin.  This particular
+        test passes a valid argument and checks for success.
+        """
+        test_name = sys._getframe().f_code.co_name
+        self._execute('priority order critical up')
+        rv, output = self._execute('priority list')
+        self.assertEqual(0, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
+    def test_priority_order_error_bad_priority(self):
+        """
+        Tests the 'priority order' command in trac-admin.  This particular
+        test tries to reorder a priority that does not exist.
         """
         test_name = sys._getframe().f_code.co_name
         rv, output = self._execute('priority remove bad_priority')
@@ -638,6 +685,42 @@ Trac Admin Console %s
         """
         Tests the 'severity remove' command in trac-admin.  This particular
         test tries to remove a severity that does not exist.
+        """
+        test_name = sys._getframe().f_code.co_name
+        rv, output = self._execute('severity remove bad_severity')
+        self.assertEqual(2, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
+    def test_severity_order_down_ok(self):
+        """
+        Tests the 'severity order' command in trac-admin.  This particular
+        test passes a valid argument and checks for success.
+        """
+        test_name = sys._getframe().f_code.co_name
+        self._execute('severity add foo')
+        self._execute('severity add bar')
+        self._execute('severity order foo down')
+        rv, output = self._execute('severity list')
+        self.assertEqual(0, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
+    def test_severity_order_up_ok(self):
+        """
+        Tests the 'severity order' command in trac-admin.  This particular
+        test passes a valid argument and checks for success.
+        """
+        test_name = sys._getframe().f_code.co_name
+        self._execute('severity add foo')
+        self._execute('severity add bar')
+        self._execute('severity order bar up')
+        rv, output = self._execute('severity list')
+        self.assertEqual(0, rv)
+        self.assertEqual(self.expected_results[test_name], output)
+
+    def test_severity_order_error_bad_severity(self):
+        """
+        Tests the 'severity order' command in trac-admin.  This particular
+        test tries to reorder a priority that does not exist.
         """
         test_name = sys._getframe().f_code.co_name
         rv, output = self._execute('severity remove bad_severity')

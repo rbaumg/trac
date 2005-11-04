@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 # 
 # Copyright (C) 2003-2005 Edgewall Software
 # All rights reserved.
@@ -31,7 +31,6 @@ from trac import perm, util, db_default
 from trac.config import default_dir
 from trac.env import Environment
 from trac.config import Configuration
-from trac.Milestone import Milestone
 from trac.perm import PermissionSystem
 from trac.ticket.model import *
 from trac.wiki import WikiPage
@@ -45,6 +44,34 @@ except NameError:
         for item in list:
             tot += item
         return tot
+
+def copytree(src, dst, symlinks=False, skip=[]):
+    """Recursively copy a directory tree using copy2() (from shutil.copytree.)
+
+    Added an `skip` parameter consisting of absolute paths
+    which we don't want to copy.
+    """
+    names = os.listdir(src)
+    os.mkdir(dst)
+    errors = []
+    for name in names:
+        srcname = os.path.join(src, name)
+        if srcname in skip:
+            continue
+        dstname = os.path.join(dst, name)
+        try:
+            if symlinks and os.path.islink(srcname):
+                linkto = os.readlink(srcname)
+                os.symlink(linkto, dstname)
+            elif os.path.isdir(srcname):
+                copytree(srcname, dstname, symlinks, skip)
+            else:
+                shutil.copy2(srcname, dstname)
+            # XXX What about devices, sockets etc.?
+        except (IOError, os.error), why:
+            errors.append((srcname, dstname, why))
+    if errors:
+        raise shutil.Error, errors
 
 
 class TracAdmin(cmd.Cmd):
@@ -65,6 +92,7 @@ class TracAdmin(cmd.Cmd):
         self.interactive = False
         if envdir:
             self.env_set(os.path.abspath(envdir))
+        self._permsys = None
 
     def emptyline(self):
         pass
@@ -130,7 +158,8 @@ class TracAdmin(cmd.Cmd):
 
     def db_query(self, sql, cursor=None):
         if not cursor:
-            cursor = self.db_open().cursor()
+            cnx = self.db_open()
+            cursor = cnx.cursor()
         cursor.execute(sql)
         for row in cursor:
             yield row
@@ -434,16 +463,21 @@ class TracAdmin(cmd.Cmd):
             self.do_help('permission')
 
     def _do_permission_list(self, user=None):
+        if not self._permsys:
+            self._permsys = PermissionSystem(self.env_open())
         if user:
-            rows = self.db_query("SELECT username, action FROM permission "
-                                 "WHERE username='%s' ORDER BY action" % user)
+            rows = []
+            perms = self._permsys.get_user_permissions(user)
+            for action in perms:
+                if perms[action]:
+                    rows.append((action, user))
         else:
-            rows = self.db_query("SELECT username, action FROM permission "
-                                 "ORDER BY username, action")
+            rows = self._permsys.get_all_permissions()
+        rows.sort()
         self.print_listing(['User', 'Action'], rows)
         print
         print 'Available actions:'
-        actions = PermissionSystem(self.env_open()).get_actions()
+        actions = self._permsys.get_actions()
         actions.sort()
         text = ', '.join(actions)
         print util.wrap(text, initial_indent=' ', subsequent_indent=' ',
@@ -451,23 +485,29 @@ class TracAdmin(cmd.Cmd):
         print
 
     def _do_permission_add(self, user, action):
+        if not self._permsys:
+            self._permsys = PermissionSystem(self.env_open())
         if not action.islower() and not action.isupper():
             print 'Group names must be in lower case and actions in upper case'
             return
-        self.db_update("INSERT INTO permission VALUES('%s', '%s')"
-                       % (user, action))
+        self._permsys.grant_permission(user, action)
 
     def _do_permission_remove(self, user, action):
-        sql = "DELETE FROM permission"
-        clauses = []
-        if action != '*':
-            clauses.append("action='%s'" % action)
-        if user != '*':
-            clauses.append("username='%s'" % user)
-        if clauses:
-            sql += " WHERE " + " AND ".join(clauses)
-        self.db_update(sql)
-
+        if not self._permsys:
+            self._permsys = PermissionSystem(self.env_open())
+        rows = self._permsys.get_all_permissions()
+        if action == '*':
+            for row in rows:
+                if user != '*' and user != row[0]:
+                    continue
+                self._permsys.revoke_permission(row[0], row[1])
+        else:
+            for row in rows:
+                if action != row[1]:
+                    continue
+                if user != '*' and user != row[0]:
+                    continue
+                self._permsys.revoke_permission(row[0], row[1])
 
     ## Initenv
     _help_initenv = [('initenv',
@@ -557,16 +597,6 @@ class TracAdmin(cmd.Cmd):
             print '  project.name'
             config.set('project', 'name', project_name)
             config.save()
-
-            # Add the default wiki macros
-            print ' Installing default wiki macros'
-            for f in os.listdir(default_dir('macros')):
-                if not f.endswith('.py'):
-                    continue
-                src = os.path.join(default_dir('macros'), f)
-                dst = os.path.join(self.__env.path, 'wiki-macros', f)
-                print "  %s => %s" % (src, f)
-                shutil.copy2(src, dst)
 
             # Add a few default wiki pages
             print ' Installing default wiki pages'
@@ -689,7 +719,7 @@ Congratulations!
             self.do_help ('wiki')
 
     def _do_wiki_list(self):
-        rows = self.db_query("SELECT name,max(version),time "
+        rows = self.db_query("SELECT name, max(version), max(time) "
                              "FROM wiki GROUP BY name ORDER BY name")
         self.print_listing(['Title', 'Edits', 'Modified'],
                            [(r[0], r[1], self._format_datetime(r[2])) for r in rows])
@@ -764,13 +794,15 @@ Congratulations!
                          ('ticket_type add <value>', 'Add a ticket type'),
                          ('ticket_type change <value> <newvalue>',
                           'Change a ticket type'),
-                         ('ticket_type remove <value>', 'Remove a ticket type')]
- 
+                         ('ticket_type remove <value>', 'Remove a ticket type'),
+                         ('ticket_type order <value> up|down',
+                          'Move a ticket type up or down in the list')]
+
     def complete_ticket_type (self, text, line, begidx, endidx):
         if begidx == 16:
             comp = self.get_enum_list ('ticket_type')
         elif begidx < 15:
-            comp = ['list', 'add', 'change', 'remove']
+            comp = ['list', 'add', 'change', 'remove', 'order']
         return self.word_complete(text, comp)
  
     def do_ticket_type(self, line):
@@ -781,13 +813,15 @@ Congratulations!
                        ('priority add <value>', 'Add a priority value option'),
                        ('priority change <value> <newvalue>',
                         'Change a priority value'),
-                       ('priority remove <value>', 'Remove priority value')]
+                       ('priority remove <value>', 'Remove priority value'),
+                       ('priority order <value> up|down',
+                        'Move a priority value up or down in the list')]
 
     def complete_priority (self, text, line, begidx, endidx):
         if begidx == 16:
             comp = self.get_enum_list ('priority')
         elif begidx < 15:
-            comp = ['list', 'add', 'change', 'remove']
+            comp = ['list', 'add', 'change', 'remove', 'order']
         return self.word_complete(text, comp)
 
     def do_priority(self, line):
@@ -798,13 +832,15 @@ Congratulations!
                       ('severity add <value>', 'Add a severity value option'),
                       ('severity change <value> <newvalue>',
                        'Change a severity value'),
-                      ('severity remove <value>', 'Remove severity value')]
+                      ('severity remove <value>', 'Remove severity value'),
+                      ('severity order <value> up|down',
+                       'Move a severity value up or down in the list')]
 
     def complete_severity (self, text, line, begidx, endidx):
         if begidx == 16:
             comp = self.get_enum_list ('severity')
         elif begidx < 15:
-            comp = ['list', 'add', 'change', 'remove']
+            comp = ['list', 'add', 'change', 'remove', 'order']
         return self.word_complete(text, comp)
 
     def do_severity(self, line):
@@ -819,18 +855,25 @@ Congratulations!
         arg = self.arg_tokenize(line)
         if arg[0]  == 'list':
             self._do_enum_list(type)
-        elif arg[0] == 'add' and len(arg)==2:
+        elif arg[0] == 'add' and len(arg) == 2:
             name = arg[1]
             self._do_enum_add(type, name)
-        elif arg[0] == 'change'  and len(arg)==3:
+        elif arg[0] == 'change' and len(arg) == 3:
             name = arg[1]
             newname = arg[2]
             self._do_enum_change(type, name, newname)
-        elif arg[0] == 'remove'  and len(arg)==2:
+        elif arg[0] == 'remove' and len(arg) == 2:
             name = arg[1]
             self._do_enum_remove(type, name)
+        elif arg[0] == 'order' and len(arg) == 3 and arg[2] in ('up', 'down'):
+            name = arg[1]
+            if arg[2] == 'up':
+                direction = -1
+            else:
+                direction = 1
+            self._do_enum_order(type, name, direction)
         else:    
-            self.do_help (type)
+            self.do_help(type)
 
     def _do_enum_list(self, type):
         enum_cls = self._enum_map[type]
@@ -858,8 +901,22 @@ Congratulations!
         enum = enum_cls(self.env_open(), name)
         enum.delete()
 
+    def _do_enum_order(self, type, name, direction):
+        env = self.env_open()
+        enum_cls = self._enum_map[type]
+        enum1 = enum_cls(env, name)
+        enum1.value = int(float(enum1.value) + direction)
+        for enum2 in enum_cls.select(env):
+            if int(float(enum2.value)) == enum1.value:
+                enum2.value = int(float(enum2.value) - direction)
+                break
+        else:
+            return
+        enum1.update()
+        enum2.update()
 
     ## Milestone
+
     _help_milestone = [('milestone list', 'Show milestones'),
                        ('milestone add <name> [due]', 'Add milestone'),
                        ('milestone rename <name> <newname>',
@@ -1033,7 +1090,15 @@ Congratulations!
 
         try:
             print 'Hotcopying %s to %s ...' % (self.__env.path, dest),
-            shutil.copytree(self.__env.path, dest, symlinks=1)
+            db_str = self.__env.config.get('trac', 'database')
+            prefix, db_path = db_str.split(':', 1)
+            if prefix == 'sqlite':
+                # don't copy the journal (also, this would fail on Windows)
+                db_path = os.path.normpath(db_path)
+                skip = ['%s-journal' % os.path.join(self.__env.path, db_path)]
+            else:
+                skip = []
+            copytree(self.__env.path, dest, symlinks=1, skip=skip)
         finally:
             # Unlock database
             cnx.rollback()

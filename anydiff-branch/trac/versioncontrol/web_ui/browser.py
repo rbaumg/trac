@@ -87,7 +87,7 @@ class BrowserModule(Component):
         rev = req.args.get('rev')
 
         repos = self.env.get_repository(req.authname)
-        node = repos.get_node(path, rev)
+        node = get_existing_node(self.env, repos, path, rev)
         rev = repos.normalize_rev(rev)
 
         hidden_properties = [p.strip() for p
@@ -106,7 +106,7 @@ class BrowserModule(Component):
             'href': self.env.href.browser(path,rev=rev),
             'restr_changeset_href': self.env.href.changeset(node.rev, path),
             'anydiff_href': self.env.href.anydiff(),
-            'log_href': self.env.href.log(path)
+            'log_href': self.env.href.log(path, rev=rev)
             }
         browser_hdf.update(dict([(key, util.escape(href)) for key, href in
                                  browser_hrefs.items()]))

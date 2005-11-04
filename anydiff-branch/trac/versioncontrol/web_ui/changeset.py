@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
 # Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
@@ -79,18 +79,21 @@ class ChangesetModule(AbstractDiffModule):
                 if chgset.date < start:
                     return
                 if chgset.date < stop:
-                    excerpt = util.shorten_line(chgset.message or '--')
+                    message = chgset.message or '--'
                     if format == 'rss':
-                        title = 'Changeset <em>[%s]</em>: %s' % (
-                            util.escape(chgset.rev), util.escape(excerpt))
+                        title = 'Changeset <em>[%s]</em>: %s' \
+                                % (util.escape(chgset.rev),
+                                   util.escape(util.shorten_line(message)))
                         href = self.env.abs_href.changeset(chgset.rev)
-                        message = wiki_to_html(chgset.message or '--', self.env,
-                                               db, absurls=True)
+                        message = wiki_to_html(message, self.env, db,
+                                               absurls=True)
                     else:
-                        title = 'Changeset <em>[%s]</em> by %s' % (
-                            util.escape(chgset.rev), util.escape(chgset.author))
+                        title = 'Changeset <em>[%s]</em> by %s' \
+                                % (util.escape(chgset.rev),
+                                   util.escape(chgset.author))
                         href = self.env.href.changeset(chgset.rev)
-                        message = wiki_to_oneliner(excerpt, self.env, db)
+                        message = wiki_to_oneliner(message, self.env, db,
+                                                   shorten=True)
                     if show_files:
                         files = []
                         for chg in chgset.get_changes():
@@ -147,9 +150,8 @@ class ChangesetModule(AbstractDiffModule):
         authzperm = SubversionAuthorizer(self.env, req.authname)
         db = self.env.get_db_cnx()
         sql = "SELECT rev,time,author,message " \
-              "FROM revision WHERE %s OR %s" % \
-              (query_to_sql(db, query, 'message'),
-               query_to_sql(db, query, 'author'))
+              "FROM revision WHERE %s" % \
+              (query_to_sql(db, query, 'message||author'),)
         cursor = db.cursor()
         cursor.execute(sql)
         for rev, date, author, log in cursor:
