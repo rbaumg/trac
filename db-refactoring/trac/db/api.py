@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
@@ -13,8 +13,6 @@
 # history and logs, available at http://projects.edgewall.com/trac/.
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
-
-from __future__ import generators
 
 import os
 import time
@@ -41,7 +39,7 @@ class IDatabaseBackend(Interface):
         Highest number is highest priority.
         """
 
-    def connection(self):
+    def connection(self, **params):
         """Create a new connection to the database"""
         
     def init_db(self, **params):
@@ -70,14 +68,12 @@ class DatabaseBackendManager(Component):
             self._backend_map = {}
             for backend in self.backends:
                 for ident, prio in backend.identifiers():
-                    print ident, prio
                     if ident in self._backend_map:
                         highest = self._backend_map[ident][1]
                     else:
                         highest = 0
                     if prio > highest:
                         self._backend_map[ident] = (backend, prio)
-        print self._backend_map
         if not scheme in self._backend_map:
             raise TracError, 'Unsupported database type "%s"' % scheme
 

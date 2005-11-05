@@ -14,9 +14,7 @@
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
-from __future__ import generators
-
-from trac.util import enum, escape
+from trac.util import escape
 
 from difflib import SequenceMatcher
 import re
@@ -105,16 +103,15 @@ def _group_opcodes(opcodes, n=3):
     None for the parameter n.
     """
     # Full context produces all the opcodes
-    if n == None:
-        for opcode in opcodes:
-            yield opcode
+    if n is None:
+        yield opcodes
         return
 
     # Otherwise we leave at most n lines with the tag 'equal' before and after
     # every change
     nn = n + n
     group = []
-    for idx, (tag, i1, i2, j1, j2) in enum(opcodes):
+    for idx, (tag, i1, i2, j1, j2) in enumerate(opcodes):
         if idx == 0 and tag == 'equal': # Fixup leading unchanged block
             i1, j1 = max(i1, i2 - n), max(j1, j2 - n)
         elif tag == 'equal' and i2 - i1 > nn:
@@ -249,11 +246,17 @@ def get_diff_options(req):
     req.hdf['diff.style'] = style
 
     pref = int(req.session.get('diff_contextlines', 2))
-    arg = int(req.args.get('contextlines', pref))
+    try:
+        arg = int(req.args.get('contextlines', pref))
+    except ValueError:
+        arg = -1
     if req.args.has_key('update') and arg != pref:
         req.session['diff_contextlines'] = arg
     options = ['-U%d' % arg]
-    req.hdf['diff.options.contextlines'] = arg
+    if arg >= 0:
+        req.hdf['diff.options.contextlines'] = arg
+    else:
+        req.hdf['diff.options.contextlines'] = 'all'
 
     arg = get_bool_option('ignoreblanklines')
     if arg:

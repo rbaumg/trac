@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
 # Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
@@ -16,7 +16,6 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
 
-from __future__ import generators
 import re
 import StringIO
 
@@ -25,7 +24,7 @@ from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.Search import ISearchSource, query_to_sql, shorten_result
 from trac.Timeline import ITimelineEventProvider
-from trac.util import enum, escape, format_datetime, get_reporter_id, \
+from trac.util import escape, format_datetime, get_reporter_id, \
                       pretty_timedelta, shorten_line
 from trac.versioncontrol.diff import get_diff_options, hdf_diff
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
@@ -141,8 +140,8 @@ class WikiModule(Component):
                                            absurls=True)
                 else:
                     href = self.env.href.wiki(name)
-                    comment = wiki_to_oneliner(shorten_line(comment), self.env,
-                                               db)
+                    comment = wiki_to_oneliner(comment, self.env, db,
+                                               shorten=True)
                 yield 'wiki', href, title, t, author, comment
 
     # Internal methods
@@ -267,6 +266,8 @@ class WikiModule(Component):
             if option.startswith('-U'):
                 context = int(option[2:])
                 break
+        if context < 0:
+            context = None
         changes = hdf_diff(oldtext, newtext, context=context,
                            ignore_blank_lines='-B' in diff_options,
                            ignore_case='-i' in diff_options,
@@ -390,10 +391,8 @@ class WikiModule(Component):
               "(SELECT name,max(version) AS ver " \
               "FROM wiki GROUP BY name) w2 " \
               "WHERE w1.version = w2.ver AND w1.name = w2.name " \
-              "AND (%s OR %s OR %s)" % \
-              (query_to_sql(db, query, 'w1.name'),
-               query_to_sql(db, query, 'w1.author'),
-               query_to_sql(db, query, 'w1.text'))
+              "AND %s" % \
+              (query_to_sql(db, query, 'w1.name||w1.author||w1.text'),)
         
         cursor = db.cursor()
         cursor.execute(sql)

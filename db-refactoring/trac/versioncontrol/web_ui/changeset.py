@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: iso-8859-1 -*-
 #
 # Copyright (C) 2003-2005 Edgewall Software
 # Copyright (C) 2003-2005 Jonas Borgström <jonas@edgewall.com>
@@ -16,7 +16,6 @@
 # Author: Jonas Borgström <jonas@edgewall.com>
 #         Christopher Lenz <cmlenz@gmx.de>
 
-from __future__ import generators
 import time
 import re
 
@@ -117,18 +116,21 @@ class ChangesetModule(Component):
                 if chgset.date < start:
                     return
                 if chgset.date < stop:
-                    excerpt = util.shorten_line(chgset.message or '--')
+                    message = chgset.message or '--'
                     if format == 'rss':
-                        title = 'Changeset <em>[%s]</em>: %s' % (
-                            util.escape(chgset.rev), util.escape(excerpt))
+                        title = 'Changeset <em>[%s]</em>: %s' \
+                                % (util.escape(chgset.rev),
+                                   util.escape(util.shorten_line(message)))
                         href = self.env.abs_href.changeset(chgset.rev)
-                        message = wiki_to_html(chgset.message or '--', self.env,
-                                               db, absurls=True)
+                        message = wiki_to_html(message, self.env, db,
+                                               absurls=True)
                     else:
-                        title = 'Changeset <em>[%s]</em> by %s' % (
-                            util.escape(chgset.rev), util.escape(chgset.author))
+                        title = 'Changeset <em>[%s]</em> by %s' \
+                                % (util.escape(chgset.rev),
+                                   util.escape(chgset.author))
                         href = self.env.href.changeset(chgset.rev)
-                        message = wiki_to_oneliner(excerpt, self.env, db)
+                        message = wiki_to_oneliner(message, self.env, db,
+                                                   shorten=True)
                     if show_files:
                         files = []
                         for chg in chgset.get_changes():
@@ -224,16 +226,18 @@ class ChangesetModule(Component):
             old_content = old_node.get_content().read()
             if mimeview.is_binary(old_content):
                 continue
-            charset = mimeview.get_charset(old_node.content_type) or \
-                      default_charset
-            old_content = util.to_utf8(old_content, charset)
+            charset = mimeview.get_charset(old_node.content_type)
+            if not charset:
+                charset = mimeview.detect_unicode(old_content)
+            old_content = util.to_utf8(old_content, charset or default_charset)
 
             new_content = new_node.get_content().read()
             if mimeview.is_binary(new_content):
                 continue
-            charset = mimeview.get_charset(new_node.content_type) or \
-                      default_charset
-            new_content = util.to_utf8(new_content, charset)
+            charset = mimeview.get_charset(new_node.content_type)
+            if not charset:
+                charset = mimeview.detect_unicode(new_content)
+            new_content = util.to_utf8(new_content, charset or default_charset)
 
             if old_content != new_content:
                 context = 3
@@ -241,6 +245,8 @@ class ChangesetModule(Component):
                     if option.startswith('-U'):
                         context = int(option[2:])
                         break
+                if context < 0:
+                    context = None
                 tabwidth = int(self.config.get('diff', 'tab_width',
                                                self.config.get('mimeviewer',
                                                                'tab_width')))
@@ -379,9 +385,8 @@ class ChangesetModule(Component):
         authzperm = SubversionAuthorizer(self.env, req.authname)
         db = self.env.get_db_cnx()
         sql = "SELECT rev,time,author,message " \
-              "FROM revision WHERE %s OR %s" % \
-              (query_to_sql(db, query, 'message'),
-               query_to_sql(db, query, 'author'))
+              "FROM revision WHERE %s" % \
+              (query_to_sql(db, query, 'message||author'),)
         cursor = db.cursor()
         cursor.execute(sql)
         for rev, date, author, log in cursor:
