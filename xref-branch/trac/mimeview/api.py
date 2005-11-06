@@ -17,7 +17,6 @@
 #         Christopher Lenz <cmlenz@gmx.de>
 #
 
-from __future__ import generators
 import re
 try:
     from cStringIO import StringIO
@@ -25,7 +24,7 @@ except ImportError:
     from StringIO import StringIO
 
 from trac.core import *
-from trac.util import enum, escape, to_utf8
+from trac.util import escape, to_utf8
 
 __all__ = ['get_charset', 'get_mimetype', 'is_binary', 'detect_unicode',
            'Mimeview']
@@ -269,7 +268,7 @@ class Mimeview(Component):
                 return div * '&nbsp; ' + mod * '&nbsp;'
             return (match.group('tag') or '') + '&nbsp;'
 
-        for num, line in enum(_html_splitlines(lines)):
+        for num, line in enumerate(_html_splitlines(lines)):
             cells = []
             for annotator in annotators:
                 cells.append(annotator.annotate_line(num + 1, line))
@@ -290,16 +289,15 @@ class Mimeview(Component):
 
     def preview_to_hdf(self, req, mimetype, charset, content, filename,
                        detail=None, annotations=None):
-        if not is_binary(content):
-            content = to_utf8(content, charset or self.preview_charset(content))
-        max_preview_size = self.max_preview_size()            
+        max_preview_size = self.max_preview_size()
         if len(content) >= max_preview_size:
             return {'max_file_size_reached': True,
-                    'max_file_size': max_preview_size,
-                    'preview': ' '}
-        else:
-            return {'preview': self.render(req, mimetype, content,
-                                           filename, detail, annotations)}
+                    'max_file_size': max_preview_size}
+
+        if not is_binary(content):
+            content = to_utf8(content, charset or self.preview_charset(content))
+        return {'preview': self.render(req, mimetype, content,
+                                       filename, detail, annotations)}
 
 
 def _html_splitlines(lines):

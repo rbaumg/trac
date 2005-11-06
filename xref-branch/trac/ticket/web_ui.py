@@ -14,7 +14,6 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
-from __future__ import generators
 import os
 import re
 import time
@@ -23,9 +22,8 @@ from trac import util
 from trac.attachment import Attachment
 from trac.core import *
 from trac.env import IEnvironmentSetupParticipant
-from trac.Milestone import Milestone
 from trac.Notify import TicketNotifyEmail
-from trac.ticket import Ticket, TicketSystem
+from trac.ticket import Milestone, Ticket, TicketSystem
 from trac.Timeline import ITimelineEventProvider
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
@@ -125,7 +123,7 @@ class NewticketModule(Component):
                     milestone = Milestone(self.env, option, db=db)
                     if milestone.is_completed:
                         options.remove(option)
-                field['options'] = options
+                field['options'] = [util.escape(option) for option in options]
             req.hdf['newticket.fields.' + name] = field
 
         add_stylesheet(req, 'common/css/ticket.css')
@@ -298,14 +296,14 @@ class TicketModule(Component):
                         message = util.escape(message)
                 else:
                     href = self.env.href.ticket(id)
-                    message = util.shorten_line(message)
                     if status != 'new':
                         message = ': '.join(filter(None, [
                             resolution,
-                            wiki_to_oneliner(message, self.env, db)
+                            wiki_to_oneliner(message, self.env, db,
+                                             shorten=True)
                         ]))
                     else:
-                        message = util.escape(message)
+                        message = util.escape(util.shorten_line(message))
                 yield kinds[status], href, title, t, author, message
 
     # Internal methods
@@ -374,10 +372,12 @@ class TicketModule(Component):
         for field in TicketSystem(self.env).get_ticket_fields():
             if field['type'] in ('radio', 'select'):
                 value = ticket.values.get(field['name'])
-                if value and not value in field['options']:
+                options = field['options']
+                if value and not value in options:
                     # Current ticket value must be visible even if its not in the
                     # possible values
-                    field['options'].append(value)
+                    options.append(value)
+                field['options'] = [util.escape(option) for option in options]
             name = field['name']
             del field['name']
             if name in ('summary', 'reporter', 'description', 'type', 'status',
@@ -422,7 +422,7 @@ class TicketModule(Component):
         req.hdf['ticket.changes'] = changes
 
         # List attached files
-        for idx, attachment in util.enum(Attachment.select(ticket)):
+        for idx, attachment in enumerate(Attachment.select(ticket)):
             hdf = attachment.to_hdf(req, db)
             req.hdf['ticket.attachments.%s' % idx] = hdf
         if req.perm.has_permission('TICKET_APPEND'):
@@ -443,8 +443,10 @@ class UpdateDetailsForTimeline(Component):
     # ITimelineEventProvider methods
 
     def get_timeline_filters(self, req):
+        if self.config.get('timeline', 'ticket_show_details') in util.FALSE:
+            return
         if req.perm.has_permission('TICKET_VIEW'):
-            yield ('ticket_details', 'Ticket details')
+            yield ('ticket_details', 'Ticket details', False)
 
     def get_timeline_events(self, req, start, stop, filters):
         if 'ticket_details' in filters:
@@ -487,6 +489,6 @@ class UpdateDetailsForTimeline(Component):
                 message = ''
                 if len(field_changes) > 0:
                     message = ', '.join(field_changes) + ' changed.<br />'
-                message += wiki_to_oneliner(util.shorten_line(comment),
-                                            self.env, db, absurls=absurls)
+                message += wiki_to_oneliner(comment, self.env, db,
+                                            shorten=True, absurls=absurls)
                 yield 'editedticket', href, title, t, author, message

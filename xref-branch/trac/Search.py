@@ -14,13 +14,12 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
-from __future__ import generators
 import re
 import time
 
 from trac.core import *
 from trac.perm import IPermissionRequestor
-from trac.util import TracError, escape, format_datetime, shorten_line
+from trac.util import TracError, escape, format_datetime
 from trac.web import IRequestHandler
 from trac.web.chrome import add_link, add_stylesheet, INavigationContributor
 from trac.wiki import IWikiSyntaxProvider

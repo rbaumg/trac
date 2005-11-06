@@ -14,7 +14,6 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
-from __future__ import generators
 import re
 import urllib
 
@@ -106,10 +105,10 @@ class BrowserModule(Component):
                            if not name in hidden_properties])
             }
         browser_hrefs = {
-            'href': self.env.href.browser(path,rev=rev),
+            'href': self.env.href.browser(path, rev=rev),
             'restr_changeset_href': self.env.href.changeset(node.rev, path),
             'anydiff_href': self.env.href.anydiff(),
-            'log_href': self.env.href.log(path)
+            'log_href': self.env.href.log(path, rev=rev)
             }
         browser_hdf.update(dict([(key, util.escape(href)) for key, href in
                                  browser_hrefs.items()]))

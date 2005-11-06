@@ -1,4 +1,4 @@
-# -*- coding: iso8859-1 -*-
+# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2005 Edgewall Software
 # Copyright (C) 2005 Christopher Lenz <cmlenz@gmx.de>
@@ -14,8 +14,6 @@
 #
 # Author: Christopher Lenz <cmlenz@gmx.de>
 
-from __future__ import generators
-
 import os
 import time
 import urllib
@@ -27,7 +25,6 @@ except ImportError:
 import weakref
 
 from trac.core import TracError
-from trac.util import enum
 
 __all__ = ['get_cnx_pool', 'init_db']
 
@@ -344,9 +341,9 @@ class SQLiteConnection(ConnectionWrapper):
             coldefs.append("    UNIQUE (%s)" % ','.join(table.key))
         sql.append(',\n'.join(coldefs) + '\n);')
         yield '\n'.join(sql)
-        for i, index in enum(table.indexes):
-            yield ("CREATE INDEX %s_idx%d ON %s (%s);"
-                   % (table.name, i, table.name, ','.join(index.columns)))
+        for index in table.indexes:
+            yield "CREATE INDEX %s_%s_idx ON %s (%s);" % (table.name,
+                  '_'.join(index.columns), table.name, ','.join(index.columns))
     to_sql = classmethod(to_sql)
 
 
@@ -420,15 +417,17 @@ class PostgreSQLConnection(ConnectionWrapper):
             ctype = column.type
             if column.auto_increment:
                 ctype = "SERIAL"
+            if len(table.key) == 1 and column.name in table.key:
+                ctype += " PRIMARY KEY"
             coldefs.append("    %s %s" % (column.name, ctype))
         if len(table.key) > 1:
             coldefs.append("    CONSTRAINT %s_pk PRIMARY KEY (%s)"
                            % (table.name, ','.join(table.key)))
         sql.append(',\n'.join(coldefs) + '\n);')
         yield '\n'.join(sql)
-        for i, index in enum(table.indexes):
-            yield ("CREATE INDEX %s_idx%d ON %s (%s);"
-                   % (table.name, i, table.name, ','.join(index.columns)))
+        for index in table.indexes:
+            yield "CREATE INDEX %s_%s_idx ON %s (%s);" % (table.name, 
+                   '_'.join(index.columns), table.name, ','.join(index.columns))
     to_sql = classmethod(to_sql)
 
 

@@ -16,7 +16,7 @@
 
 from trac.__init__ import __version__
 from trac.core import TracError
-from trac.util import CRLF, TRUE, FALSE, enum, wrap
+from trac.util import CRLF, TRUE, FALSE, wrap
 from trac.web.clearsilver import HDFWrapper
 from trac.web.main import populate_hdf
 
@@ -119,11 +119,14 @@ class NotifyEmail(Notify):
             self.server.login(self.user_name, self.password)
 
     def send(self, rcpt, mime_headers={}):
+        from email.MIMEMultipart import MIMEMultipart
         from email.MIMEText import MIMEText
         from email.Header import Header
         from email.Utils import formatdate
         body = self.hdf.render(self.template_name)
-        msg = MIMEText(body, 'plain', 'utf-8')
+        msg = MIMEMultipart()
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        msg.epilogue = ''
         msg['X-Mailer'] = 'Trac %s, by Edgewall Software' % __version__
         msg['X-Trac-Version'] =  __version__
         projname = self.config.get('project','name')
@@ -211,7 +214,6 @@ class TicketNotifyEmail(NotifyEmail):
     def format_props(self):
         tkt = self.ticket
         fields = [f for f in tkt.fields if f['name'] not in ('summary', 'cc')]
-        t = self.modtime or tkt.time_changed
         width = [0, 0, 0, 0]
         i = 0
         for f in [f['name'] for f in fields if f['type'] != 'textarea']:
