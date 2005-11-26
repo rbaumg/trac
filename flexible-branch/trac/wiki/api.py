@@ -87,7 +87,7 @@ class WikiSystem(Component):
     change_listeners = ExtensionPoint(IWikiChangeListener)
     macro_providers = ExtensionPoint(IWikiMacroProvider)
     syntax_providers = ExtensionPoint(IWikiSyntaxProvider)
-    wikipagenames_providers = ExtensionPoint(IWikiPageNameSyntaxProvider)
+    wikipagenames_provider = SingleExtensionPoint(IWikiPageNameSyntaxProvider)
 
     INDEX_UPDATE_INTERVAL = 5 # seconds
 
@@ -200,23 +200,9 @@ class WikiSystem(Component):
     def get_wiki_syntax(self):
         ignore_missing = self.config.get('wiki', 'ignore_missing_pages')
         ignore_missing = ignore_missing in TRUE
-        providers = []
-        for p in self.wikipagenames_providers:
-            if not providers:
-                yield (p.get_wiki_page_names_syntax(),
-                       lambda x, y, z: self._format_link(x, 'wiki', y, y,
-                                                         ignore_missing))
-            pc = p.__class__
-            providers.append('# %s\n%s.%s = disabled' \
-                             % (pc.__doc__.split('\n')[0],
-                                pc.__module__, pc.__name__))
-        if len(providers) > 1:
-            self.log.warning('More than one IWikiPageNameSyntaxProvider '
-                             'implementation available:\n'
-                             'You should set one of the following to "enabled" '
-                             'in your trac.ini:\n\n'
-                             '[components]\n' +
-                             '\n'.join(providers) +'\n')
+        yield (self.wikipagenames_provider.get_wiki_page_names_syntax(),
+               lambda x, y, z: self._format_link(x, 'wiki', y, y,
+                                                 ignore_missing))
 
     def get_link_resolvers(self):
         yield ('wiki', self._format_fancy_link)

@@ -18,7 +18,8 @@
 
 from trac.util import TracError
 
-__all__ = ['Component', 'ExtensionPoint', 'implements', 'Interface',
+__all__ = ['Component', 'ExtensionPoint', 'SingleExtensionPoint',
+           'implements', 'Interface',
            'TracError']
 
 
@@ -43,6 +44,39 @@ class ExtensionPoint(object):
         """Return a textual representation of the extension point."""
         return '<ExtensionPoint %s>' % self.interface.__name__
 
+    def __get__(self, instance, owner):
+        """If requesting an extension point member, return a list of components
+        that declare to implement the extension point interface."""
+        xtnpt = instance._extension_points.get(self.name)
+        if xtnpt:
+            extensions = ComponentMeta._registry.get(xtnpt.interface, [])
+            return [instance.compmgr[cls] for cls in extensions
+                    if instance.compmgr[cls]]
+        raise TracError("no such interface '%s'" % self.name) 
+
+
+class SingleExtensionPoint(ExtensionPoint):
+    def __get__(self, instance, owner):
+        xtnpt = instance._extension_points.get(self.name)
+        if xtnpt:
+            exts = [e for e in ComponentMeta._registry.get(xtnpt.interface, [])
+                    if instance.compmgr[e]]
+            if exts:
+                if len(exts) > 1:
+                    providers = ['# %s\n%s.%s = disabled' \
+                                 % (e.__doc__.split('\n')[0],
+                                    e.__module__, e.__name__) for e in exts]
+                    instance.log.warning('More than one %s '
+                                         'implementation available.\n\n'
+                                         'You should set one of the following '
+                                         'to "enabled" in your trac.ini:\n\n'
+                                         '[components]\n' \
+                                         % xtnpt.interface.__name__ +
+                                         '\n'.join(providers) +'\n')
+                return instance.compmgr[exts[0]]
+        raise TracError("No component active for '%s' interface" \
+                        % xtnpt.interface.__name__)
+
 
 class ComponentMeta(type):
     """Meta class for components.
@@ -60,8 +94,8 @@ class ComponentMeta(type):
             xtnpts.update(base._extension_points)
         for key, value in d.items():
             if isinstance(value, ExtensionPoint):
+                value.name = key
                 xtnpts[key] = value
-                del d[key]
 
         new_class = type.__new__(cls, name, bases, d)
         new_class._extension_points = xtnpts
@@ -100,7 +134,8 @@ class ComponentMeta(type):
             ComponentMeta._registry.setdefault(interface, []).append(new_class)
         for base in [base for base in bases if hasattr(base, '_implements')]:
             for interface in base._implements:
-                ComponentMeta._registry.setdefault(interface, []).append(new_class)
+                ComponentMeta._registry.setdefault(interface,
+                                                   []).append(new_class)
 
         return new_class
 
@@ -150,19 +185,6 @@ class Component(object):
             compmgr.component_activated(self)
             return self
         return compmgr[cls]
-
-    def __getattr__(self, name):
-        """If requesting an extension point member, return a list of components
-        that declare to implement the extension point interface."""
-        xtnpt = self._extension_points.get(name)
-        if xtnpt:
-            extensions = ComponentMeta._registry.get(xtnpt.interface, [])
-            return [self.compmgr[cls] for cls in extensions
-                    if self.compmgr[cls]]
-        cls = self.__class__.__name__
-        if hasattr(self, '__module__'):
-            cls = '.'.join((self.__module__, cls))
-        raise AttributeError, "'%s' object has no attribute '%s'" % (cls, name)
 
 
 class ComponentManager(object):
