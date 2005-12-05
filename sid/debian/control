@@ -8,7 +8,7 @@ Standards-Version: 3.6.2
 
 Package: trac
 Architecture: all
-Depends: python-clearsilver (>= 0.9.3), python-pysqlite2 | python-sqlite(>=0.4.3) | python2.3-psycopg, python2.3-subversion (>=0.37), subversion (>= 1.0.1), python2.3
+Depends: ${python:Depends}, python-clearsilver (>= 0.9.3), python-pysqlite2 | python-sqlite(>=0.4.3) | python2.3-psycopg, python2.3-subversion (>=0.37), subversion (>= 1.0.1)
 Recommends: apache2 | httpd, python2.3-setuptools (>= 0.5a13)
 Suggests: enscript, python-docutils, libapache2-mod-python
 Description: Enhanced wiki and issue tracking system for software development projects
