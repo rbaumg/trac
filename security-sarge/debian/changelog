@@ -1,3 +1,10 @@
+trac (0.8.1-3sarge2) stable-security; urgency=high
+
+  * Non-maintainer upload by the Security Team
+  * Acknowledged patch from proposed-updates
+
+ -- Martin Schulze <joey@infodrom.org>  Wed,  6 Jul 2005 07:47:34 +0200
+
 trac (0.8.1-3sarge1) stable-security; urgency=critical
 
   * debian/patches/10_upload_vuln.patch:
