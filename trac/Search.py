@@ -36,12 +36,12 @@ class Search(Module):
         self.log.debug("Query: %s" % q)
         if q[0] == q[-1] == "'" or q[0] == q[-1] == '"':
             sql_q = "%s LIKE %%s" % name
-            params.append(q[1:-1])
+            params.append('%' + q[1:-1] + '%')
         else:
             keywords = q.split(' ')
             x = map(lambda x, name=name: name + ' LIKE %s', keywords)
             sql_q = string.join(x, ' AND ')
-            params += keywords
+            params += [('%' + kw + '%') for kw in keywords]
         self.log.debug("SQL Condition: %s" % sql_q)
         return sql_q
     
@@ -157,7 +157,7 @@ class Search(Module):
         q_str += ' ORDER BY 7 DESC LIMIT %d OFFSET %d' % \
                  (self.RESULTS_PER_PAGE + 1, self.RESULTS_PER_PAGE * page)
 
-        self.log.debug("SQL Query: %s" % q_str)
+        self.log.debug("SQL Query: %s, %s" % (q_str, repr(params)))
         cursor.execute(q_str, params)
 
         # Make the data more HDF-friendly
