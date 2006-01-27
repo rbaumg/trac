@@ -22,7 +22,7 @@
 import time
 
 from Module import Module
-from util import add_to_hdf, get_date_format_hint, sql_escape, TracError
+from util import add_to_hdf, get_date_format_hint, sql_escape, TracError, escape
 from Ticket import get_custom_fields, Ticket
 from WikiFormatter import wiki_to_html
 import perm
@@ -35,13 +35,12 @@ def get_tickets_for_milestone(env, db, milestone, field='component'):
     if custom:
         sql += 'ticket_custom.value AS %s ' \
                'FROM ticket LEFT OUTER JOIN ticket_custom ON id = ticket ' \
-               'WHERE name = \'%s\' AND milestone = \'%s\'' % (
-               sql_escape(field), sql_escape(field), sql_escape(milestone))
+               'WHERE name = \'%s\' AND milestone = %%s' % (field, field)
     else:
-        sql += 'ticket.%s AS %s FROM ticket WHERE milestone = \'%s\'' % (
-               sql_escape(field), sql_escape(field), sql_escape(milestone))
+        sql += 'ticket.%s AS %s FROM ticket WHERE milestone = %%s' % (
+               field, field)
     
-    cursor.execute(sql)
+    cursor.execute(sql, (milestone,))
     tickets = []
     while 1:
         row = cursor.fetchone()
@@ -137,7 +136,7 @@ class Milestone(Module):
             except ValueError:
                 continue
         if seconds == None:
-            raise TracError('%s is not a known date format.' % datestr,
+            raise TracError('%s is not a known date format.' % escape(datestr),
                             'Invalid Date Format')
         return seconds
 
@@ -227,7 +226,7 @@ class Milestone(Module):
         row = cursor.fetchone()
         cursor.close()
         if not row:
-            raise TracError('Milestone %s does not exist.' % name,
+            raise TracError('Milestone %s does not exist.' % escape(name),
                             'Invalid Milestone Number')
         milestone = { 'name': row['name'] }
         descr = row['descr']
@@ -315,6 +314,8 @@ class Milestone(Module):
                    'milestone.stats.available_groups')
 
         by = self.args.get('by', 'component')
+        if by not in available_groups:
+            by = 'component'
         self.req.hdf.setValue('milestone.stats.grouped_by', by)
 
         tickets = get_tickets_for_milestone(self.env, self.db, id, by)

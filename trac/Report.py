@@ -80,7 +80,7 @@ class Report (Module):
         try:
             arg = args[aname]
         except KeyError:
-            raise util.TracError("Dynamic variable '$%s' not defined." % aname)
+            raise util.TracError("Dynamic variable '$%s' not defined." % util.escape(aname))
         self.req.hdf.setValue('report.var.'+aname , arg)
         sql = m.string[:m.start()] + arg + m.string[m.end():]
         return self.sql_sub_vars(sql, args)
@@ -132,7 +132,7 @@ class Report (Module):
         cursor = self.db.cursor()
         sql = self.sql_sub_vars(sql, args)
         if not sql:
-            raise util.TracError('Report %s has no SQL query.' % id)
+            raise util.TracError('Report has no SQL query.')
         cursor.execute(sql)
 
         if sql.find('__group__') == -1:
@@ -171,7 +171,7 @@ class Report (Module):
         cursor.execute('SELECT title FROM report WHERE id = %s', id)
         row = cursor.fetchone()
         if not row:
-            raise util.TracError('Report %s does not exist.' % id,
+            raise util.TracError('Report %s does not exist.' % util.escape(id),
                                  'Invalid Report Number')
         self.req.hdf.setValue('title',
                               'Delete Report {%s} %s' % (id, row['title']))
@@ -190,7 +190,7 @@ class Report (Module):
                            ' WHERE id=%s', id)
             row = cursor.fetchone()
             if not row:
-                raise util.TracError('Report %s does not exist.' % id,
+                raise util.TracError('Report %s does not exist.' % util.escape(id),
                                      'Invalid Report Number')
             sql = row[2] or ''
             description = row[1] or ''

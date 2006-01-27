@@ -47,9 +47,9 @@ class QueryModule(Module):
             constraints[field] = vals
         return constraints
 
-    def get_results(self, sql):
+    def get_results(self, sql, params):
         cursor = self.db.cursor()
-        cursor.execute(sql)
+        cursor.execute(sql, params)
         results = []
         while 1:
             row = cursor.fetchone()
@@ -166,6 +166,7 @@ class QueryModule(Module):
                     self.env.href.query(constraints, headers[i]))
 
         sql = []
+        params = []
         sql.append("SELECT " + ", ".join(headers))
         custom_fields = [f['name'] for f in get_custom_fields(self.env)]
         for k in [k for k in constraints.keys() if k in custom_fields]:
@@ -185,12 +186,14 @@ class QueryModule(Module):
         clauses = []
         for k, v in constraints.items():
             if len(v) > 1:
-                inlist = ["'" + util.sql_escape(item) + "'" for item in v]
-                clauses.append("%s IN (%s)" % (k, ",".join(inlist)))
+                clauses.append("%s IN (%s)" % (k, ",".join(['%s'] * len(v))))
+                params += v
             elif k in ['keywords', 'cc']:
-                clauses.append("%s LIKE '%%%s%%'" % (k, util.sql_escape(v[0])))
+                clauses.append("%s LIKE %%s" % k)
+                params.append('%' + v[0] + '%')
             else:
-                clauses.append("%s='%s'" % (k, util.sql_escape(v[0])))
+                clauses.append("%s=%%s" % k)
+                params.append(v[0])
         if clauses:
             sql.append(" WHERE " + " AND ".join(clauses))
 
@@ -202,6 +205,6 @@ class QueryModule(Module):
             sql.append(" DESC")
 
         sql = "".join(sql)
-        self.log.debug("SQL Query: %s" % sql)
-        results = self.get_results(sql)
+        self.log.debug("SQL Query: %s, %s" % (sql, params))
+        results = self.get_results(sql, params)
         util.add_to_hdf(results, self.req.hdf, 'query.results')

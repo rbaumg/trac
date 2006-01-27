@@ -50,7 +50,7 @@ class Browser(Module.Module):
         node_type = svn.fs.check_path(root, path, self.pool)
         if not node_type in [svn.core.svn_node_dir, svn.core.svn_node_file]:
             raise util.TracError('"%s": no such file or directory in revision %d' \
-                            % (path, revision), 'No such file or directory')
+                            % (util.escape(path), revision), 'No such file or directory')
 
         # Redirect to the file module if the requested path happens
         # to point to a regular file
@@ -97,7 +97,7 @@ class Browser(Module.Module):
                 'date_seconds' : date_seconds,
                 'age'          : util.pretty_age(date_seconds),
                 'is_dir'       : is_dir,
-                'author'       : author,
+                'author'       : util.escape(author),
                 'change'       : wiki_to_oneliner(util.shorten_line(util.wiki_escape_newline(change)),
                                                   self.req.hdf, self.env,self.db),
 		'permission'   : self.authzperm.has_permission(fullpath)

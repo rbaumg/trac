@@ -19,7 +19,10 @@
 #
 # Author: Jonas Borgström <jonas@edgewall.com>
 
+from __future__ import nested_scopes
+
 import os
+import re
 import sys
 import time
 import tempfile
@@ -322,6 +325,131 @@ def quote_cookie_value(path):
     Cookie values can not contain " ,;" characters.
     """
     return path.replace(' ', '%20').replace(';', '%3B').replace(',', '%3C')
+
+def html_sanitize(self):
+    """Parse the text as HTML and return a cleaned up XHTML representation.
+    
+    This will remove any javascript code or other potentially dangerous
+    elements.
+    
+    If the HTML cannot be parsed, an `HTMLParseError` will be raised by the
+    underlying `HTMLParser` module, which should be handled by the caller of
+    this function.
+    """
+    import htmlentitydefs
+    from HTMLParser import HTMLParser, HTMLParseError
+
+    buf = StringIO.StringIO()
+
+    class HTMLSanitizer(HTMLParser):
+        # FIXME: move this out into a top-level class
+        safe_tags = ('a', 'abbr', 'acronym', 'address', 'area',
+            'b', 'big', 'blockquote', 'br', 'button', 'caption', 'center',
+            'cite', 'code', 'col', 'colgroup', 'dd', 'del', 'dfn', 'dir',
+            'div', 'dl', 'dt', 'em', 'fieldset', 'font', 'form', 'h1', 'h2',
+            'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'input', 'ins', 'kbd',
+            'label', 'legend', 'li', 'map', 'menu', 'ol', 'optgroup',
+            'option', 'p', 'pre', 'q', 's', 'samp', 'select', 'small',
+            'span', 'strike', 'strong', 'sub', 'sup', 'table', 'tbody',
+            'td', 'textarea', 'tfoot', 'th', 'thead', 'tr', 'tt', 'u', 'ul',
+            'var')
+        safe_attrs = ('abbr', 'accept', 'accept-charset',
+            'accesskey', 'action', 'align', 'alt', 'axis', 'border',
+            'cellpadding', 'cellspacing', 'char', 'charoff', 'charset',
+            'checked', 'cite', 'class', 'clear', 'cols', 'colspan', 'color',
+            'compact', 'coords', 'datetime', 'dir', 'disabled', 'enctype',
+            'for', 'frame', 'headers', 'height', 'href', 'hreflang',
+            'hspace', 'id', 'ismap', 'label', 'lang', 'longdesc',
+            'maxlength', 'media', 'method', 'multiple', 'name', 'nohref',
+            'noshade', 'nowrap', 'prompt', 'readonly', 'rel', 'rev', 'rows',
+            'rowspan', 'rules', 'scope', 'selected', 'shape', 'size',
+            'span', 'src', 'start', 'style', 'summary', 'tabindex',
+            'target', 'title', 'type', 'usemap', 'valign', 'value',
+            'vspace', 'width')
+        uri_attrs = ('action', 'background', 'dynsrc', 'href', 'lowsrc', 'src')
+        safe_schemes = ('file', 'ftp', 'http', 'https', 'mailto', None)
+        empty_tags = ('br', 'hr', 'img', 'input')
+        waiting_for = None
+
+        def handle_starttag(self, tag, attrs):
+            if self.waiting_for:
+                return
+            if tag not in self.safe_tags:
+                self.waiting_for = tag
+                return
+            buf.write('<' + tag)
+
+            def _get_scheme(text):
+                if ':' not in text:
+                    return None
+                chars = [char for char in text.split(':', 1)[0]
+                         if char.isalnum()]
+                return ''.join(chars).lower()
+
+            for attrname, attrval in attrs:
+                if attrname not in self.safe_attrs:
+                    continue
+                elif attrname in self.uri_attrs:
+                    # Don't allow URI schemes such as "javascript:"
+                    if _get_scheme(attrval) not in self.safe_schemes:
+                        continue
+                elif attrname == 'style':
+                    # Remove dangerous CSS declarations from inline styles
+                    decls = []
+                    for decl in filter(None, attrval.split(';')):
+                        is_evil = 0
+                        if 'expression' in decl:
+                            is_evil = 1
+                        for m in re.finditer(r'url\s*\(([^)]+)', decl):
+                            if _get_scheme(m.group(1)) not in self.safe_schemes:
+                                is_evil = 1
+                                break
+                        if not is_evil:
+                            decls.append(decl.strip())
+                    if not decls:
+                        continue
+                    attrval = '; '.join(decls)
+                buf.write(' ' + attrname + '="' + escape(attrval) + '"')
+
+            if tag in self.empty_tags:
+                buf.write(' />')
+            else:
+                buf.write('>')
+
+        def handle_entityref(self, name):
+            if not self.waiting_for:
+                if name not in ('amp', 'lt', 'gt', 'quot'):
+                    latinchar = htmlentitydefs.entitydefs.get(name, '?')
+                    buf.write(latinchar.decode('iso-8859-1').encode('utf-8'))
+                else:
+                    buf.write('&%s;' % name)
+
+        def handle_data(self, data):
+            if not self.waiting_for:
+                buf.write(escape(data))
+
+        def handle_endtag(self, tag):
+            if self.waiting_for:
+                if self.waiting_for == tag:
+                    self.waiting_for = None
+                return
+            if tag not in self.empty_tags:
+                buf.write('</' + tag + '>')
+
+    # Translate any character or entity references to the corresponding
+    # UTF-8 characters
+    def _ref2utf8(match):
+        ref = match.group(1)
+        if ref.startswith('x'):
+            ref = int(ref[1:], 16)
+        else:
+            ref = int(ref, 10)
+        return unichr(int(ref)).encode('utf-8')
+    text = re.sub(r'&#((?:\d+)|(?:[xX][0-9a-fA-F]+));?', _ref2utf8, self)
+
+    sanitizer = HTMLSanitizer()
+    sanitizer.feed(text)
+    return buf.getvalue()
 
 
 if __name__ == '__main__ ':

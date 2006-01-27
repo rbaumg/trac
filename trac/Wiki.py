@@ -143,7 +143,7 @@ class WikiModule(Module):
                                   escape(self.env.href.wiki(pagename, str(row[0]), 1)))
             self.req.hdf.setValue(n+'.version', str(row[0]))
             self.req.hdf.setValue(n+'.time', time_str)
-            self.req.hdf.setValue(n+'.author', str(row[2]))
+            self.req.hdf.setValue(n+'.author', escape(str(row[2])))
             self.req.hdf.setValue(n+'.comment', wiki_to_oneliner(row[3] or '', self.req.hdf, self.env, self.db))
             self.req.hdf.setValue(n+'.ipaddr', str(row[4]))
             i = i + 1
@@ -161,7 +161,7 @@ class WikiModule(Module):
         res = cursor.fetchall()
         if not res:
             raise TracError('Version %d of page "%s" not found.'
-                            % (version, pagename),
+                            % (version, escape(pagename)),
                             'Page Not Found')
 
         if len(res) == 1:

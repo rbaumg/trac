@@ -126,7 +126,7 @@ class Log (Module):
         if not svn.fs.check_path(root, self.path, self.pool) in \
                [svn.core.svn_node_file, svn.core.svn_node_dir]:
             raise util.TracError('The file or directory "%s" doesn\'t exist in the '
-                                 'repository at revision %d.' % (self.path, rev),
+                                 'repository at revision %d.' % (util.escape(self.path), rev),
                                  'Nonexistent path')
         else:
             info = self.get_info (self.path, rev)

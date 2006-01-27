@@ -32,16 +32,16 @@ class Search(Module):
 
     RESULTS_PER_PAGE = 10
 
-    def query_to_sql(self, q, name):
+    def query_to_sql(self, q, name, params):
         self.log.debug("Query: %s" % q)
         if q[0] == q[-1] == "'" or q[0] == q[-1] == '"':
-            sql_q = "%s like '%%%s%%'" % (name, q[1:-1].replace('\'',
-                                                                '\'\''))
+            sql_q = "%s LIKE %%s" % name
+            params.append(q[1:-1])
         else:
-            q = q.replace('\'', '\'\'')
             keywords = q.split(' ')
-            x = map(lambda x, name=name: name + ' LIKE \'%' + x + '%\'', keywords)
+            x = map(lambda x, name=name: name + ' LIKE %s', keywords)
             sql_q = string.join(x, ' AND ')
+            params += keywords
         self.log.debug("SQL Condition: %s" % sql_q)
         return sql_q
     
@@ -118,12 +118,13 @@ class Search(Module):
         cursor = self.db.cursor ()
 
         q = []
+        params = []
         if changeset:
             q.append('SELECT 1 as type, message AS title, message, author, '
                      ' \'\' AS keywords, rev AS data, time,0 AS ver'
                      ' FROM revision WHERE %s OR %s' % 
-                     (self.query_to_sql(query, 'message'),
-                      self.query_to_sql(query, 'author')))
+                     (self.query_to_sql(query, 'message', params),
+                      self.query_to_sql(query, 'author', params)))
         if tickets:
             q.append('SELECT DISTINCT 2 as type, a.summary AS title, '
                      ' a.description AS message, a.reporter AS author, '
@@ -131,12 +132,12 @@ class Search(Module):
                      ' FROM ticket a LEFT JOIN ticket_change b ON a.id = b.ticket'
                      ' WHERE (b.field=\'comment\' AND %s ) OR'
                      ' %s OR %s OR %s OR %s OR %s' %
-                      (self.query_to_sql(query, 'b.newvalue'),
-                       self.query_to_sql(query, 'summary'),
-                       self.query_to_sql(query, 'keywords'),
-                       self.query_to_sql(query, 'description'),
-                       self.query_to_sql(query, 'reporter'),
-                       self.query_to_sql(query, 'cc')))
+                      (self.query_to_sql(query, 'b.newvalue', params),
+                       self.query_to_sql(query, 'summary', params),
+                       self.query_to_sql(query, 'keywords', params),
+                       self.query_to_sql(query, 'description', params),
+                       self.query_to_sql(query, 'reporter', params),
+                       self.query_to_sql(query, 'cc', params)))
         if wiki:
             q.append('SELECT 3 as type, text AS title, text AS message,'
                      ' author, \'\' AS keywords, w1.name AS data, time,'
@@ -146,9 +147,9 @@ class Search(Module):
                      '    FROM wiki GROUP BY name) w2'
                      ' WHERE w1.version = w2.ver AND w1.name = w2.name  AND'
                      ' (%s OR %s OR %s) ' %
-                     (self.query_to_sql(query, 'w1.name'),
-                      self.query_to_sql(query, 'w1.author'),
-                      self.query_to_sql(query, 'w1.text')))
+                     (self.query_to_sql(query, 'w1.name', params),
+                      self.query_to_sql(query, 'w1.author', params),
+                      self.query_to_sql(query, 'w1.text', params)))
 
         if not q: return []
 
@@ -157,7 +158,7 @@ class Search(Module):
                  (self.RESULTS_PER_PAGE + 1, self.RESULTS_PER_PAGE * page)
 
         self.log.debug("SQL Query: %s" % q_str)
-        cursor.execute(q_str)
+        cursor.execute(q_str, params)
 
         # Make the data more HDF-friendly
         info = []

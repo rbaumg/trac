@@ -277,12 +277,6 @@ class Formatter(CommonFormatter):
                         'linkname', 'macroname', 'macroargs', 'inline',
                         'modulename', 'moduleargs')
 
-    # Forbid "dangerous" HTML tags and attributes
-    _htmlproc_disallow_rule = re.compile('(?i)<(script|noscript|embed|object|'
-                                         'iframe|frame|frameset|link|style|'
-                                         'meta|param|doctype)')
-    _htmlproc_disallow_attribute = re.compile('(?i)<[^>]*\s+(on\w+)=')
-
     def default_processor(hdf, text, env):
         return '<pre class="wiki">' + util.escape(text) + '</pre>'
     def asp_processor(hdf, text, env):
@@ -310,23 +304,7 @@ class Formatter(CommonFormatter):
     def verilog_processor(hdf, text, env):
         return env.mimeview.display(text, 'text/x-verilog')
     def html_processor(hdf, text, env):
-        if Formatter._htmlproc_disallow_rule.search(text):
-            err = """\
-<div class="system-message">
- <strong>Error: HTML block contains disallowed tags.</strong>
- <pre>%s</pre>
-</div>\n""" % util.escape(text)
-            env.log.error(err)
-            return err
-        if Formatter._htmlproc_disallow_attribute.search(text):
-            err = """\
-<div class="system-message">
- <strong>Error: HTML block contains disallowed attributes.</strong>
- <pre>%s</pre>
-</div>\n""" % util.escape(text)
-            env.log.error(err)
-            return err
-        return text
+        return util.html_sanitize(text)
     def mime_processor(self, hdf, text, env):
         return env.mimeview.display(text, self.mime_type)
 

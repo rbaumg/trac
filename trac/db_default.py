@@ -437,6 +437,7 @@ default_config = \
   ('header_logo', 'width', '236'),
   ('header_logo', 'height', '73'),
   ('attachment', 'max_size', '262144'),
+  ('attachment', 'render_unsafe_content', 'false'),
   ('diff', 'tab_width', '8'),
   ('mimeviewer', 'enscript_path', 'enscript'),
   ('notification', 'smtp_enabled', 'false'),

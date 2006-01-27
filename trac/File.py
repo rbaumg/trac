@@ -72,6 +72,8 @@ class FileCommon(Module.Module):
     def display_raw(self):
         self.req.send_response(200)
         self.req.send_header('Content-Type', self.mime_type)
+        self.req.send_header('Content-Disposition', 'attachment;filename=' +
+                             self.filename)
         self.req.send_header('Content-Length', str(self.length))
         self.req.send_header('Last-Modified', self.last_modified)
         self.req.end_headers()
@@ -146,11 +148,16 @@ class Attachment(FileCommon):
             self.mime_type = self.env.mimeview.get_mimetype(self.filename) \
                              or 'application/octet-stream'
 
-            self.add_link('alternate',
-                          self.env.href.attachment(self.attachment_type,
-                                                   self.attachment_id,
-                                                   self.filename, 'txt'),
-                'Plain Text', 'text/plain')
+            render_unsafe = self.env.get_config('attachment',
+                                                'render_unsafe_content',
+                                                'false')
+            if render_unsafe in util.TRUE:
+                self.add_link('alternate',
+                              self.env.href.attachment(self.attachment_type,
+                                                       self.attachment_id,
+                                                       self.filename, 'txt'),
+                    'Plain Text', 'text/plain')
+
             self.add_link('alternate',
                           self.env.href.attachment(self.attachment_type,
                                                    self.attachment_id,
@@ -210,6 +217,13 @@ class Attachment(FileCommon):
         self.req.hdf.setValue('file.filename', urllib.unquote(self.filename))
         self.req.hdf.setValue('trac.active_module', self.attachment_type) # Kludge
         FileCommon.display(self)
+
+    def display_txt(self):
+        render_unsafe = self.env.get_config('attachment',
+                                            'render_unsafe_content', 'false')
+        if render_unsafe not in util.TRUE:
+            raise util.TracError('Bad Request')
+        FileCommon.display_txt(self)
 
 
 class File(FileCommon):
