@@ -1,4 +1,4 @@
-trac (0.8.1-3sarge3) UNRELEASED; urgency=high
+trac (0.8.1-3sarge3) stable-security; urgency=high
 
   * debian/patches/10_securityfixes.diff (Closes: #348791):
     Fix CVE-2005-4065 and CVE-2005-4644 vulnerabilities.
