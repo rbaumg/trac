@@ -1,3 +1,10 @@
+trac (0.8.1-3sarge4) stable-security; urgency=high
+
+  * debian/patches/11_fixsearch.diff: Fix regression of search feature
+    included in last security upload.
+
+ -- Otavio Salvador <otavio@debian.org>  Sat, 28 Jan 2006 09:55:21 -0200
+
 trac (0.8.1-3sarge3) stable-security; urgency=high
 
   * debian/patches/10_securityfixes.diff (Closes: #348791):
