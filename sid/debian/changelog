@@ -1,3 +1,9 @@
+trac (0.9.4-2) unstable; urgency=low
+
+  * Revert db_default.py move. (Reopen: #332657)
+
+ -- Otavio Salvador <otavio@debian.org>  Thu, 16 Feb 2006 10:45:24 -0200
+
 trac (0.9.4-1) unstable; urgency=low
 
   * New upstream release.
