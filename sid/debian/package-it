@@ -1,6 +1,7 @@
 #!/bin/sh
 
 VERSION=$(dpkg-parsechangelog | grep Version | sed 's,^Version: \(.*\)\-.*$,\1,g')
+CURRENT_BRANCH=$(svn info | grep URL | cut -d' ' -f 2)
 
 if [ ! -f ../trac_${VERSION}.orig.tar.gz ]; then
     (cd .. ; svn export http://svn.edgewall.com/repos/trac/tags/trac-${VERSION} && \
@@ -8,9 +9,9 @@ if [ ! -f ../trac_${VERSION}.orig.tar.gz ]; then
 	echo "Created trac_${VERSION}.orig.tar.gz")
 fi
 
-[ ! -f ../trac-${VERSION} ] && (cd .. ; svn export http://svn.edgewall.com/repos/trac/tags/trac-${VERSION})
-[ -f ../trac-${VERSION}/debian ] && rm -rf ../trac-${VERSION}/debian
-svn export --force . ../
-mv ../debian ../trac-${VERSION}/
-
-
+cd ..
+rm -rf ../trac-${VERSION}
+tar -xzf trac_${VERSION}.orig.tar.gz
+svn export --force $CURRENT_BRANCH trac-${VERSION}
+cd trac-${VERSION}
+dpkg-buildpackage -us -uc -rfakeroot
