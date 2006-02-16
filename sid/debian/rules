@@ -14,5 +14,6 @@ binary-post-install/trac::
 	chmod 644 debian/trac/usr/share/trac/htdocs/css/code.css
 	chmod 644 debian/trac/usr/share/trac/htdocs/js/wikitoolbar.js
 	mv debian/trac/usr/lib/python2.3/site-packages/trac/db_default.py debian/trac/etc/trac/
+	(cd debian/trac ; ln -fs etc/trac/db_default.py usr/lib/python2.3/site-packages/trac/db_default.py)
 	install -d debian/trac/usr/share/man/man1/
 	install -m 644 debian/man/* debian/trac/usr/share/man/man1/
