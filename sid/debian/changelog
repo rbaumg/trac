@@ -1,4 +1,4 @@
-trac (0.9.4-1) UNRELEASED; urgency=low
+trac (0.9.4-1) unstable; urgency=low
 
   * New upstream release.
   * Revert back compatibility level to 4 allowing easier backporting to
@@ -6,7 +6,7 @@ trac (0.9.4-1) UNRELEASED; urgency=low
   * Move db_default.py to /etc/trac allowing better user customizability
     (Closes: #332657).
 
- -- Otavio Salvador <otavio@debian.org>  Thu, 16 Feb 2006 08:34:09 -0200
+ -- Otavio Salvador <otavio@debian.org>  Thu, 16 Feb 2006 10:12:23 -0200
 
 trac (0.9.3-1) unstable; urgency=high
 
