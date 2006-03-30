@@ -1,3 +1,9 @@
+trac (0.9.4-3) unstable; urgency=low
+
+  * Set a proper python-subversion dependency (Closes: #356797)
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Tue, 28 Mar 2006 18:49:06 +0000
+
 trac (0.9.4-2) unstable; urgency=low
 
   * Revert db_default.py move. (Reopen: #332657)
