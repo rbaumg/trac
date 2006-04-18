@@ -1,3 +1,14 @@
+trac (0.9.5-1) unstable; urgency=high
+
+  * New upstream release.
+  * Security upload, hence urgency set to HIGH.
+    - Fixed wiki macro XSS vulnerability.
+    - Smaller memory usage when accessing subversion history.
+    - Fixed issue with incorrectly generated urls when installed behind a web
+      proxy.
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Tue, 18 Apr 2006 20:04:25 +0000
+
 trac (0.9.4-3) unstable; urgency=low
 
   * Set a proper python-subversion dependency (Closes: #356797)
