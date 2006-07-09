@@ -5,8 +5,9 @@ trac (0.9.6-1) unstable; urgency=high
     - Fixed reStructuredText breach of privacy and denial of service
       vulnerability found by Felix Wiemann.
     - trac-post-commit-hook fix.
+  * Added -f to rm to enforce removal of file, even if it does not exist.
 
- -- Jesus Climent <jesus.climent@hispalinux.es>  Thu,  6 Jul 2006 23:24:43 +0300
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Thu,  6 Jul 2006 23:28:04 +0300
 
 trac (0.9.5-1) unstable; urgency=high
 
