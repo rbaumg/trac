@@ -16,7 +16,7 @@ This is a brief reference of available configuration options.
 == [trac] ==
 || `database`        || [wiki:TracEnvironment#DatabaseConnectionStrings Database connection string] for this project ||
 || `default_charset` || Charset used in text files in the subversion repository (default is `iso-8859-15`) ||
-|| `default_handler` || Name of the component that handles requests to the base URL (default is `WikiHandler`) (''since 0.9'') ||
+|| `default_handler` || Name of the component that handles requests to the base URL (default is `WikiModule`) (''since 0.9'') ||
 || `repository_dir`  || Path to local Subversion repository ||
 || `authz_file`      || Path to Subversion [http://svnbook.red-bean.com/en/1.1/ch06s04.html#svn-ch-6-sect-4.4.2 authorization (authz) file]. ||
 || `authz_module_name` || The module prefix used in the `authz_file` (See FineGrainedPermissions)||
