@@ -12,9 +12,10 @@
 # history and logs, available at http://projects.edgewall.com/trac/.
 #
 
+from __future__ import generators
+
 __copyright__ = 'Copyright (c) 2003-2006 Edgewall Software'
 
-from __future__ import generators
 import cmd
 import getpass
 import os
