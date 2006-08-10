@@ -5,7 +5,7 @@ Build-Depends-Indep: python, python-support (>= 0.3)
 Build-Depends: cdbs (>= 0.4.43), python-all-dev, debhelper (>= 4.0.0)
 Maintainer: Jesus Climent <jesus.climent@hispalinux.es>
 Uploaders: Otavio Salvador <otavio@debian.org>
-Standards-Version: 3.6.2
+Standards-Version: 3.7.2
 
 Package: trac
 Architecture: all
