@@ -1,3 +1,9 @@
+trac (0.9.6-2) unstable; urgency=low
+
+  * Upgraded to the new Python policy (Closes: #380977)
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Tue,  8 Aug 2006 15:54:20 +0300
+
 trac (0.9.6-1) unstable; urgency=high
 
   * New upstream release.
