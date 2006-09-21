@@ -308,9 +308,12 @@ class SubversionRepository(Repository):
             return rev + 1
         if rev == 0:
             return self.oldest_rev
-        idx = self.history.index(rev)
-        if idx > 0:
-            return self.history[idx - 1]
+        try:
+            idx = self.history.index(rev)
+            if idx > 0:
+                return self.history[idx - 1]
+        except ValueError:
+            return rev + 1 # for scoped repos.
         return None
 
     def rev_older_than(self, rev1, rev2):
