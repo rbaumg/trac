@@ -1,3 +1,13 @@
+trac (0.9.6-3) unstable; urgency=low
+
+  * Make the python-support build-dep-indep a normal build-depends, and
+    drop the python dep (python-support pulls in python).
+  * Reset permissions on wikitoolbar.js during build.
+  * Drop old usr/lib/python2.3/site-packages/trac/ path from package, which
+    cdbs seemed to be picking up for some reason (closes: #385166).
+
+ -- Andres Salomon <dilinger@debian.org>  Wed, 30 Aug 2006 01:53:25 +0000
+
 trac (0.9.6-2) unstable; urgency=low
 
   * Upgraded to the new Python policy (Closes: #380977)
@@ -15,6 +25,30 @@ trac (0.9.6-1) unstable; urgency=high
   * Added -f to rm to enforce removal of file, even if it does not exist.
 
  -- Jesus Climent <jesus.climent@hispalinux.es>  Thu,  6 Jul 2006 23:28:04 +0300
+
+trac (0.9.5-2) unstable; urgency=low
+
+  * Add myself to uploaders.
+  * Ack NMU; thanks Lars!
+  * Drop debian-specific manpages; upstream already includes them.  Allow
+    debhelper to create manpage directory, as well.
+  * Change the path for test.py in debian/rules to match regardless of
+    the python version.
+  * Fix grammar errors in README.Debian; thanks to Micah Anderson for the
+    patch (closes: #372188).
+
+ -- Andres Salomon <dilinger@debian.org>  Sat, 10 Jun 2006 05:44:19 +0000
+
+trac (0.9.5-1.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Fix debian/rules clean target so it doesn't break by trying to remove
+    files even when they don't exist. Closes: #366827.
+  * Updated build dependency for debhelper to be at leat 4.1.0, since that
+    is required for cdbs's debhelper.mk to work (according to linda, at
+    least).
+
+ -- Lars Wirzenius <liw@iki.fi>  Sun, 21 May 2006 07:41:47 +0300
 
 trac (0.9.5-1) unstable; urgency=high
 
