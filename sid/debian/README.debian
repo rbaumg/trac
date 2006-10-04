@@ -15,11 +15,11 @@ system.
 Creating a Project Environment
 ------------------------------
 Trac Environment is the backend storage format where Trac stores information
-like wiki pages, tickets, reports, settings, etc. A Trac environment consist of
-a directory containing an SQLite database, human-readable configuration file,
+like wiki pages, tickets, reports, settings, etc. A Trac environment consists of
+a directory containing a SQLite database, human-readable configuration file,
 log-files and attachments.
 
-Before create a Trac environment, you need to have a Subversion
+Before creating a Trac environment, you need to have a Subversion
 repository. This can be made with:
 
     $ mkdir /path/to/repos
@@ -29,7 +29,7 @@ A new Trac environment is created with trac-admin:
 
     $ trac-admin /path/to/projectenv initenv
 
-NOTE: The web server user need write permission to the environment directory
+NOTE: The web server user needs write permission to the environment directory
 and all the files inside. After creating the environment you would need to 
 execute "chown -R www-data /path/to/projectenv" if trac-admin was executed as
 another user.
@@ -39,7 +39,7 @@ it can find the trac templates directory (the default value should be fine).
 
 Configuring Apache
 ------------------
-Copy (or symlink) "trac/cgi-bin/trac.cgi" to you web servers /cgi-bin/
+Copy (or symlink) "trac/cgi-bin/trac.cgi" to your web server's /cgi-bin/
 directory. You can also configure apache to use the "trac/cgi-bin/" directory
 directly if you like, it's a matter of taste.
 
@@ -85,8 +85,8 @@ There you should be able to browse your subversion repository, create tickets,
 view the timeline etc. Keep in mind that anonymous users (not logged in) can
 only access a restricted subset of all Trac features.
 
-Please continue to TracPermissions to learn how to grant additional privileges
-to authenticated users.
+Please read TracPermissions (in the wiki) to learn how to grant additional
+privileges to authenticated users.
 
 For further user-documentation, see TracGuide.
 
