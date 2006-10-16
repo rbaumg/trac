@@ -1,3 +1,20 @@
+trac (0.10-2) unstable; urgency=medium
+
+  * debian/control: Added a Conflicts: against libapache2-mod-python2.3 to
+    avoid breakage if using it through apache2 (Closes: #384381).
+  * Urgency = high to get it back in etch.
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Mon, 16 Oct 2006 21:58:29 +0300
+
+trac (0.10-1) unstable; urgency=low
+
+  * New upstream release
+  * Add a watch file
+  * Add a NEWS entry to remember user that he needs to handle the upgrade
+    byhand
+
+ -- Otavio Salvador <otavio@debian.org>  Thu,  5 Oct 2006 13:51:10 -0300
+
 trac (0.9.6-3) unstable; urgency=low
 
   * Make the python-support build-dep-indep a normal build-depends, and
