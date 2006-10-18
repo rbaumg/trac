@@ -11,7 +11,7 @@ Architecture: all
 Depends: ${python:Depends}, python-clearsilver (>= 0.9.3), python-pysqlite2 | python-sqlite (>= 0.4.3) | python-psycopg, python-subversion, subversion (>= 1.0.1)
 Recommends: apache2 | httpd, python-setuptools (>= 0.5a13)
 Suggests: enscript, python-docutils, libapache2-mod-python
-Conflicts: libapache2-mod-python2.3
+Conflicts: libapache2-mod-python2.3 (<< 3.2.8-3)
 Description: Enhanced wiki and issue tracking system for software development projects
  Trac uses a minimalistic approach to web-based software project management.
  Our mission; to help developers write great software while staying out of

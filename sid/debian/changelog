@@ -1,3 +1,9 @@
+trac (0.10-3) unstable; urgency=low
+
+  * 
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Wed, 18 Oct 2006 09:02:00 +0300
+
 trac (0.10-2) unstable; urgency=medium
 
   * debian/control: Added a Conflicts: against libapache2-mod-python2.3 to
