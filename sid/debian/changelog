@@ -1,8 +1,9 @@
 trac (0.10-3) unstable; urgency=low
 
-  * 
+  * debian/control: changed the Conflicts: entry with a versioned oned
+    (Closes: #393842, #384381)
 
- -- Jesus Climent <jesus.climent@hispalinux.es>  Wed, 18 Oct 2006 09:02:00 +0300
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Wed, 18 Oct 2006 11:47:41 +0300
 
 trac (0.10-2) unstable; urgency=medium
 
