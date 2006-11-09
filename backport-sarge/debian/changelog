@@ -1,3 +1,24 @@
+trac (0.10.1-0.sarge.1) stable; urgency=high
+
+  * New upstream release, backported to sarge.
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Thu,  9 Nov 2006 11:59:54 +0200
+
+trac (0.10.1-1) unstable; urgency=high
+
+  * New Upstream Release (Closes: #397683)
+  * Depend on python-psycopg2 (Closes: #397725)
+  * Security fix, hence urgency=high. No DSA or CVS available yet.
+  * Upstream changes (most important ones):
+    - fixed CSRF vulnerability
+    - better database handling
+    - only TICKET_ADMIN can assign a passed milestone to a ticket
+    - failed to upload attachments
+    - more (comprehensive list can be found at
+      http://trac.edgewall.org/query?status=closed&milestone=0.10.1)
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Thu,  9 Nov 2006 11:53:53 +0200
+
 trac (0.10-0.sarge.1) stable; urgency=low
 
   * New upstream release, backported to sarge.
