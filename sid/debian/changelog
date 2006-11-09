@@ -1,6 +1,7 @@
 trac (0.10.1-1) unstable; urgency=high
 
   * New Upstream Release (Closes: #397683)
+  * Depend on python-psycopg2 (Closes: #397725)
   * Security fix, hence urgency=high. No DSA or CVS available yet.
   * Upstream changes (most important ones):
     - fixed CSRF vulnerability
@@ -10,7 +11,7 @@ trac (0.10.1-1) unstable; urgency=high
     - more (comprehensive list can be found at
       http://trac.edgewall.org/query?status=closed&milestone=0.10.1)
 
- -- Jesus Climent <jesus.climent@hispalinux.es>  Thu,  9 Nov 2006 11:33:39 +0200
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Thu,  9 Nov 2006 11:53:53 +0200
 
 trac (0.10-3) unstable; urgency=low
 
