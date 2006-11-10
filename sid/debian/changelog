@@ -1,6 +1,6 @@
-trac (0.10.1-1svn4207) unstable; urgency=high
+trac (0.10.1.svn4207-1) unstable; urgency=high
 
-  * Subversion checkout to fix for Timeline and Browse Source.
+  * Subversion stable checkout to get a fix for Timeline and Browse Source.
   * Urgency high because this is an RC candidate.
 
  -- Jesus Climent <jesus.climent@hispalinux.es>  Fri, 10 Nov 2006 14:25:36 +0200
