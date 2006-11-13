@@ -1,9 +1,19 @@
-trac (0.10.1.svn4207-1) unstable; urgency=high
+trac (0.10.2-1) unstable; urgency=high
+
+  * New upstream release, fixing 3 RC bugs introduced at 0.10.1, which were
+    not triggered in normal conditions.
+    - Fixes deadlock when using authz_file config option
+    - Makes the CSRF code play nice with the XmlRpcPlugin
+    - Fixes Timeline breakage after svn commit when using sqlite
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Mon, 13 Nov 2006 22:46:59 +0200
+
+trac (0.10.1.svn4235-1) unstable; urgency=high
 
   * Subversion stable checkout to get a fix for Timeline and Browse Source.
   * Urgency high because this is an RC candidate.
 
- -- Jesus Climent <jesus.climent@hispalinux.es>  Fri, 10 Nov 2006 14:25:36 +0200
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Fri, 11 Nov 2006 14:25:36 +0200
 
 trac (0.10.1-1) unstable; urgency=high
 
