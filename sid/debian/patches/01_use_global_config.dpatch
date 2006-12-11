@@ -1,0 +1,19 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 01_use_global_config.dpatch by Jesus Climent <jesus.climent@hispalinux.es>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Modify the global config to /etc/trac/
+
+@DPATCH@
+
+--- setup.py.orig	2006-12-12 00:15:30.000000000 +0200
++++ setup.py	2006-12-12 00:16:21.000000000 +0200
+@@ -33,7 +33,7 @@
+      def siteconfig(self):
+          path = self.prefix or self.home
+          path = os.path.expanduser(path)
+-         conf_dir = os.path.join(path, 'share', 'trac', 'conf')
++         conf_dir = os.path.join('etc', 'trac')
+          templates_dir = os.path.join(path, 'share', 'trac', 'templates')
+          htdocs_dir = os.path.join(path, 'share', 'trac', 'htdocs')
+          wiki_dir = os.path.join(path, 'share', 'trac', 'wiki-default')

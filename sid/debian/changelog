@@ -1,3 +1,14 @@
+trac (0.10.3~rc1-1) unstable; urgency=low
+
+  * This is the "Luis Matos" release. Without his help and dedication we would
+    have never had it. Thanks.
+  * New upstream release candidate.
+  * Change the global path for the config file from /usr/share to /etc/trac
+    (Closes: #393226, #337243, #386415, #400826)
+  * The "NoSuchChangeset" problem is solved in this release (Closes: #400489)
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Tue, 12 Dec 2006 00:20:33 +0200
+
 trac (0.10.2-1) unstable; urgency=high
 
   * New upstream release, fixing 3 RC bugs introduced at 0.10.1, which were
