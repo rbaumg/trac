@@ -1,7 +1,7 @@
 Source: trac
 Section: web
 Priority: optional
-Build-Depends: cdbs (>= 0.4.43), python-all-dev, python-support (>= 0.3), debhelper (>= 4.1.0)
+Build-Depends: cdbs (>= 0.4.43), python-all-dev, python-support (>= 0.3), debhelper (>= 4.1.0), dpatch
 Maintainer: Jesus Climent <jesus.climent@hispalinux.es>
 Uploaders: Otavio Salvador <otavio@debian.org>, Andres Salomon <dilinger@debian.org>
 Standards-Version: 3.7.2
