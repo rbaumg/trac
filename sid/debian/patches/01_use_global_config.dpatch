@@ -13,7 +13,7 @@
           path = self.prefix or self.home
           path = os.path.expanduser(path)
 -         conf_dir = os.path.join(path, 'share', 'trac', 'conf')
-+         conf_dir = os.path.join('etc', 'trac')
++         conf_dir = os.path.join('/etc', 'trac')
           templates_dir = os.path.join(path, 'share', 'trac', 'templates')
           htdocs_dir = os.path.join(path, 'share', 'trac', 'htdocs')
           wiki_dir = os.path.join(path, 'share', 'trac', 'wiki-default')

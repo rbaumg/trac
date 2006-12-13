@@ -1,3 +1,12 @@
+trac (0.10.3-1) unstable; urgency=low
+
+  * New upstream upload. Final 0.10.3 release that will hopefully make it into
+    Debian 4.0 etch.
+  * Add a NEWS entry for trac.ini being moved to /etc/trac/trac.ini 
+    (Closes: #402937)
+
+ -- Jesus Climent <jesus.climent@hispalinux.es>  Wed, 13 Dec 2006 23:18:45 +0200
+
 trac (0.10.3~rc1-1) unstable; urgency=low
 
   * This is the "Luis Matos" release. Without his help and dedication we would
